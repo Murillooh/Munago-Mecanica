@@ -1,19 +1,34 @@
 import React, { useState, useMemo } from 'react';
-import { motion } from 'motion/react';
-import { 
-  History, 
-  ArrowDownLeft, 
+import {
+  ArrowDownLeft,
   ArrowUpRight,
   FileText,
   FileSpreadsheet,
   Search,
-  Filter,
-  Package
+  History
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { useApp } from '../context/AppContext';
+import { useApp, type Transaction } from '../context/AppContext';
 import { exportTransactionsToPDF } from '../lib/pdfExport';
+import { parseDate } from '../components/dashboard/utils';
+
+const timeOf = (t: Transaction) => parseDate(t.timestamp)?.getTime() ?? 0;
+
+const dayLabel = (d: Date) => {
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Hoje';
+  if (d.toDateString() === yesterday.toDateString()) return 'Ontem';
+  return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const fmtQty = (n: number) => n.toLocaleString('pt-BR');
+
+// Células no estilo planilha: linhas de grade finas e altura baixa
+const th = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 border-b border-r last:border-r-0 border-zinc-200 dark:border-zinc-800 whitespace-nowrap';
+const td = 'px-3 py-1.5 border-b border-r last:border-r-0 border-zinc-100 dark:border-zinc-800/70';
 
 export const Transactions = () => {
   const { transactions, settings } = useApp();
@@ -21,37 +36,49 @@ export const Transactions = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'in' | 'out'>('all');
 
   const filteredTransactions = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
     return (transactions || []).filter(t => {
-      const matchesSearch = 
-        (t.productName && t.productName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (t.userName && t.userName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (t.reason && t.reason.toLowerCase().includes(searchTerm.toLowerCase()));
-
+      const matchesSearch = !q ||
+        t.productName?.toLowerCase().includes(q) ||
+        t.userName?.toLowerCase().includes(q) ||
+        t.reason?.toLowerCase().includes(q);
       const matchesType = typeFilter === 'all' || t.type === typeFilter;
-
       return matchesSearch && matchesType;
-    }).sort((a, b) => {
-      const timeA = typeof a.timestamp?.toMillis === 'function' ? a.timestamp.toMillis() : new Date(a.timestamp || 0).getTime();
-      const timeB = typeof b.timestamp?.toMillis === 'function' ? b.timestamp.toMillis() : new Date(b.timestamp || 0).getTime();
-      return timeB - timeA;
-    });
+    }).sort((a, b) => timeOf(b) - timeOf(a));
   }, [transactions, searchTerm, typeFilter]);
 
-  const stats = useMemo(() => {
-    const inList = (transactions || []).filter(t => t.type === 'in');
-    const outList = (transactions || []).filter(t => t.type === 'out');
-    const inQty = inList.reduce((acc, t) => acc + (t.quantity || 0), 0);
-    const outQty = outList.reduce((acc, t) => acc + (t.quantity || 0), 0);
+  // Agrupa por dia, mantendo a ordem (mais recente primeiro)
+  const groups = useMemo(() => {
+    const list: { key: string; label: string; rows: Transaction[]; inQty: number; outQty: number }[] = [];
+    filteredTransactions.forEach(t => {
+      const d = parseDate(t.timestamp);
+      const key = d ? d.toDateString() : 'sem-data';
+      let g = list[list.length - 1];
+      if (!g || g.key !== key) {
+        g = { key, label: d ? dayLabel(d) : 'Sem data', rows: [], inQty: 0, outQty: 0 };
+        list.push(g);
+      }
+      g.rows.push(t);
+      if (t.type === 'in') g.inQty += t.quantity || 0;
+      else g.outQty += t.quantity || 0;
+    });
+    return list;
+  }, [filteredTransactions]);
 
-    return {
-      total: (transactions || []).length,
-      inCount: inList.length,
-      outCount: outList.length,
-      inQty,
-      outQty,
-      balance: inQty - outQty
-    };
-  }, [transactions]);
+  const stats = useMemo(() => {
+    let inQty = 0, outQty = 0, inCount = 0, outCount = 0;
+    filteredTransactions.forEach(t => {
+      if (t.type === 'in') { inQty += t.quantity || 0; inCount += 1; }
+      else { outQty += t.quantity || 0; outCount += 1; }
+    });
+    return { total: filteredTransactions.length, inQty, outQty, inCount, outCount, balance: inQty - outQty };
+  }, [filteredTransactions]);
+
+  const counts = useMemo(() => ({
+    all: (transactions || []).length,
+    in: (transactions || []).filter(t => t.type === 'in').length,
+    out: (transactions || []).filter(t => t.type === 'out').length,
+  }), [transactions]);
 
   const handleExportPDF = () => {
     if (!filteredTransactions || filteredTransactions.length === 0) {
@@ -85,7 +112,7 @@ export const Transactions = () => {
 
     try {
       const data = filteredTransactions.map(t => ({
-        'Data / Hora': t.timestamp?.toDate ? t.timestamp.toDate().toLocaleString('pt-BR') : 'Data não registrada',
+        'Data / Hora': parseDate(t.timestamp)?.toLocaleString('pt-BR') ?? 'Data não registrada',
         'Produto': t.productName || '',
         'Tipo': t.type === 'in' ? 'Entrada (+)' : 'Saída (-)',
         'Quantidade': t.quantity || 0,
@@ -105,252 +132,182 @@ export const Transactions = () => {
     }
   };
 
+  const filterButtons = [
+    { value: 'all' as const, label: 'Todas', count: counts.all },
+    { value: 'in' as const, label: 'Entradas', count: counts.in },
+    { value: 'out' as const, label: 'Saídas', count: counts.out },
+  ];
+
   return (
-    <div className="space-y-8 pb-32">
-      {/* Header and Action Buttons */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h2 className="text-3xl md:text-4xl font-black text-zinc-900 dark:text-white tracking-widest uppercase">
-            Histórico Logístico
-          </h2>
-          <p className="text-zinc-500 dark:text-zinc-400 font-bold mt-1">
-            Auditagem completa e rastreabilidade de todas as entradas e saídas.
-          </p>
+    // No desktop a página ocupa exatamente a altura da tela (descontando o py-6 do <main>) e só a planilha rola.
+    <div className="w-full flex flex-col gap-5 lg:h-[calc(100dvh-3rem)]">
+      {/* Cabeçalho */}
+      <div className="shrink-0 flex items-center justify-between gap-4 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Movimentações</h1>
+          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Todas as entradas e saídas do estoque, por dia.</p>
         </div>
-
-        {/* Export Toolbar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button 
-            onClick={handleExportPDF}
-            className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-md shadow-rose-600/20 active:scale-95 cursor-pointer"
-            title="Exportar Relatório de Auditoria em formato PDF"
-          >
-            <FileText size={18} />
-            Relatório PDF
-          </button>
-
-          <button 
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
             onClick={handleExportExcel}
-            className="flex items-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 px-5 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-95 shadow-sm cursor-pointer"
-            title="Exportar dados para planilha Excel (.xlsx)"
+            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            title="Exportar a lista filtrada para Excel (.xlsx)"
           >
-            <FileSpreadsheet size={18} />
+            <FileSpreadsheet size={15} className="text-emerald-600" aria-hidden="true" />
             Excel
           </button>
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            title="Exportar a lista filtrada em PDF"
+          >
+            <FileText size={15} className="text-rose-600" aria-hidden="true" />
+            PDF
+          </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-5 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Total Operações</span>
-          <p className="text-2xl font-black text-zinc-900 dark:text-white mt-1 tabular-nums">
-            {stats.total}
-          </p>
-          <span className="text-[10px] font-bold text-zinc-400 mt-2">Registros auditados</span>
-        </div>
-
-        <div className="p-5 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Entradas (+)</span>
-            <ArrowDownLeft size={16} className="text-emerald-600 dark:text-emerald-400" />
+      {/* Planilha */}
+      <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs overflow-hidden">
+        {/* Barra de ferramentas + resumo do que está filtrado */}
+        <div className="shrink-0 flex flex-col lg:flex-row lg:items-center gap-3 px-3 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900">
+          <div className="relative lg:w-80">
+            <label htmlFor="tx-search" className="sr-only">Filtrar movimentações</label>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={15} aria-hidden="true" />
+            <input
+              id="tx-search"
+              type="search"
+              placeholder="Produto, operador ou motivo"
+              className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-colors"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 tabular-nums">
-            +{stats.inQty.toLocaleString('pt-BR')} <span className="text-xs font-bold text-zinc-400">un.</span>
-          </p>
-          <span className="text-[10px] font-bold text-zinc-400 mt-2">{stats.inCount} movimentações</span>
-        </div>
 
-        <div className="p-5 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-widest text-red-500 dark:text-rose-400">Saídas (-)</span>
-            <ArrowUpRight size={16} className="text-red-500 dark:text-rose-400" />
+          <div className="flex items-center gap-1 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200/70 dark:border-zinc-700 w-fit" role="group" aria-label="Tipo de movimentação">
+            {filterButtons.map(f => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setTypeFilter(f.value)}
+                aria-pressed={typeFilter === f.value}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                  typeFilter === f.value
+                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                }`}
+              >
+                {f.label}
+                <span className="tabular-nums text-[10px] font-bold text-zinc-400">{f.count}</span>
+              </button>
+            ))}
           </div>
-          <p className="text-2xl font-black text-red-500 dark:text-rose-400 mt-1 tabular-nums">
-            -{stats.outQty.toLocaleString('pt-BR')} <span className="text-xs font-bold text-zinc-400">un.</span>
-          </p>
-          <span className="text-[10px] font-bold text-zinc-400 mt-2">{stats.outCount} movimentações</span>
+
+          <dl className="flex items-center gap-4 lg:ml-auto text-xs tabular-nums">
+            <div className="flex items-center gap-1.5">
+              <dt className="text-zinc-500">Registros</dt>
+              <dd className="font-semibold text-zinc-900 dark:text-white">{fmtQty(stats.total)}</dd>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <dt className="text-zinc-500">Entradas</dt>
+              <dd className="font-semibold text-emerald-600 dark:text-emerald-400">+{fmtQty(stats.inQty)}</dd>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <dt className="text-zinc-500">Saídas</dt>
+              <dd className="font-semibold text-red-600 dark:text-red-400">-{fmtQty(stats.outQty)}</dd>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <dt className="text-zinc-500">Saldo</dt>
+              <dd className={`font-semibold ${stats.balance >= 0 ? 'text-zinc-900 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>
+                {stats.balance >= 0 ? '+' : ''}{fmtQty(stats.balance)}
+              </dd>
+            </div>
+          </dl>
         </div>
 
-        <div className="p-5 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">Saldo Líquido</span>
-          <p className={`text-2xl font-black mt-1 tabular-nums ${stats.balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
-            {stats.balance >= 0 ? '+' : ''}{stats.balance.toLocaleString('pt-BR')} <span className="text-xs font-bold text-zinc-400">un.</span>
-          </p>
-          <span className="text-[10px] font-bold text-zinc-400 mt-2">Fluxo de volume</span>
-        </div>
-      </div>
-
-      {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Filtrar por produto, operador ou motivo..." 
-            className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl font-bold text-xs outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setTypeFilter('all')}
-            className={`flex-1 sm:flex-initial px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              typeFilter === 'all'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
-                : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-            }`}
-          >
-            Todos ({transactions.length})
-          </button>
-          <button
-            onClick={() => setTypeFilter('in')}
-            className={`flex-1 sm:flex-initial px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              typeFilter === 'in'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 border border-zinc-100 dark:border-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/20'
-            }`}
-          >
-            Entradas
-          </button>
-          <button
-            onClick={() => setTypeFilter('out')}
-            className={`flex-1 sm:flex-initial px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              typeFilter === 'out'
-                ? 'bg-red-500 text-white shadow-sm'
-                : 'bg-white dark:bg-zinc-900 text-red-500 dark:text-rose-400 border border-zinc-100 dark:border-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/20'
-            }`}
-          >
-            Saídas
-          </button>
-        </div>
-      </div>
-
-      {/* Table Container */}
-      <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-xl overflow-hidden">
-        <div className="overflow-x-auto hidden md:block">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-100 dark:border-zinc-700">
-                <th className="px-8 py-5 text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Temporal</th>
-                <th className="px-8 py-5 text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Produto / Item</th>
-                <th className="px-8 py-5 text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center">Tipo de Fluxo</th>
-                <th className="px-8 py-5 text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center">Quantidade</th>
-                <th className="px-8 py-5 text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Operador</th>
-                <th className="px-8 py-5 text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Justificativa</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {filteredTransactions.map((t, i) => (
-                <motion.tr 
-                  key={t.id} 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: Math.min(i * 0.03, 0.5) }}
-                  className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group"
-                >
-                  <td className="px-8 py-5 text-xs font-black text-zinc-600 dark:text-zinc-400 tabular-nums uppercase">
-                    {t.timestamp?.toDate ? t.timestamp.toDate().toLocaleString('pt-BR') : 'Recente'}
-                  </td>
-                  <td className="px-8 py-5">
-                    <p className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight group-hover:text-blue-600 transition-colors">
-                      {t.productName}
-                    </p>
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex justify-center">
-                      <span className={`inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl ${
-                        t.type === 'in' 
-                          ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' 
-                          : 'text-red-500 dark:text-rose-400 bg-red-50 dark:bg-rose-900/20 shadow-inner shadow-red-500/5'
-                      }`}>
-                        {t.type === 'in' ? <ArrowDownLeft size={12} strokeWidth={3} /> : <ArrowUpRight size={12} strokeWidth={3} />}
-                        {t.type === 'in' ? 'Entrada' : 'Saída'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-center">
-                    <p className={`text-lg font-black tracking-tighter tabular-nums ${t.type === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                      {t.type === 'in' ? '+' : '-'}{t.quantity}
-                    </p>
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-[10px] font-black text-zinc-700 dark:text-zinc-300">
-                        {t.userName?.charAt(0) || 'S'}
-                      </div>
-                      <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 truncate max-w-[140px]">
-                        {t.userName || 'Sistema'}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-8 py-5">
-                    <p className="text-xs text-zinc-500 dark:text-zinc-500 italic font-medium leading-relaxed">
-                      {t.reason || 'S/ justificativa'}
-                    </p>
-                  </td>
-                </motion.tr>
-              ))}
-
-              {filteredTransactions.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-8 py-16 text-center text-zinc-400 italic font-black text-xs uppercase tracking-widest opacity-60">
-                    Nenhuma movimentação encontrada com os filtros selecionados.
-                  </td>
+        {filteredTransactions.length > 0 ? (
+          <div className="flex-1 min-h-0 overflow-auto max-h-[70dvh] lg:max-h-none">
+            <table className="w-full min-w-[760px] text-xs border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900">
+                <tr className="text-left">
+                  <th scope="col" className={`${th} w-12 text-right`}>#</th>
+                  <th scope="col" className={`${th} w-16`}>Hora</th>
+                  <th scope="col" className={th}>Produto</th>
+                  <th scope="col" className={`${th} w-24`}>Tipo</th>
+                  <th scope="col" className={`${th} w-20 text-right`}>Qtd.</th>
+                  <th scope="col" className={`${th} w-40`}>Operador</th>
+                  <th scope="col" className={th}>Justificativa</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile View */}
-        <div className="md:hidden divide-y divide-zinc-100 dark:divide-zinc-800">
-          {filteredTransactions.map(t => (
-            <div key={t.id} className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl ${
-                  t.type === 'in' 
-                    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' 
-                    : 'text-red-500 dark:text-rose-400 bg-red-50 dark:bg-rose-900/20'
-                }`}>
-                  {t.type === 'in' ? <ArrowDownLeft size={12} strokeWidth={3} /> : <ArrowUpRight size={12} strokeWidth={3} />}
-                  {t.type === 'in' ? 'Entrada' : 'Saída'}
-                </span>
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest">
-                  {t.timestamp?.toDate ? t.timestamp.toDate().toLocaleString('pt-BR') : 'Agora'}
-                </span>
-              </div>
-              <div>
-                <p className="text-lg font-black text-zinc-900 dark:text-white uppercase tracking-tight leading-none mb-2">
-                  {t.productName}
-                </p>
-                <div className="flex items-center justify-between mt-1">
-                  <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
-                    Quantidade: <span className={`font-black text-lg ml-1 ${t.type === 'in' ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {t.type === 'in' ? '+' : '-'}{t.quantity}
-                    </span>
-                  </p>
-                  <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest truncate max-w-[150px]">
-                    {t.userName}
-                  </p>
-                </div>
-              </div>
-              {t.reason && (
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 italic bg-zinc-50 dark:bg-zinc-800/80 p-3 rounded-2xl border border-zinc-100 dark:border-zinc-700">
-                  {t.reason}
-                </p>
-              )}
-            </div>
-          ))}
-
-          {filteredTransactions.length === 0 && (
-            <div className="p-16 text-center text-zinc-400 italic uppercase font-black text-xs tracking-widest opacity-40">
-              Nenhuma movimentação encontrada.
-            </div>
-          )}
-        </div>
+              </thead>
+              {(() => {
+                let rowNumber = 0;
+                return groups.map(g => (
+                  <tbody key={g.key}>
+                    <tr>
+                      <th
+                        scope="rowgroup"
+                        colSpan={7}
+                        className="sticky top-[33px] z-[5] px-3 py-1.5 text-left bg-zinc-100/95 dark:bg-zinc-800/95 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-700"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-100 capitalize">{g.label}</span>
+                          <span className="flex items-center gap-3 text-[11px] font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
+                            <span>{g.rows.length} {g.rows.length === 1 ? 'registro' : 'registros'}</span>
+                            {g.inQty > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{fmtQty(g.inQty)} un</span>}
+                            {g.outQty > 0 && <span className="text-red-600 dark:text-red-400">-{fmtQty(g.outQty)} un</span>}
+                          </span>
+                        </div>
+                      </th>
+                    </tr>
+                    {g.rows.map(t => {
+                      rowNumber += 1;
+                      const d = parseDate(t.timestamp);
+                      const isIn = t.type === 'in';
+                      return (
+                        <tr key={t.id} className="even:bg-zinc-50/60 dark:even:bg-zinc-800/20 hover:bg-blue-50/60 dark:hover:bg-blue-950/20 transition-colors">
+                          <td className={`${td} text-right font-mono text-[10px] text-zinc-400 tabular-nums`}>{rowNumber}</td>
+                          <td className={`${td} font-mono text-zinc-600 dark:text-zinc-400 tabular-nums whitespace-nowrap`}>
+                            {d ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                          </td>
+                          <td className={`${td} font-medium text-zinc-900 dark:text-white max-w-[280px] truncate`} title={t.productName}>
+                            {t.productName || 'Item sem nome'}
+                          </td>
+                          <td className={`${td} whitespace-nowrap`}>
+                            <span className={`inline-flex items-center gap-1 font-semibold ${isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {isIn ? <ArrowDownLeft size={12} aria-hidden="true" /> : <ArrowUpRight size={12} aria-hidden="true" />}
+                              {isIn ? 'Entrada' : 'Saída'}
+                            </span>
+                          </td>
+                          <td className={`${td} text-right font-mono font-semibold tabular-nums ${isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {isIn ? '+' : '-'}{fmtQty(t.quantity || 0)}
+                          </td>
+                          <td className={`${td} text-zinc-600 dark:text-zinc-400 max-w-[160px] truncate`} title={t.userName}>
+                            {t.userName || 'Sistema'}
+                          </td>
+                          <td className={`${td} text-zinc-500 dark:text-zinc-400 max-w-[320px] truncate`} title={t.reason}>
+                            {t.reason || <span className="text-zinc-300 dark:text-zinc-600">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                ));
+              })()}
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center text-center py-14 px-6">
+            <History size={22} className="text-zinc-300 dark:text-zinc-600" aria-hidden="true" />
+            <p className="mt-3 text-sm font-semibold text-zinc-900 dark:text-white">
+              {(transactions || []).length === 0 ? 'Nenhuma movimentação registrada' : 'Nada encontrado'}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {(transactions || []).length === 0 ? 'As entradas e saídas do estoque aparecem aqui.' : 'Mude a busca ou o filtro de tipo.'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

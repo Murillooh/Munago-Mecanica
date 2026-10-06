@@ -100,10 +100,15 @@ export const serviceOrders = pgTable('service_orders', {
   scheduledDate: text('scheduled_date').notNull(),
   completionDate: text('completion_date'),
   observations: text('observations'),
+  // Repasse congelado no pagamento (status 'paid'); nulos enquanto a OS não está paga.
+  companySharePercent: numeric('company_share_percent', { precision: 5, scale: 2, mode: 'number' }),
+  companyAmount: money('company_amount'),
+  workshopAmount: money('workshop_amount'),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
   createdBy: text('created_by').notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => [index('os_created_idx').on(t.createdAt)]);
+}, (t) => [index('os_created_idx').on(t.createdAt), index('os_paid_idx').on(t.paidAt)]);
 
 export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),

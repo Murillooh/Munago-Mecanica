@@ -16,6 +16,7 @@ import logger from "./server/utils/logger.js";
 import { errorHandler } from "./server/middleware/errorHandler";
 import { createDb } from "./server/db/client";
 import { ChangeBus } from "./server/realtime/events";
+import { startPgChangeListener } from "./server/realtime/pgListener";
 import { createApiRouter } from "./server/api";
 import { authMiddleware, requireAdmin, requirePermission } from "./server/auth/middleware";
 import { createCognitoAdmin, createCognitoVerifier } from "./server/auth/cognito";
@@ -53,6 +54,7 @@ const env = envResult.data;
 const cognitoConfig = { region: env.AWS_REGION, userPoolId: env.COGNITO_USER_POOL_ID, clientId: env.COGNITO_CLIENT_ID };
 const db = createDb(env.DATABASE_URL);
 const bus = new ChangeBus();
+startPgChangeListener(env.DATABASE_URL, bus, logger);
 const verifier = createCognitoVerifier(cognitoConfig);
 const bootstrapAdmins = env.BOOTSTRAP_ADMIN_EMAILS.split(',');
 // Rotas legadas fora do /api/v1 (Gemini, Sheets, download) também exigem login.
@@ -190,6 +192,11 @@ async function startServer() {
   app.post("/api/gemini/chat-stream", ...requireLogin, geminiLimiter, async (req, res, next) => {
     const { model, contents, config, systemInstruction } = req.body;
 
+    // Sem chave a chamada falharia no meio do stream; responde antes com erro claro.
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({ error: "GEMINI_API_KEY não configurada no servidor." });
+    }
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -291,19 +298,25 @@ async function startServer() {
       });
     }
 
+    // Só escopos não sensíveis por padrão: com o app publicado, o Google não mostra
+    // "app não verificado" nem exige verificação. Planilhas (sensível) só para quem usa a sincronização.
     const scopes = [
-      "https://www.googleapis.com/auth/spreadsheets.readonly",
       // Backup/restauração no Google Drive (só arquivos criados pelo app)
       "https://www.googleapis.com/auth/drive.file",
       "https://www.googleapis.com/auth/userinfo.profile",
       "https://www.googleapis.com/auth/userinfo.email",
     ];
+    if (req.query.purpose === "sheets") {
+      scopes.push("https://www.googleapis.com/auth/spreadsheets.readonly");
+    }
 
     const state = (req.query.nonce as string) || "";
 
     const url = oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: scopes,
+      // Mantém o que o usuário já autorizou (ex.: Drive) ao pedir planilhas depois.
+      include_granted_scopes: true,
       prompt: "consent",
       state: state,
       redirect_uri: GOOGLE_REDIRECT_URI,
@@ -423,7 +436,11 @@ async function startServer() {
       if (error.message.includes('invalid_grant') || error.message.includes('invalid_token')) {
         return res.status(401).json({ error: "Sessão expirada ou inválida. Por favor, conecte-se novamente." });
       }
-      
+      // Conta conectada só para o Drive: falta autorizar a leitura de planilhas.
+      if (error.code === 403 && /insufficient.*scope/i.test(error.message)) {
+        return res.status(403).json({ code: "SHEETS_SCOPE_REQUIRED", error: "Sua conta Google está conectada só para o backup. Clique em Conectar Google para autorizar a leitura de planilhas." });
+      }
+
       res.status(500).json({ error: `Erro na API do Google: ${error.message}` });
     }
   });
@@ -487,7 +504,8 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    // extensions: /privacidade e /termos servem os .html públicos (link exigido pelo Google OAuth).
+    app.use(express.static(distPath, { extensions: ['html'] }));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });

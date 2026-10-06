@@ -5,6 +5,7 @@ import { serviceOrders } from '../db/schema';
 import { requirePermission } from '../auth/middleware';
 import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { applyMovement } from '../services/stock';
+import { NO_SPLIT, splitRevenue } from '../services/revenueSplit';
 import { getSettings } from './settings';
 import { newId, type ApiDeps } from './deps';
 
@@ -35,6 +36,8 @@ const osFields = z.object({
   scheduledDate: z.string().min(1).max(40),
   completionDate: optText(40),
   observations: optText(2000),
+  // Só entrada: o servidor calcula e congela o repasse quando a OS fica 'paid'.
+  companySharePercent: z.number().min(0).max(100).nullish(),
 });
 
 // Zod 4 aplica .default() mesmo dentro de .partial(): edição usa os campos sem default.
@@ -57,14 +60,18 @@ export function createServiceOrdersRouter({ db, bus }: ApiDeps) {
   }));
 
   r.post('/service-orders', requirePermission('canManageOS'), asyncHandler(async (req, res) => {
-    const data = osInput.parse(req.body);
+    const { companySharePercent, ...data } = osInput.parse(req.body);
     const user = req.user!;
-    const { allowNegativeStock } = await getSettings(db);
+    const settings = await getSettings(db);
+    const { allowNegativeStock } = settings;
     const id = newId();
     const reason = `Ordem de Serviço #${id.slice(-6).toUpperCase()}`;
+    const split = data.status === 'paid'
+      ? { ...splitRevenue(data.totalAmount, companySharePercent ?? settings.companySharePercent), paidAt: new Date() }
+      : NO_SPLIT;
 
     const { row, notified } = await db.transaction(async (tx) => {
-      const [row] = await tx.insert(serviceOrders).values({ id, ...data, createdBy: user.id }).returning();
+      const [row] = await tx.insert(serviceOrders).values({ id, ...data, ...split, createdBy: user.id }).returning();
       let notified = false;
       for (const item of data.items) {
         const m = await applyMovement(tx, {
@@ -87,9 +94,20 @@ export function createServiceOrdersRouter({ db, bus }: ApiDeps) {
       }
       throw parsed.error;
     }
-    const [row] = await db.update(serviceOrders).set({ ...parsed.data, updatedAt: sql`now()` })
+    const { companySharePercent, ...data } = parsed.data;
+    const [current] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, req.params.id));
+    if (!current) throw new ApiError(404, 'NOT_FOUND', 'Ordem de serviço não encontrada.');
+
+    // Repasse: (re)calculado enquanto a OS está paga, com o % pedido, o já congelado ou o padrão; limpo se sair de 'paid'.
+    const status = data.status ?? current.status;
+    let split: Partial<typeof serviceOrders.$inferInsert> = NO_SPLIT;
+    if (status === 'paid') {
+      const pct = companySharePercent ?? current.companySharePercent ?? (await getSettings(db)).companySharePercent;
+      split = { ...splitRevenue(data.totalAmount ?? current.totalAmount, pct), paidAt: current.paidAt ?? new Date() };
+    }
+
+    const [row] = await db.update(serviceOrders).set({ ...data, ...split, updatedAt: sql`now()` })
       .where(eq(serviceOrders.id, req.params.id)).returning();
-    if (!row) throw new ApiError(404, 'NOT_FOUND', 'Ordem de serviço não encontrada.');
     bus.emitChange('serviceOrders');
     res.json(row);
   }));

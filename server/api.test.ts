@@ -165,6 +165,42 @@ describe('API v1', () => {
       await h.as('viewer').del(`/service-orders/${id}`).expect(403);
       await h.as('editor').del(`/service-orders/${id}`).expect(204);
     });
+
+    describe('repasse no pagamento', () => {
+      it('ao pagar usa o % padrão; OS não paga não tem repasse', async () => {
+        await h.as('admin').patch('/settings', { companySharePercent: 30 }).expect(200);
+        const id = (await h.as('editor').post('/service-orders', os([item(a, 1)]))).body.id;
+        const open = await h.as('editor').patch(`/service-orders/${id}`, { status: 'completed' }).expect(200);
+        expect(open.body).toMatchObject({ companySharePercent: null, companyAmount: null, workshopAmount: null, paidAt: null });
+
+        const paid = await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
+        expect(paid.body).toMatchObject({ companySharePercent: 30, companyAmount: 45, workshopAmount: 105 });
+        expect(paid.body.paidAt).toBeTruthy();
+      });
+
+      it('% ajustado na OS fica congelado mesmo se o padrão mudar', async () => {
+        await h.as('admin').patch('/settings', { companySharePercent: 30 }).expect(200);
+        const id = (await h.as('editor').post('/service-orders', { ...os([item(a, 1)]), status: 'paid', companySharePercent: 40 }).expect(201)).body.id;
+        await h.as('admin').patch('/settings', { companySharePercent: 10 }).expect(200);
+
+        const upd = await h.as('editor').patch(`/service-orders/${id}`, { observations: 'cliente pagou no pix' }).expect(200);
+        expect(upd.body).toMatchObject({ companySharePercent: 40, companyAmount: 60, workshopAmount: 90 });
+      });
+
+      it('centavos: empresa + oficina sempre fecham o total', async () => {
+        const body = { ...os([item(a, 1)]), totalAmount: 100.01, status: 'paid', companySharePercent: 33.33 };
+        const res = await h.as('editor').post('/service-orders', body).expect(201);
+        expect(res.body.companyAmount + res.body.workshopAmount).toBeCloseTo(100.01, 2);
+        expect(res.body.companyAmount).toBe(33.33);
+      });
+
+      it('sair de pago limpa o repasse; % fora de 0–100 → 400', async () => {
+        const id = (await h.as('editor').post('/service-orders', { ...os([item(a, 1)]), status: 'paid', companySharePercent: 50 })).body.id;
+        const back = await h.as('editor').patch(`/service-orders/${id}`, { status: 'completed' }).expect(200);
+        expect(back.body).toMatchObject({ companySharePercent: null, companyAmount: null, paidAt: null });
+        await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid', companySharePercent: 120 }).expect(400);
+      });
+    });
   });
 
   describe('categories', () => {

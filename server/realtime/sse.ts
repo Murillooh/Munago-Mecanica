@@ -12,6 +12,8 @@ export const sseTokenFromQuery: RequestHandler = (req, _res, next) => {
   next();
 };
 
+const COALESCE_MS = 150;
+
 export function sseHandler(bus: ChangeBus): RequestHandler {
   return (req, res) => {
     res.set({
@@ -23,11 +25,23 @@ export function sseHandler(bus: ChangeBus): RequestHandler {
     res.flushHeaders();
     res.write(': connected\n\n');
 
-    const onChange = (r: Resource) => res.write(`event: change\ndata: ${r}\n\n`);
+    // A mesma escrita chega duas vezes (rota da API + trigger do banco): junta numa janela curta
+    // para o cliente refazer cada GET uma vez só.
+    const pending = new Set<Resource>();
+    let flush: ReturnType<typeof setTimeout> | undefined;
+    const onChange = (r: Resource) => {
+      pending.add(r);
+      flush ??= setTimeout(() => {
+        flush = undefined;
+        for (const p of pending) res.write(`event: change\ndata: ${p}\n\n`);
+        pending.clear();
+      }, COALESCE_MS);
+    };
     const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
     bus.on('change', onChange);
     req.on('close', () => {
       clearInterval(ping);
+      clearTimeout(flush);
       bus.off('change', onChange);
     });
   };

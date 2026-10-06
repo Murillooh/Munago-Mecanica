@@ -1,25 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from "../context/AppContext";
 import { apiDelete, apiGet, apiPost, authFetch, hydrateDates, type AppTimestamp } from "../lib/api";
-import { 
-  Send, 
-  Bot, 
-  User, 
-  Loader2, 
-  Sparkles, 
-  Search, 
-  MapPin, 
-  TrendingUp, 
-  AlertTriangle,
-  Info,
+import { parseDate } from './dashboard/utils';
+import {
+  Send,
+  Loader2,
+  Sparkles,
+  Search,
+  MapPin,
   ExternalLink,
   History,
   MessageSquare,
-  Clock,
   Trash2,
-  X
+  Plus,
+  Package,
+  Truck,
+  TrendingUp,
+  FileText
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 
 interface Message {
@@ -27,6 +25,7 @@ interface Message {
   content: string;
   type?: 'text' | 'search' | 'maps';
   groundingMetadata?: any;
+  isError?: boolean;
 }
 
 interface SavedSearch {
@@ -37,33 +36,124 @@ interface SavedSearch {
   metadata?: any;
 }
 
-const AIAssistant = () => {
-  const { user, products, categories, serviceOrders, profile, isEditor } = useApp();
-  const [activeTab, setActiveTab] = useState<'chat' | 'history'>('chat');
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    { 
-      role: 'assistant', 
-      content: `Olá ${profile?.name || 'usuário'}! Sou seu assistente de inteligência. Como posso ajudar você hoje? ${isEditor ? 'Posso analisar seu estoque, buscar preços de mercado ou encontrar fornecedores próximos.' : 'Posso ajudar você a analisar as ordens de serviço ou buscar informações de mercado.'}` 
+const SUGGESTIONS = [
+  { icon: Package, title: 'Estoque crítico', prompt: 'Quais itens do meu estoque estão com nível crítico e o que devo repor primeiro?' },
+  { icon: TrendingUp, title: 'Preços de mercado', prompt: 'Quais os preços médios de pastilhas de freio no mercado hoje?' },
+  { icon: Truck, title: 'Fornecedores', prompt: 'Encontre fornecedores de pneus em São Paulo.' },
+  { icon: FileText, title: 'Ordens de serviço', prompt: 'Resuma as ordens de serviço em aberto e o valor total delas.' },
+];
+
+/** **negrito** dentro de uma linha, sem HTML cru. */
+const renderInline = (text: string) =>
+  text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i} className="font-semibold text-zinc-900 dark:text-white">{part.slice(2, -2)}</strong>
+      : <React.Fragment key={i}>{part}</React.Fragment>
+  );
+
+/** Markdown simples que o Gemini costuma devolver: títulos, listas e parágrafos. */
+const FormattedText: React.FC<{ content: string }> = ({ content }) => {
+  const blocks: React.ReactNode[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  const flush = () => {
+    if (!list) return;
+    const Tag = list.ordered ? 'ol' : 'ul';
+    blocks.push(
+      <Tag key={blocks.length} className={`${list.ordered ? 'list-decimal' : 'list-disc'} pl-5 space-y-1`}>
+        {list.items.map((it, i) => <li key={i}>{renderInline(it)}</li>)}
+      </Tag>
+    );
+    list = null;
+  };
+  content.split('\n').forEach(raw => {
+    const line = raw.trimEnd();
+    const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
+    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const heading = line.match(/^#{1,4}\s+(.*)$/);
+    if (bullet || numbered) {
+      const ordered = Boolean(numbered);
+      if (!list || list.ordered !== ordered) { flush(); list = { ordered, items: [] }; }
+      list.items.push((bullet || numbered)![1]);
+      return;
     }
-  ]);
+    flush();
+    if (!line.trim()) return;
+    if (heading) {
+      blocks.push(<p key={blocks.length} className="font-semibold text-zinc-900 dark:text-white">{renderInline(heading[1])}</p>);
+    } else {
+      blocks.push(<p key={blocks.length}>{renderInline(line)}</p>);
+    }
+  });
+  flush();
+  return <div className="space-y-2.5">{blocks}</div>;
+};
+
+const Sources: React.FC<{ metadata: any }> = ({ metadata }) => {
+  const chunks = metadata?.groundingChunks;
+  if (!chunks?.length) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {chunks.map((chunk: any, i: number) => {
+        const src = chunk.web || chunk.maps;
+        if (!src) return null;
+        const Icon = chunk.web ? Search : MapPin;
+        return (
+          <a
+            key={i}
+            href={src.uri}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 max-w-[220px] px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 text-[11px] text-zinc-600 dark:text-zinc-300 hover:border-blue-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          >
+            <Icon size={11} className="shrink-0" aria-hidden="true" />
+            <span className="truncate">{src.title || (chunk.web ? 'Fonte' : 'Ver no Maps')}</span>
+            <ExternalLink size={10} className="shrink-0" aria-hidden="true" />
+          </a>
+        );
+      })}
+    </div>
+  );
+};
+
+const relativeDate = (ts: AppTimestamp) => {
+  const d = parseDate(ts);
+  if (!d) return '';
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+};
+
+const AIAssistant = () => {
+  const { user, products, serviceOrders, profile, isEditor } = useApp();
+  const [mobilePane, setMobilePane] = useState<'chat' | 'history'>('chat');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<SavedSearch[]>([]);
+  const [historyFilter, setHistoryFilter] = useState('');
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, activeTab]);
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
 
-  // Histórico de pesquisas do usuário (API)
+  // Textarea cresce até ~6 linhas
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
+
   const loadHistory = async () => {
     try {
       setHistory((await apiGet<SavedSearch[]>('/ai-searches')).map(hydrateDates));
     } catch (error) {
       console.error('Error loading AI history:', error);
+      toast.error('Não foi possível carregar o histórico de conversas.');
     }
   };
 
@@ -72,17 +162,30 @@ const AIAssistant = () => {
     loadHistory();
   }, [user?.uid]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const newConversation = () => {
+    setMessages([]);
+    setActiveHistoryId(null);
+    setMobilePane('chat');
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
 
-    const userQuery = input;
-    const userMessage: Message = { role: 'user', content: userQuery };
-    setMessages(prev => [...prev, userMessage]);
+  const send = async (text?: string) => {
+    const userQuery = (text ?? input).trim();
+    if (!userQuery || isLoading) return;
+
+    setMessages(prev => [...prev, { role: 'user', content: userQuery }, { role: 'assistant', content: '', type: 'text' }]);
     setInput('');
+    setActiveHistoryId(null);
     setIsLoading(true);
 
+    const updateLast = (patch: Partial<Message>) =>
+      setMessages(prev => {
+        const next = [...prev];
+        next[next.length - 1] = { ...next[next.length - 1], ...patch };
+        return next;
+      });
+
     try {
-      // Context for the AI
       const inventoryContext = isEditor ? (products || []).map(p => ({
         name: p.name,
         sku: p.sku || 'N/A',
@@ -98,418 +201,326 @@ const AIAssistant = () => {
         vehicle: os.vehiclePlate || 'N/A',
         status: os.status,
         total: os.totalAmount || 0,
-        date: os.createdAt && typeof os.createdAt.toDate === 'function' 
-          ? os.createdAt.toDate().toLocaleDateString('pt-BR') 
-          : 'N/A'
+        date: parseDate(os.createdAt)?.toLocaleDateString('pt-BR') ?? 'N/A'
       }));
 
       const systemInstruction = `
         Você é um assistente especializado em gestão de oficina automotiva e mercado de autopeças.
         ${isEditor ? `Contexto do estoque: ${JSON.stringify(inventoryContext.slice(0, 25))}.` : 'Você não tem acesso direto ao estoque.'}
         Contexto das ordens de serviço: ${JSON.stringify(osContext.slice(0, 15))}.
-        
+
         Capacidades:
         1. Analisar dados internos (estoque/OS) para dar insights.
         2. Buscar preços e fornecedores reais no Brasil usando Google Search.
-        
+
         Sempre responda em Português do Brasil. Seja técnico mas acessível.
       `;
 
       const response = await authFetch('/api/gemini/chat-stream', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: userQuery,
           systemInstruction,
-          config: {
-            maxOutputTokens: 1000,
-            temperature: 0.7,
-          }
+          config: { maxOutputTokens: 1000, temperature: 0.7 }
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        const serverError = errorData.error || "Erro ao conectar com o serviço de IA.";
-        throw new Error(serverError);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao conectar com o serviço de IA.');
       }
 
       const reader = response.body?.getReader();
-      if (!reader) throw new Error("A resposta não pôde ser processada.");
+      if (!reader) throw new Error('A resposta não pôde ser processada.');
 
-      let fullResponse = "";
-      const aiMessage: Message = { 
-        role: 'assistant', 
-        content: "",
-        type: 'text'
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-
+      let fullResponse = '';
+      let metadata: any;
       const decoder = new TextDecoder();
+      let buffer = '';
       let finished = false;
 
       while (!finished) {
         const { value, done } = await reader.read();
         if (done) break;
-        
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-        
+        // Um evento SSE pode chegar partido entre duas leituras: guarda a última linha incompleta.
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.substring(6);
-            if (dataStr === '[DONE]') {
-              finished = true;
-              break;
-            }
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.error) throw new Error(data.error);
-              
-              if (data.text) {
-                fullResponse += data.text;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[newMessages.length - 1] = {
-                    ...newMessages[newMessages.length - 1],
-                    content: fullResponse,
-                    groundingMetadata: data.groundingMetadata || newMessages[newMessages.length - 1].groundingMetadata
-                  };
-                  return newMessages;
-                });
-              }
-            } catch (e) {
-              console.error("Error parsing chunk:", e);
-            }
+          if (!line.startsWith('data: ')) continue;
+          const dataStr = line.substring(6);
+          if (dataStr === '[DONE]') { finished = true; break; }
+          let data: any;
+          try {
+            data = JSON.parse(dataStr);
+          } catch (e) {
+            console.error('Error parsing chunk:', e);
+            continue;
+          }
+          // Erro enviado pelo servidor no meio do stream: precisa chegar ao usuário.
+          if (data.error) throw new Error(data.error);
+          if (data.text) {
+            fullResponse += data.text;
+            metadata = data.groundingMetadata || metadata;
+            updateLast({ content: fullResponse, groundingMetadata: metadata });
           }
         }
       }
 
-      // Salva no histórico após o stream terminar
-      if (user && fullResponse) {
-        await apiPost('/ai-searches', { query: userQuery, response: fullResponse });
-        loadHistory();
-      }
+      if (!fullResponse) throw new Error('A IA não retornou resposta. Tente reformular a pergunta.');
 
+      if (user) {
+        try {
+          await apiPost('/ai-searches', { query: userQuery, response: fullResponse });
+          loadHistory();
+        } catch (err) {
+          console.error('Error saving AI search:', err);
+        }
+      }
     } catch (error: any) {
       console.error('AI Error:', error);
-      let errorMessage = error.message || "Ocorreu um erro ao processar sua solicitação. Tente novamente em alguns instantes.";
-      
-      if (error.message?.includes("GEMINI_API_KEY")) {
-        errorMessage = "Erro de configuração: Chave de API do Gemini não foi encontrada ou está com valor padrão. Por favor, configure GEMINI_API_KEY nas configurações (Secrets) do projeto.";
-      } else if (error.message?.includes("API key") || error.message?.includes("403") || error.message?.includes("401")) {
-        errorMessage = "Erro de autenticação: A chave de API fornecida é inválida ou não tem permissão para este modelo.";
+      let errorMessage = error.message || 'Ocorreu um erro ao processar sua solicitação. Tente novamente em alguns instantes.';
+      if (error.message?.includes('GEMINI_API_KEY')) {
+        errorMessage = 'Erro de configuração: a chave de API do Gemini não foi encontrada. Configure GEMINI_API_KEY no servidor.';
+      } else if (error.message?.includes('API key') || error.message?.includes('403') || error.message?.includes('401')) {
+        errorMessage = 'Erro de autenticação: a chave de API é inválida ou não tem permissão para este modelo.';
       }
-        
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: errorMessage 
-      }]);
+      updateLast({ content: errorMessage, isError: true });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const renderGrounding = (metadata: any) => {
-    if (!metadata) return null;
-
-    const chunks = metadata.groundingChunks;
-    if (!chunks || chunks.length === 0) return null;
-
-    return (
-      <div className="mt-4 space-y-2 border-t border-zinc-100 dark:border-zinc-800 pt-4">
-        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
-          <Info size={10} /> Fontes de Informação
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {chunks.map((chunk: any, i: number) => {
-            if (chunk.web) {
-              return (
-                <a 
-                  key={i} 
-                  href={chunk.web.uri} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all border border-blue-100 dark:border-blue-900/40"
-                >
-                  <Search size={10} />
-                  {chunk.web.title || 'Ver Fonte'}
-                  <ExternalLink size={8} />
-                </a>
-              );
-            }
-            if (chunk.maps) {
-              return (
-                <a 
-                  key={i} 
-                  href={chunk.maps.uri} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg text-[10px] font-medium hover:bg-green-100 dark:hover:bg-green-900/30 transition-all border border-green-100 dark:border-green-900/40"
-                >
-                  <MapPin size={10} />
-                  {chunk.maps.title || 'Ver no Maps'}
-                  <ExternalLink size={8} />
-                </a>
-              );
-            }
-            return null;
-          })}
-        </div>
-      </div>
-    );
+  const openHistory = (item: SavedSearch) => {
+    setMessages([
+      { role: 'user', content: item.query },
+      { role: 'assistant', content: item.response, groundingMetadata: item.metadata }
+    ]);
+    setActiveHistoryId(item.id);
+    setMobilePane('chat');
   };
 
+  const deleteHistory = async (id: string) => {
+    try {
+      await apiDelete(`/ai-searches/${id}`);
+      setHistory(prev => prev.filter(h => h.id !== id));
+      if (activeHistoryId === id) newConversation();
+      toast.success('Conversa excluída.');
+    } catch {
+      toast.error('Erro ao excluir conversa.');
+    } finally {
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const filteredHistory = history.filter(h => !historyFilter.trim() || h.query.toLowerCase().includes(historyFilter.trim().toLowerCase()));
+  const firstName = (profile?.name || '').split(' ')[0];
+
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)] lg:h-[calc(100vh-120px)] bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="p-4 lg:p-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 lg:p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-600/20">
-            <Sparkles size={20} className="lg:w-6 lg:h-6" />
-          </div>
-          <div>
-            <h2 className="text-lg lg:text-xl font-bold text-zinc-900 dark:text-white">Assistente de Mercado</h2>
-            <p className="text-[10px] lg:text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-              <TrendingUp size={10} className="lg:w-3 lg:h-3" /> Inteligência com Grounding (Search & Maps)
-            </p>
-          </div>
+    <div className="w-full flex flex-col gap-4 h-[calc(100dvh-9rem)] lg:h-[calc(100dvh-3rem)]">
+      {/* Cabeçalho */}
+      <div className="shrink-0 flex items-center justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">IA Specialist</h1>
+          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Analisa seu estoque e suas OS e pesquisa preços e fornecedores na web.</p>
         </div>
-        
-        <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl w-full sm:w-auto">
-          <button 
-            onClick={() => setActiveTab('chat')}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 lg:px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'chat' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm dark:shadow-[0_0_10px_rgba(59,130,246,0.2)]' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="lg:hidden flex items-center gap-0.5 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200/70 dark:border-zinc-700" role="group" aria-label="Painel">
+            {([['chat', 'Conversa', MessageSquare], ['history', 'Histórico', History]] as const).map(([v, label, Icon]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setMobilePane(v)}
+                aria-pressed={mobilePane === v}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${mobilePane === v ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500 dark:text-zinc-400'}`}
+              >
+                <Icon size={13} aria-hidden="true" /> {label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={newConversation}
+            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
           >
-            <MessageSquare size={14} className="lg:w-4 lg:h-4" />
-            Chat
-          </button>
-          <button 
-            onClick={() => setActiveTab('history')}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 lg:px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm dark:shadow-[0_0_10px_rgba(59,130,246,0.2)]' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-          >
-            <History size={14} className="lg:w-4 lg:h-4" />
-            Histórico
+            <Plus size={15} aria-hidden="true" /> Nova conversa
           </button>
         </div>
       </div>
 
-      {activeTab === 'chat' ? (
-        <>
-          {/* Messages */}
-          <div 
-            ref={scrollRef}
-            className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
-          >
-            {messages.map((msg, i) => (
-              <motion.div 
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`flex gap-3 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
-                    msg.role === 'user' 
-                      ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400' 
-                      : 'bg-blue-600 text-white'
-                  }`}>
-                    {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
+      <div className="flex-1 min-h-0 flex gap-4">
+        {/* Histórico */}
+        <aside
+          aria-label="Histórico de conversas"
+          className={`${mobilePane === 'history' ? 'flex' : 'hidden'} lg:flex w-full lg:w-72 shrink-0 flex-col bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs overflow-hidden`}
+        >
+          <div className="shrink-0 px-3 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-900 dark:text-white">Histórico</span>
+              <span className="text-[10px] font-bold tabular-nums text-zinc-400">{history.length}</span>
+            </div>
+            <div className="relative">
+              <label htmlFor="ai-history-search" className="sr-only">Buscar no histórico</label>
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={13} aria-hidden="true" />
+              <input
+                id="ai-history-search"
+                type="search"
+                placeholder="Buscar"
+                value={historyFilter}
+                onChange={e => setHistoryFilter(e.target.value)}
+                className="w-full pl-8 pr-2 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+              />
+            </div>
+          </div>
+          <ul className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+            {filteredHistory.map(item => (
+              <li key={item.id}>
+                {deleteConfirmId === item.id ? (
+                  <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg bg-red-50 dark:bg-red-950/30">
+                    <span className="text-xs font-medium text-red-700 dark:text-red-300">Excluir?</span>
+                    <span className="flex gap-1">
+                      <button type="button" onClick={() => setDeleteConfirmId(null)} className="px-2 py-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 rounded-md hover:bg-white/60 dark:hover:bg-zinc-800 cursor-pointer">Não</button>
+                      <button type="button" onClick={() => deleteHistory(item.id)} className="px-2 py-1 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md cursor-pointer">Excluir</button>
+                    </span>
                   </div>
-                  <div className={`p-4 rounded-3xl ${
-                    msg.role === 'user' 
-                      ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-tr-none' 
-                      : 'bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-tl-none shadow-sm'
-                  }`}>
-                    <div className="prose dark:prose-invert prose-sm max-w-none">
-                      {msg.content.split('\n').map((line, j) => (
-                        <p key={j} className="mb-2 last:mb-0">{line}</p>
-                      ))}
-                    </div>
-                    {renderGrounding(msg.groundingMetadata)}
+                ) : (
+                  <div className={`group flex items-start gap-1 rounded-lg transition-colors ${activeHistoryId === item.id ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}>
+                    <button type="button" onClick={() => openHistory(item)} className="flex-1 min-w-0 text-left px-2.5 py-2 cursor-pointer">
+                      <span className={`block text-xs font-medium truncate ${activeHistoryId === item.id ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-800 dark:text-zinc-200'}`}>{item.query}</span>
+                      <span className="block text-[10px] text-zinc-400 tabular-nums mt-0.5">{relativeDate(item.timestamp)}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmId(item.id)}
+                      aria-label={`Excluir conversa: ${item.query}`}
+                      className="mt-1.5 mr-1 p-1 rounded-md text-zinc-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition cursor-pointer"
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
                   </div>
-                </div>
-              </motion.div>
+                )}
+              </li>
             ))}
-            {isLoading && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex justify-start"
-              >
-                <div className="flex gap-3 max-w-[85%]">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                    <Bot size={20} />
-                  </div>
-                  <div className="p-4 rounded-3xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-tl-none shadow-sm flex items-center gap-2 dark:shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-                    <Loader2 size={16} className="animate-spin text-blue-600" />
-                    <span className="text-sm font-medium">Analisando mercado...</span>
-                  </div>
+            {filteredHistory.length === 0 && (
+              <li className="px-3 py-8 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                {history.length === 0 ? 'Suas conversas aparecem aqui.' : 'Nada encontrado.'}
+              </li>
+            )}
+          </ul>
+        </aside>
+
+        {/* Conversa */}
+        <section
+          aria-label="Conversa"
+          className={`${mobilePane === 'chat' ? 'flex' : 'hidden'} lg:flex flex-1 min-w-0 flex-col bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs overflow-hidden`}
+        >
+          <div ref={scrollRef} className="flex-1 overflow-y-auto" aria-live="polite">
+            {messages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center px-6 py-10 text-center">
+                <span className="p-3 rounded-2xl border bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/40">
+                  <Sparkles size={22} aria-hidden="true" />
+                </span>
+                <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-white">
+                  {firstName ? `Olá, ${firstName}. Como posso ajudar?` : 'Como posso ajudar?'}
+                </h2>
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400 max-w-md">
+                  {isEditor ? 'Pergunte sobre seu estoque, suas ordens de serviço, preços de peças ou fornecedores.' : 'Pergunte sobre as ordens de serviço ou pesquise informações de mercado.'}
+                </p>
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-2xl">
+                  {SUGGESTIONS.filter(s => isEditor || s.icon !== Package).map(s => {
+                    const Icon = s.icon;
+                    return (
+                      <button
+                        key={s.title}
+                        type="button"
+                        onClick={() => send(s.prompt)}
+                        className="flex items-start gap-3 p-3 text-left rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-800 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer"
+                      >
+                        <Icon size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-zinc-900 dark:text-white">{s.title}</span>
+                          <span className="block text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{s.prompt}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </motion.div>
+              </div>
+            ) : (
+              <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 space-y-4">
+                {messages.map((msg, i) =>
+                  msg.role === 'user' ? (
+                    <div key={i} className="flex items-end justify-end gap-2">
+                      <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-sm bg-gradient-to-br from-blue-600 to-blue-700 text-white text-sm leading-relaxed whitespace-pre-wrap shadow-sm shadow-blue-600/20">
+                        {msg.content}
+                      </div>
+                      <span className="shrink-0 w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-[10px] font-bold flex items-center justify-center" aria-hidden="true">
+                        {(profile?.name || 'Você').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase()}
+                      </span>
+                    </div>
+                  ) : (
+                    <div key={i} className="flex items-end gap-2">
+                      <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${msg.isError ? 'bg-red-100 dark:bg-red-950/60 text-red-600' : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-600/30'}`} aria-hidden="true">
+                        <Sparkles size={13} />
+                      </span>
+                      <div
+                        className={`max-w-[80%] min-w-0 px-4 py-3 rounded-2xl rounded-bl-sm text-sm leading-relaxed shadow-xs ${
+                          msg.isError
+                            ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300'
+                            : 'bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-200'
+                        }`}
+                      >
+                        {msg.content ? (
+                          <FormattedText content={msg.content} />
+                        ) : (
+                          <span className="flex items-center gap-1 py-1" aria-label="A IA está pensando">
+                            {[0, 150, 300].map(delay => (
+                              <span key={delay} className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-bounce motion-reduce:animate-none" style={{ animationDelay: `${delay}ms` }} />
+                            ))}
+                          </span>
+                        )}
+                        <Sources metadata={msg.groundingMetadata} />
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
             )}
           </div>
 
-          {/* Input */}
-          <div className="p-6 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50">
-            <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 p-2 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm focus-within:ring-2 focus-within:ring-blue-600/20 focus-within:border-blue-600 transition-all dark:focus-within:shadow-[0_0_20px_rgba(59,130,246,0.15)]">
-              <input 
-                type="text" 
-                placeholder="Pergunte sobre preços, fornecedores ou seu estoque..." 
-                className="flex-1 px-4 py-2 bg-transparent outline-none text-zinc-900 dark:text-white text-sm"
+          {/* Entrada */}
+          <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 p-3">
+            <form
+              onSubmit={e => { e.preventDefault(); send(); }}
+              className="max-w-5xl mx-auto flex items-end gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 p-1.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20 transition-colors"
+            >
+              <label htmlFor="ai-input" className="sr-only">Mensagem para a IA</label>
+              <textarea
+                id="ai-input"
+                ref={inputRef}
+                rows={1}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+                }}
+                placeholder="Pergunte sobre preços, fornecedores ou seu estoque…"
+                className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none"
               />
-              <button 
-                onClick={handleSend}
+              <button
+                type="submit"
                 disabled={!input.trim() || isLoading}
-                className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50 disabled:hover:bg-blue-600 shadow-lg shadow-blue-600/20 dark:shadow-blue-500/40"
+                aria-label="Enviar"
+                className="shrink-0 p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                <Send size={20} />
+                {isLoading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
               </button>
-            </div>
-            <div className="mt-3 flex items-center justify-center gap-4 flex-wrap">
-              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1 uppercase tracking-widest font-bold">
-                <Sparkles size={10} /> Sugestões:
-              </p>
-              <button 
-                onClick={() => setInput("Quais os preços médios de pastilhas de freio no mercado?")}
-                className="text-[10px] font-bold text-zinc-500 hover:text-blue-600 dark:text-zinc-400 dark:hover:text-blue-400 transition-colors uppercase tracking-wider"
-              >
-                Preços de Peças
-              </button>
-              <button 
-                onClick={() => setInput("Encontre fornecedores de pneus em São Paulo")}
-                className="text-[10px] font-bold text-zinc-500 hover:text-blue-600 dark:text-zinc-400 dark:hover:text-blue-400 transition-colors uppercase tracking-wider"
-              >
-                Fornecedores Próximos
-              </button>
-              <button 
-                onClick={() => setInput("Quais itens do meu estoque estão com nível crítico?")}
-                className="text-[10px] font-bold text-zinc-500 hover:text-blue-600 dark:text-zinc-400 dark:hover:text-blue-400 transition-colors uppercase tracking-wider"
-              >
-                Análise de Estoque
-              </button>
-            </div>
+            </form>
+            <p className="mt-1.5 text-center text-[10px] text-zinc-400">Enter envia · Shift+Enter quebra a linha · A IA pode errar; confira preços antes de comprar.</p>
           </div>
-        </>
-      ) : (
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {history.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-400 space-y-4">
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-full">
-                <History size={48} strokeWidth={1} />
-              </div>
-              <div className="text-center">
-                <p className="font-bold text-zinc-900 dark:text-white">Nenhuma pesquisa salva</p>
-                <p className="text-sm">Suas interações com o assistente aparecerão aqui.</p>
-              </div>
-              <button 
-                onClick={() => setActiveTab('chat')}
-                className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all"
-              >
-                Começar a Conversar
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {history.map((item) => (
-                <motion.div 
-                  key={item.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all group relative"
-                >
-                  <AnimatePresence>
-                    {deleteConfirmId === item.id && (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center p-4 text-center"
-                      >
-                        <p className="text-sm font-bold text-zinc-900 dark:text-white mb-4">Excluir esta pesquisa?</p>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setDeleteConfirmId(null)}
-                            className="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
-                          >
-                            Cancelar
-                          </button>
-                          <button 
-                            onClick={async () => {
-                              try {
-                                await apiDelete(`/ai-searches/${item.id}`);
-                                setHistory(prev => prev.filter(h => h.id !== item.id));
-                                toast.success('Pesquisa excluída com sucesso!');
-                              } catch (err) {
-                                toast.error('Erro ao excluir pesquisa.');
-                              } finally {
-                                setDeleteConfirmId(null);
-                              }
-                            }}
-                            className="px-4 py-2 text-xs font-bold bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
-                          >
-                            Excluir
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                      <Clock size={14} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">
-                        {item.timestamp && typeof item.timestamp.toDate === 'function' 
-                          ? item.timestamp.toDate().toLocaleString('pt-BR') 
-                          : 'Recentemente'}
-                      </span>
-                    </div>
-                    <button 
-                      onClick={() => setDeleteConfirmId(item.id)}
-                      className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl">
-                      <p className="text-xs font-bold text-zinc-900 dark:text-white line-clamp-2">
-                        "{item.query}"
-                      </p>
-                    </div>
-                    <div className="prose dark:prose-invert prose-xs line-clamp-3 text-zinc-600 dark:text-zinc-400">
-                      {item.response}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-zinc-50 dark:border-zinc-700 flex items-center justify-between">
-                    <button 
-                      onClick={() => {
-                        setMessages([
-                          { role: 'user', content: item.query },
-                          { role: 'assistant', content: item.response, groundingMetadata: item.metadata }
-                        ]);
-                        setActiveTab('chat');
-                      }}
-                      className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest hover:underline"
-                    >
-                      Ver Conversa Completa
-                    </button>
-                    {renderGrounding(item.metadata)}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        </section>
+      </div>
     </div>
   );
 };

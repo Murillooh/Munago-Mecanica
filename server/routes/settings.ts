@@ -15,6 +15,8 @@ export const DEFAULT_SETTINGS = {
   enableSoundAlerts: true,
   monitorAutoScrollEnabled: true,
   monitorScrollIntervalSeconds: 12,
+  /** % do total da OS repassado à empresa no pagamento (o resto é da oficina). Ajustável por OS. */
+  companySharePercent: 0,
   lastBackup: '',
 };
 
@@ -37,6 +39,7 @@ const settingsPatch = z.object({
   enableSoundAlerts: z.boolean(),
   monitorAutoScrollEnabled: z.boolean(),
   monitorScrollIntervalSeconds: z.number().int().min(3).max(600),
+  companySharePercent: z.number().min(0).max(100),
 }).partial().strict();
 
 export async function getSettings(db: DB): Promise<SystemSettings> {

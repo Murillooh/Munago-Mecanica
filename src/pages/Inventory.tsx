@@ -280,7 +280,7 @@ export const Inventory = () => {
   };
 
   const handleGoogleAuth = () => {
-    openGoogleAuth();
+    openGoogleAuth('sheets');
   };
 
   const extractSpreadsheetId = (urlOrId: string): string => {

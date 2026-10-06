@@ -33,6 +33,25 @@ describe('GET /events (SSE)', () => {
     ctrl.abort();
   });
 
+  it('junta avisos repetidos do mesmo recurso (rota + trigger)', async () => {
+    const { h, base } = await listen();
+    const ctrl = new AbortController();
+    const res = await fetch(`${base}/events?token=${encodeURIComponent(TOKENS.viewer)}`, { signal: ctrl.signal });
+    const reader = res.body!.getReader();
+    await reader.read(); // ': connected'
+    h.bus.emitChange('products');
+    h.bus.emitChange('products');
+    h.bus.emitChange('transactions');
+    let text = '';
+    while (!text.includes('data: transactions')) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += new TextDecoder().decode(value);
+    }
+    expect(text.match(/data: products/g)).toHaveLength(1);
+    ctrl.abort();
+  });
+
   it('sem token → 401; pendente → 403', async () => {
     const { base } = await listen();
     expect((await fetch(`${base}/events`)).status).toBe(401);

@@ -119,6 +119,8 @@ export interface SystemSettings {
   enableSoundAlerts?: boolean;
   monitorAutoScrollEnabled?: boolean;
   monitorScrollIntervalSeconds?: number;
+  /** % do total da OS que vai para a empresa no pagamento (o resto é da oficina). */
+  companySharePercent?: number;
   lastFirestoreBackup?: string;
 }
 
@@ -147,6 +149,11 @@ export interface ServiceOrder {
   scheduledDate: string;
   completionDate?: string;
   observations?: string;
+  /** Repasse congelado pelo servidor quando a OS fica 'paid'. Na escrita, só companySharePercent é aceito. */
+  companySharePercent?: number | null;
+  companyAmount?: number | null;
+  workshopAmount?: number | null;
+  paidAt?: string | null;
   createdAt: any;
   updatedAt: any;
   createdBy: string;
@@ -179,6 +186,7 @@ const toProfile = (u: ApiUser): UserProfile => ({
 const SETTINGS_KEYS = [
   'storeName', 'logoUrl', 'contactPhone', 'contactEmail', 'address', 'allowNegativeStock', 'accentColor',
   'autoBackupEnabled', 'enableSoundAlerts', 'monitorAutoScrollEnabled', 'monitorScrollIntervalSeconds',
+  'companySharePercent',
 ] as const;
 
 /** Remove null/undefined para não violar a validação da API em campos opcionais. */
@@ -666,7 +674,8 @@ export const AppProvider = ({ children }: { children: any }) => {
       return;
     }
     // Itens e autor não mudam após criar (estoque já foi baixado).
-    const { id: _id, createdAt: _c, updatedAt: _u, createdBy: _b, items, ...data } = updates;
+    // Valores do repasse são calculados pelo servidor; só o % pode ser enviado.
+    const { id: _id, createdAt: _c, updatedAt: _u, createdBy: _b, companyAmount: _ca, workshopAmount: _wa, paidAt: _pa, items, ...data } = updates;
     const current = serviceOrders.find(o => o.id === id);
     if (items && current && JSON.stringify(items) !== JSON.stringify(current.items)) {
       toast.warning('Os itens de uma OS não podem ser alterados após a criação. Os demais campos foram salvos.');

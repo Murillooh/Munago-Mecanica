@@ -5,20 +5,14 @@ import {
   Plus, 
   Search, 
   Trash2, 
-  Edit2, 
-  Calendar, 
   User, 
   Car, 
   Wrench, 
   Save, 
   X, 
   CheckCircle2, 
-  Printer, 
   MessageCircle, 
   History,
-  ChevronRight,
-  Filter,
-  DollarSign,
   Package,
   PlusCircle,
   MinusCircle,
@@ -27,6 +21,108 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
+import { splitRevenue } from '../../server/services/revenueSplit';
+
+type OSStatus = 'draft' | 'in_progress' | 'completed' | 'paid';
+
+const OS_STEPS: { value: OSStatus; label: string }[] = [
+  { value: 'draft', label: 'Orçamento' },
+  { value: 'in_progress', label: 'Em manutenção' },
+  { value: 'completed', label: 'Aguardando retirada' },
+  { value: 'paid', label: 'Pago' },
+];
+
+const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const STATUS_META: Record<OSStatus, { label: string; chip: string; dot: string; icon: React.ElementType; badge: string }> = {
+  draft: {
+    label: 'Orçamento',
+    chip: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+    dot: 'bg-zinc-400',
+    icon: FileText,
+    badge: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200/70 dark:border-zinc-700',
+  },
+  in_progress: {
+    label: 'Em manutenção',
+    chip: 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
+    dot: 'bg-amber-500',
+    icon: Wrench,
+    badge: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200/50 dark:border-amber-900/40',
+  },
+  completed: {
+    label: 'Aguardando retirada',
+    chip: 'bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300',
+    dot: 'bg-blue-500',
+    icon: Car,
+    badge: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/40',
+  },
+  paid: {
+    label: 'Pago',
+    chip: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+    icon: CheckCircle2,
+    badge: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-900/40',
+  },
+};
+
+type StatusFilter = 'all' | 'active' | OSStatus;
+
+const formatEntry = (value?: string) => {
+  if (!value) return 'Sem data';
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? value : d.toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
+
+const whatsappLink = (phone?: string) => {
+  const digits = (phone || '').replace(/\D/g, '');
+  if (digits.length < 10) return null;
+  return `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}`;
+};
+
+/** Placa em miniatura no padrão Mercosul, igual à da ficha. */
+const PlateBadge: React.FC<{ plate?: string }> = ({ plate }) => (
+  <span className="inline-flex flex-col overflow-hidden rounded-[4px] border border-zinc-900 dark:border-zinc-300 bg-white leading-none shrink-0">
+    <span className="h-[3px] bg-[#003399]" aria-hidden="true" />
+    <span className="px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wider text-zinc-900">
+      {plate || 'S/ PLACA'}
+    </span>
+  </span>
+);
+
+const fieldClass =
+  'w-full rounded-lg border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50 dark:bg-zinc-800/60 px-3.5 py-2.5 text-[15px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-600 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-blue-600/15 disabled:opacity-60';
+
+const Field: React.FC<{ id: string; label: string; hint?: string; children: React.ReactNode }> = ({ id, label, hint, children }) => (
+  <div className="space-y-1.5">
+    <label htmlFor={id} className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      {label}
+      {hint && <span className="ml-1.5 font-normal text-zinc-400">{hint}</span>}
+    </label>
+    {children}
+  </div>
+);
+
+/** Campo de placa desenhado como placa Mercosul: é o que a recepção da oficina reconhece de relance. */
+const PlateInput: React.FC<{ id: string; value: string; onChange: (v: string) => void; disabled?: boolean }> = ({ id, value, onChange, disabled }) => (
+  <div className="w-full max-w-[13.5rem] overflow-hidden rounded-md border-2 border-zinc-900 bg-white shadow-sm transition-shadow focus-within:ring-4 focus-within:ring-blue-600/25 dark:border-zinc-300">
+    <div className="flex items-center justify-between bg-[#003399] px-2 py-[3px] text-[9px] font-semibold tracking-[0.35em] text-white" aria-hidden="true">
+      <span>BR</span>
+      <span>BRASIL</span>
+      <span className="w-3" />
+    </div>
+    <input
+      id={id}
+      value={value}
+      onChange={e => onChange(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+      maxLength={8}
+      placeholder="ABC1D23"
+      autoComplete="off"
+      spellCheck={false}
+      disabled={disabled}
+      className="w-full bg-white py-1.5 text-center font-mono text-[1.6rem] font-bold uppercase tracking-[0.12em] text-zinc-900 outline-none placeholder:text-zinc-300 disabled:opacity-60"
+    />
+  </div>
+);
 
 export const ServiceOrders = () => {
   const { 
@@ -36,7 +132,8 @@ export const ServiceOrders = () => {
     updateServiceOrder, 
     deleteServiceOrder, 
     canManageOS,
-    profile 
+    profile,
+    settings
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,7 +141,7 @@ export const ServiceOrders = () => {
   const [selectedOS, setSelectedOS] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'paid'>('active');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   
   // OS Form State
@@ -56,8 +153,9 @@ export const ServiceOrders = () => {
   const [completionDate, setCompletionDate] = useState('');
   const [generalLaborCost, setGeneralLaborCost] = useState(0);
   const [items, setItems] = useState<any[]>([]);
-  const [osStatus, setOsStatus] = useState<'draft' | 'in_progress' | 'completed' | 'paid'>('draft');
+  const [osStatus, setOsStatus] = useState<OSStatus>('draft');
   const [observations, setObservations] = useState('');
+  const [companyPct, setCompanyPct] = useState(0);
   const [activeModalTab, setActiveModalTab] = useState<'client' | 'items'>('client');
   const [productSearch, setProductSearch] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
@@ -74,6 +172,7 @@ export const ServiceOrders = () => {
       setItems(selectedOS.items || []);
       setOsStatus(selectedOS.status || 'draft');
       setObservations(selectedOS.observations || '');
+      setCompanyPct(selectedOS.companySharePercent ?? settings.companySharePercent ?? 0);
     } else {
       setCustomerName('');
       setCustomerPhone('');
@@ -85,24 +184,52 @@ export const ServiceOrders = () => {
       setItems([]);
       setOsStatus('draft');
       setObservations('');
+      setCompanyPct(settings.companySharePercent ?? 0);
     }
     setActiveModalTab('client');
   }, [selectedOS, isModalOpen]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isProductDropdownOpen) setIsProductDropdownOpen(false);
+      else setIsModalOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isModalOpen, isProductDropdownOpen]);
 
   const totalParts = items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const totalItemsLabor = items.reduce((acc, i) => acc + (i.laborCost * i.quantity), 0);
   const totalOSLabor = totalItemsLabor + generalLaborCost;
   const totalOSAmount = totalParts + totalOSLabor;
+  const split = splitRevenue(totalOSAmount, companyPct);
 
-  const filteredOS = (serviceOrders || []).filter(os => {
-    const matchesSearch = os.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      os.vehiclePlate?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (statusFilter === 'active') return matchesSearch && (os.status === 'draft' || os.status === 'in_progress');
-    if (statusFilter === 'completed') return matchesSearch && os.status === 'completed';
-    if (statusFilter === 'paid') return matchesSearch && os.status === 'paid';
-    return matchesSearch;
+  const allOS = serviceOrders || [];
+  const statusStats = OS_STEPS.map(step => {
+    const list = allOS.filter(os => os.status === step.value);
+    return { ...step, count: list.length, amount: list.reduce((a, os) => a + (os.totalAmount || 0), 0) };
   });
+  const activeCount = allOS.filter(os => os.status === 'draft' || os.status === 'in_progress').length;
+
+  const filteredOS = allOS
+    .filter(os => {
+      const q = searchTerm.trim().toLowerCase();
+      const matchesSearch = !q ||
+        os.customerName?.toLowerCase().includes(q) ||
+        os.vehiclePlate?.toLowerCase().includes(q) ||
+        os.vehicleModel?.toLowerCase().includes(q) ||
+        os.id.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'active') return os.status === 'draft' || os.status === 'in_progress';
+      return os.status === statusFilter;
+    })
+    .sort((a, b) => (b.scheduledDate || '').localeCompare(a.scheduledDate || ''));
+
+  const filterCount = (f: StatusFilter) =>
+    f === 'all' ? allOS.length : f === 'active' ? activeCount : allOS.filter(os => os.status === f).length;
 
   const handleAddItem = (product: any) => {
     const existing = items.find(i => i.productId === product.id);
@@ -150,6 +277,8 @@ export const ServiceOrders = () => {
       status: osStatus,
       observations,
       totalAmount: totalOSAmount,
+      // O servidor calcula e congela os valores; daqui só vai o % (e só quando paga).
+      companySharePercent: osStatus === 'paid' ? companyPct : undefined,
       updatedAt: new Date()
     };
 
@@ -169,508 +298,621 @@ export const ServiceOrders = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-      case 'completed': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'in_progress': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
-      default: return 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400';
-    }
-  };
+  const openOS = (os: any | null) => { setSelectedOS(os); setIsModalOpen(true); };
+
+  const filters: { value: StatusFilter; label: string }[] = [
+    { value: 'active', label: 'Em aberto' },
+    ...OS_STEPS.map(s => ({ value: s.value as StatusFilter, label: s.label })),
+    { value: 'all', label: 'Todas' },
+  ];
 
   return (
-    <div className="space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h2 className="text-4xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase">Ordens de Serviço</h2>
-          <p className="text-zinc-500 dark:text-zinc-400 font-bold mt-1">Gerencie manutenções, clientes e faturamento da oficina.</p>
+    <div className="w-full space-y-8 pb-20">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between gap-4 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Ordens de Serviço</h1>
+          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Orçamentos, manutenções em andamento e faturamento da oficina.</p>
         </div>
-        <div className="flex items-center gap-3">
-          {canManageOS && (
-            <button 
-              onClick={() => { setSelectedOS(null); setIsModalOpen(true); }}
-              className="flex items-center gap-2 px-8 py-3.5 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl active:scale-95"
-            >
-              <Plus size={18} />
-              Gerar Nova OS
-            </button>
-          )}
-        </div>
+        {canManageOS && (
+          <button
+            type="button"
+            onClick={() => openOS(null)}
+            className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 cursor-pointer"
+          >
+            <Plus size={16} aria-hidden="true" />
+            Nova OS
+          </button>
+        )}
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
+      {/* Resumo por etapa: clica e filtra */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {statusStats.map(s => {
+          const meta = STATUS_META[s.value];
+          const Icon = meta.icon;
+          const selected = statusFilter === s.value;
+          return (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => setStatusFilter(selected ? 'all' : s.value)}
+              aria-pressed={selected}
+              className={`text-left p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border shadow-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
+                selected ? 'border-blue-500 ring-1 ring-blue-500/40' : 'border-zinc-200/70 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{meta.label}</span>
+                <span className={`p-1.5 rounded-lg border ${meta.badge}`}>
+                  <Icon size={14} aria-hidden="true" />
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">{s.count}</p>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">{brl.format(s.amount)}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Busca + filtros */}
+      <div className="flex flex-col lg:flex-row gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-5 top-1/2 -track-y-1/2 text-zinc-400 -translate-y-1/2" size={20} />
-          <input 
-            type="text" 
-            placeholder="Buscar por cliente, placa ou detalhes..." 
-            className="w-full pl-14 pr-6 py-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-sm"
+          <label htmlFor="os-search" className="sr-only">Buscar ordens de serviço</label>
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={18} aria-hidden="true" />
+          <input
+            id="os-search"
+            type="search"
+            placeholder="Buscar por cliente, placa, modelo ou nº da OS"
+            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-colors"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 p-1.5 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
-          {['all', 'active', 'completed', 'paid'].map(status => (
+        <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/70 dark:border-zinc-700/60 overflow-x-auto" role="group" aria-label="Filtrar por etapa">
+          {filters.map(f => (
             <button
-              key={status}
-              onClick={() => setStatusFilter(status as any)}
-              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${statusFilter === status ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
+              key={f.value}
+              type="button"
+              onClick={() => setStatusFilter(f.value)}
+              aria-pressed={statusFilter === f.value}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                statusFilter === f.value
+                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              }`}
             >
-              {status === 'all' ? 'Ver Tudo' : status === 'active' ? 'Em Aberto' : status === 'completed' ? 'Concluído' : 'Pago'}
+              {f.label}
+              <span className="tabular-nums text-[10px] font-bold text-zinc-400">{filterCount(f.value)}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <AnimatePresence>
-          {filteredOS.map((os, idx) => (
-            <motion.div 
-              key={os.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: idx * 0.05 }}
-              className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-8 rounded-[3rem] shadow-xl hover:shadow-2xl transition-all group cursor-pointer relative overflow-hidden"
-              onClick={() => { setSelectedOS(os); setIsModalOpen(true); }}
-            >
-              <div className="absolute top-0 right-0 p-8 text-blue-600/5 group-hover:scale-110 transition-transform">
-                <FileText size={120} />
-              </div>
-
-              <div className="flex justify-between items-start mb-6 relative z-10">
-                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest ${getStatusColor(os.status)} shadow-sm`}>
-                  {os.status}
-                </div>
-                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{os.scheduledDate?.slice(0, 10)}</p>
-              </div>
-
-              <div className="mb-6 relative z-10">
-                <h4 className="text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tight truncate group-hover:text-blue-600 transition-colors uppercase">{os.customerName}</h4>
-                <div className="flex items-center gap-3 mt-2">
-                  <div className="flex items-center gap-1.5 text-xs font-black text-zinc-400 bg-zinc-50 dark:bg-zinc-800 px-3 py-1 rounded-lg">
-                    <Car size={14} className="text-blue-600" />
-                    {os.vehiclePlate || 'S/ PLACA'}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 uppercase">
-                    <Wrench size={14} />
-                    {os.vehicleModel || 'Modelo'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-4 pt-6 border-t border-zinc-50 dark:border-zinc-800">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Total Peças</p>
-                  <p className="text-lg font-black text-zinc-900 dark:text-white tabular-nums">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(os.items?.reduce((a:any, b:any)=>a+(b.price*b.quantity), 0) || 0)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Mão de Obra</p>
-                  <p className="text-lg font-black text-zinc-900 dark:text-white tabular-nums">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((os.generalLaborCost || 0) + (os.items?.reduce((a:any, b:any)=>a+(b.laborCost*b.quantity), 0) || 0))}
-                  </p>
-                </div>
-              </div>
-
-              {os.items && os.items.length > 0 && (
-                <div className="mb-8 pt-4 border-t border-dashed border-zinc-100 dark:border-zinc-800 space-y-3">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Itens Inclusos</p>
-                  {os.items.map((item: any, i: number) => (
-                    <div key={i} className="flex justify-between items-start text-xs border-b border-zinc-50 dark:border-zinc-800/50 pb-2 last:border-0 last:pb-0">
-                      <div className="flex-1 pr-2">
-                        <span className="font-bold text-zinc-700 dark:text-zinc-300 uppercase block mb-0.5">
-                          {item.quantity}x {item.name}
-                        </span>
-                        <div className="text-[9px] text-zinc-400 font-medium tracking-wide">
-                          Peça: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)} <span className="mx-1 text-zinc-300">|</span> 
-                          M.O: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.laborCost)}
-                        </div>
-                      </div>
-                      <div className="text-right pl-2">
-                         <div className="font-black text-blue-600 mb-0.5">
-                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((item.price + item.laborCost) * item.quantity)}
-                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between pt-6 border-t border-zinc-50 dark:border-zinc-800">
-                 <div>
-                    <p className="text-[8px] font-black uppercase tracking-widest text-blue-600 mb-1">Faturamento Total</p>
-                    <p className="text-3xl font-black text-blue-600 tabular-nums tracking-tighter">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(os.totalAmount || 0)}
-                    </p>
-                 </div>
-                 <div className="flex gap-2">
-                    <button className="p-3 bg-zinc-50 dark:bg-zinc-800 text-zinc-400 hover:text-blue-600 rounded-2xl transition-all shadow-sm">
-                      <Printer size={18} />
+      {/* Lista */}
+      {filteredOS.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+          {filteredOS.map(os => {
+            const status: OSStatus = (os.status as OSStatus) in STATUS_META ? os.status : 'draft';
+            const meta = STATUS_META[status];
+            const stepIndex = OS_STEPS.findIndex(s => s.value === status);
+            const parts = (os.items || []).reduce((a: number, i: any) => a + (i.price || 0) * (i.quantity || 0), 0);
+            const labor = (os.generalLaborCost || 0) + (os.items || []).reduce((a: number, i: any) => a + (i.laborCost || 0) * (i.quantity || 0), 0);
+            const itemCount = (os.items || []).length;
+            const wa = whatsappLink(os.customerPhone);
+            return (
+              <article
+                key={os.id}
+                onClick={() => openOS(os)}
+                className="group flex flex-col bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md transition-all cursor-pointer"
+              >
+                <div className="px-4 pt-3.5 pb-3 space-y-2.5 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); openOS(os); }}
+                      className="min-w-0 truncate text-left text-sm font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors focus-visible:outline-none focus-visible:underline cursor-pointer"
+                    >
+                      {os.customerName || 'Cliente sem nome'}
                     </button>
-                    {canManageOS && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm(os.id); }}
-                        className="p-3 bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all shadow-sm"
+                    <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${meta.chip}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
+                      {meta.label}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 min-w-0 text-xs text-zinc-500 dark:text-zinc-400">
+                    <PlateBadge plate={os.vehiclePlate} />
+                    <span className="truncate">{os.vehicleModel || 'Modelo não informado'}</span>
+                    <span className="ml-auto shrink-0 font-mono text-[10px] text-zinc-400">#{os.id.slice(-6).toUpperCase()}</span>
+                  </div>
+
+                  {/* Etapas */}
+                  <div className="grid grid-cols-4 gap-1" aria-label={`Etapa ${stepIndex + 1} de 4: ${meta.label}`} role="img">
+                    {OS_STEPS.map((s, i) => (
+                      <span key={s.value} className={`h-1 rounded-full ${i <= stepIndex ? meta.dot : 'bg-zinc-200 dark:bg-zinc-700'}`} />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="px-4 py-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p
+                      className="text-base font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums"
+                      title={`Peças ${brl.format(parts)} · Mão de obra ${brl.format(labor)}`}
+                    >
+                      {brl.format(os.totalAmount || 0)}
+                    </p>
+                    {os.status === 'paid' && os.companyAmount != null ? (
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums truncate" title={`Repasse: empresa ${os.companySharePercent}% · oficina ${100 - (os.companySharePercent ?? 0)}%`}>
+                        Empresa {brl.format(os.companyAmount)} · Oficina {brl.format(os.workshopAmount ?? 0)}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums truncate">
+                        {formatEntry(os.scheduledDate)} · {itemCount} {itemCount === 1 ? 'item' : 'itens'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center shrink-0">
+                    {wa && (
+                      <a
+                        href={wa}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        aria-label={`Falar com ${os.customerName} no WhatsApp`}
+                        title="WhatsApp do cliente"
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
                       >
-                        <Trash2 size={18} />
+                        <MessageCircle size={15} aria-hidden="true" />
+                      </a>
+                    )}
+                    {canManageOS && (
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setDeleteConfirm(os.id); }}
+                        aria-label={`Excluir OS de ${os.customerName}`}
+                        title="Excluir OS"
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={15} aria-hidden="true" />
                       </button>
                     )}
-                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* Modal - Large Side Drawer Style or Centered */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-zinc-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, x: 100 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 100 }}
-              className="bg-white dark:bg-zinc-900 w-full max-w-5xl h-full sm:h-auto sm:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col"
-            >
-              <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900">
-                <div className="flex items-center gap-6">
-                  <div className="w-14 h-14 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white rounded-3xl flex items-center justify-center shadow-xl">
-                    <FileText size={28} />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tight">
-                      {selectedOS ? 'Auditoria de OS' : 'Gerar Ordem de Serviço'}
-                    </h3>
-                    <div className="flex items-center gap-4 mt-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">ID: {selectedOS?.id?.slice(-6) || 'NOVA'}</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsModalOpen(false)} 
-                  className="p-4 bg-white dark:bg-zinc-800 text-zinc-400 hover:text-zinc-600 rounded-3xl transition-all shadow-sm"
-                >
-                  <X size={24} />
-                </button>
-              </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center text-center py-16 px-6 bg-white dark:bg-zinc-900/90 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
+          <span className="p-3 rounded-xl border bg-zinc-50 dark:bg-zinc-800 border-zinc-200/70 dark:border-zinc-700 text-zinc-400">
+            <FileText size={22} aria-hidden="true" />
+          </span>
+          <p className="mt-4 text-sm font-semibold text-zinc-900 dark:text-white">
+            {searchTerm ? 'Nenhuma OS encontrada' : allOS.length === 0 ? 'Nenhuma ordem de serviço ainda' : 'Nada nesta etapa'}
+          </p>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-sm">
+            {searchTerm
+              ? 'Confira a grafia ou busque pela placa.'
+              : allOS.length === 0
+                ? 'Abra a primeira OS para começar a acompanhar a oficina.'
+                : 'Troque o filtro para ver as outras etapas.'}
+          </p>
+          {canManageOS && allOS.length === 0 && (
+            <button
+              type="button"
+              onClick={() => openOS(null)}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors cursor-pointer"
+            >
+              <Plus size={16} aria-hidden="true" /> Nova OS
+            </button>
+          )}
+        </div>
+      )}
 
-              <div className="flex border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-                <button 
-                  onClick={() => setActiveModalTab('client')}
-                  className={`flex-1 py-6 text-xs font-black uppercase tracking-widest relative ${activeModalTab === 'client' ? 'text-blue-600' : 'text-zinc-400'}`}
-                >
-                  Módulo Cliente & Veículo
-                  {activeModalTab === 'client' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-10 right-10 h-1 bg-blue-600 rounded-full" />}
-                </button>
-                <button 
-                  onClick={() => setActiveModalTab('items')}
-                  className={`flex-1 py-6 text-xs font-black uppercase tracking-widest relative ${activeModalTab === 'items' ? 'text-blue-600' : 'text-zinc-400'}`}
-                >
-                  Lista de Peças & Serviços
-                  {activeModalTab === 'items' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-10 right-10 h-1 bg-blue-600 rounded-full" />}
-                </button>
-              </div>
+      {/* Ficha da OS */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-zinc-950/60 backdrop-blur-sm sm:p-6"
+            onMouseDown={e => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="os-dialog-title"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="flex h-[100dvh] sm:h-auto sm:max-h-[min(860px,calc(100dvh-3rem))] w-full max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl"
+            >
+              {/* Cabeçalho: número da OS + etapa */}
+              <header className="border-b border-zinc-200 dark:border-zinc-800 px-6 pt-5 pb-4 sm:px-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                      OS {selectedOS?.id ? `#${selectedOS.id.slice(-6).toUpperCase()}` : '· rascunho'}
+                    </p>
+                    <h3 id="os-dialog-title" className="mt-0.5 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white">
+                      {selectedOS ? (customerName || 'Ordem de serviço') : 'Nova ordem de serviço'}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    aria-label="Fechar"
+                    className="-mr-2 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
 
-              <div className="flex-1 overflow-y-auto p-10 bg-zinc-50/30 dark:bg-zinc-900/30">
-                 {activeModalTab === 'client' ? (
-                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                      <div className="space-y-8">
-                        <div className="flex items-center gap-3">
-                          <User size={18} className="text-blue-600" />
-                          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Proprietário</h4>
-                        </div>
-                        <div className="space-y-6">
-                           <div className="space-y-1.5">
-                              <label className="text-[11px] font-black text-zinc-500 uppercase tracking-widest ml-1">Nome Completo</label>
-                              <input 
-                                className="w-full bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl p-5 text-zinc-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-sm"
-                                value={customerName}
-                                onChange={e => setCustomerName(e.target.value)}
-                                placeholder="Ex: Rodrigo Albuquerque"
-                              />
-                           </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[11px] font-black text-zinc-500 uppercase tracking-widest ml-1">Telefone / WhatsApp</label>
-                              <input 
-                                className="w-full bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl p-5 text-zinc-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-sm"
-                                value={customerPhone}
-                                onChange={e => setCustomerPhone(e.target.value)}
-                                placeholder="(00) 00000-0000"
-                              />
-                           </div>
-                        </div>
-                      </div>
+                <div role="radiogroup" aria-label="Etapa da ordem de serviço" className="mt-4 grid grid-cols-4 gap-1.5">
+                  {OS_STEPS.map((step, i) => {
+                    const current = OS_STEPS.findIndex(s => s.value === osStatus);
+                    const reached = i <= current;
+                    return (
+                      <button
+                        key={step.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={osStatus === step.value}
+                        disabled={!canManageOS}
+                        onClick={() => setOsStatus(step.value)}
+                        className="group text-left focus-visible:outline-none disabled:cursor-default"
+                      >
+                        <span className={`block h-1 rounded-full transition-colors ${reached ? 'bg-blue-600' : 'bg-zinc-200 dark:bg-zinc-700'} group-focus-visible:ring-2 group-focus-visible:ring-blue-600 group-focus-visible:ring-offset-2 dark:group-focus-visible:ring-offset-zinc-900`} />
+                        <span className={`mt-1.5 block truncate text-xs ${osStatus === step.value ? 'font-semibold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400'} ${canManageOS ? 'group-hover:text-zinc-900 dark:group-hover:text-white' : ''}`}>
+                          {step.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                      <div className="space-y-8">
-                        <div className="flex items-center gap-3">
-                          <Car size={18} className="text-indigo-600" />
-                          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Automóvel</h4>
-                        </div>
-                        <div className="space-y-6">
-                           <div className="grid grid-cols-2 gap-6">
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-black text-zinc-500 uppercase tracking-widest ml-1">Marca / Modelo</label>
-                                <input 
-                                  className="w-full bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl p-5 text-zinc-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-sm"
-                                  value={vehicleModel}
-                                  onChange={e => setVehicleModel(e.target.value)}
-                                  placeholder="Ex: Jeep Compass"
-                                />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-black text-zinc-500 uppercase tracking-widest ml-1">Placa</label>
-                                <input 
-                                  className="w-full bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl p-5 text-zinc-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-sm uppercase tabular-nums"
-                                  value={vehiclePlate}
-                                  onChange={e => setVehiclePlate(e.target.value)}
-                                  placeholder="ABC-1234"
-                                />
-                             </div>
-                           </div>
-                           <div className="grid grid-cols-2 gap-6">
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-black text-zinc-500 uppercase tracking-widest ml-1">Entrada</label>
-                                <input 
-                                  type="datetime-local"
-                                  className="w-full bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl p-5 text-zinc-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-sm"
-                                  value={scheduledDate}
-                                  onChange={e => setScheduledDate(e.target.value)}
-                                />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-black text-zinc-500 uppercase tracking-widest ml-1">Status do Processo</label>
-                                <select 
-                                  className="w-full bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl p-5 text-zinc-900 dark:text-white font-bold outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-sm cursor-pointer"
-                                  value={osStatus}
-                                  onChange={e => setOsStatus(e.target.value as any)}
-                                >
-                                  <option value="draft">Análise / Rascunho</option>
-                                  <option value="in_progress">Em Manutenção</option>
-                                  <option value="completed">Aguardando Retirada</option>
-                                  <option value="paid">Finalizado & Pago</option>
-                                </select>
-                             </div>
-                           </div>
-                        </div>
-                      </div>
-
-                      <div className="lg:col-span-2 space-y-4">
-                        <label className="text-[11px] font-black text-zinc-500 uppercase tracking-widest ml-1">Observações Premium</label>
-                        <textarea 
-                          className="w-full bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-[2.5rem] p-8 text-zinc-900 dark:text-white font-medium outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all shadow-inner resize-none h-40"
-                          value={observations}
-                          onChange={e => setObservations(e.target.value)}
-                          placeholder="Descreva problemas relatados, diagnósticos iniciais ou detalhes técnicos..."
+                {osStatus === 'paid' && (
+                  <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Repasse do pagamento</p>
+                    <div className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      <label htmlFor="os-company-share">Empresa</label>
+                      <div className="relative">
+                        <input
+                          id="os-company-share"
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.5"
+                          inputMode="decimal"
+                          value={companyPct}
+                          onChange={e => setCompanyPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                          disabled={!canManageOS}
+                          className="w-20 rounded-md border border-zinc-200 bg-white py-1 pl-2 pr-6 text-right font-mono text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                         />
+                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-xs text-zinc-400">%</span>
                       </div>
-                   </div>
-                 ) : (
-                   <div className="space-y-10">
-                      <div className="flex flex-col md:flex-row gap-6">
-                        <div className="flex-1 relative">
-                          <SearchIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-400" size={24} />
-                          <input 
-                            placeholder="Buscar produto no estoque..." 
-                            className="w-full pl-16 pr-8 py-6 bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-[2.5rem] font-bold text-lg outline-none focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 shadow-xl"
-                            value={productSearch}
-                            onChange={e => { setProductSearch(e.target.value); setIsProductDropdownOpen(true); }}
-                            onFocus={() => setIsProductDropdownOpen(true)}
-                          />
-                          <AnimatePresence>
-                            {isProductDropdownOpen && productSearch && (
-                              <motion.div 
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 10 }}
-                                className="absolute left-0 right-0 top-full mt-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[2rem] shadow-2xl z-50 overflow-hidden"
-                              >
-                                {(products || []).filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())).slice(0, 5).map(p => (
-                                  <button
-                                    key={p.id}
-                                    onClick={() => { handleAddItem(p); setProductSearch(''); setIsProductDropdownOpen(false); }}
-                                    className="w-full p-6 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800 border-b border-zinc-50 dark:border-zinc-800 last:border-0"
-                                  >
-                                    <div className="text-left">
-                                      <p className="font-black text-zinc-900 dark:text-white uppercase tracking-tight">{p.name}</p>
-                                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{p.sku || 'S/ SKU'}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-lg font-black text-blue-600 tabular-nums">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price)}
-                                      </p>
-                                      <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Saldo: {p.quantity}</p>
-                                    </div>
-                                  </button>
-                                ))}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                        <div className="bg-white dark:bg-zinc-800 p-6 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-700 shadow-xl flex items-center gap-10">
-                           <div className="text-center">
-                              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Total Peças</p>
-                              <p className="text-2xl font-black text-zinc-900 dark:text-white tabular-nums">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalParts)}
-                              </p>
-                           </div>
-                           <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-700" />
-                           <div className="text-center">
-                              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Mão de Obra</p>
-                              <p className="text-2xl font-black text-zinc-900 dark:text-white tabular-nums">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalOSLabor)}
-                              </p>
-                           </div>
-                        </div>
-                      </div>
+                      <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">{brl.format(split.companyAmount)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      <span>Oficina</span>
+                      <span className="font-mono text-xs text-zinc-500">{(100 - companyPct).toLocaleString('pt-BR')}%</span>
+                      <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">{brl.format(split.workshopAmount)}</span>
+                    </div>
+                    {selectedOS?.paidAt && (
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 sm:ml-auto">
+                        Pago em {new Date(selectedOS.paidAt).toLocaleDateString('pt-BR')}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </header>
 
-                      <div className="bg-white dark:bg-zinc-900 rounded-[3rem] border border-zinc-100 dark:border-zinc-800 shadow-xl overflow-hidden">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-700 text-left">
-                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Item Selecionado</th>
-                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-center">Quantidade</th>
-                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Valor Unit.</th>
-                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">M.O Unit.</th>
-                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-right">Subtotal</th>
-                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800">
-                            {(items || []).map(item => (
-                              <tr key={item.productId} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-all group">
-                                <td className="px-8 py-6">
-                                  <p className="font-black text-zinc-900 dark:text-white uppercase tracking-tight">{item.name}</p>
-                                </td>
-                                <td className="px-8 py-6">
-                                  <div className="flex items-center justify-center gap-4">
-                                    <button onClick={() => handleUpdateItemQuantity(item.productId, item.quantity - 1)} className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-red-50 text-zinc-400 hover:text-red-500 transition-all"><MinusCircle size={18} /></button>
-                                    <span className="text-xl font-black tabular-nums">{item.quantity}</span>
-                                    <button onClick={() => handleUpdateItemQuantity(item.productId, item.quantity + 1)} className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-blue-50 text-zinc-400 hover:text-blue-600 transition-all"><PlusCircle size={18} /></button>
-                                  </div>
-                                </td>
-                                <td className="px-8 py-6">
-                                  <p className="font-bold text-zinc-600 dark:text-zinc-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}</p>
-                                </td>
-                                <td className="px-8 py-6 font-bold text-zinc-600 dark:text-zinc-400">
-                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.laborCost)}
-                                </td>
-                                <td className="px-8 py-6 text-right">
-                                  <p className="font-black text-blue-600 tabular-nums">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
-                                  </p>
-                                </td>
-                                <td className="px-8 py-6 text-right">
-                                  <button onClick={() => handleRemoveItem(item.productId)} className="p-3 text-zinc-300 hover:text-red-500 transition-colors">
-                                    <Trash2 size={20} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {items.length === 0 && (
-                          <div className="p-20 text-center text-zinc-300 italic uppercase font-black text-xs tracking-widest opacity-30">
-                            Nenhum item adicionado à ordem.
+              <div role="tablist" aria-label="Seções da OS" className="flex gap-6 border-b border-zinc-200 dark:border-zinc-800 px-6 sm:px-8">
+                {([['client', 'Cliente e veículo'], ['items', 'Peças e serviços']] as const).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeModalTab === tab}
+                    onClick={() => setActiveModalTab(tab)}
+                    className={`relative -mb-px flex items-center gap-2 py-3 text-sm transition-colors focus-visible:outline-none focus-visible:text-blue-600 ${activeModalTab === tab ? 'font-semibold text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'}`}
+                  >
+                    {label}
+                    {tab === 'items' && items.length > 0 && (
+                      <span className="rounded bg-zinc-100 px-1.5 py-px font-mono text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{items.length}</span>
+                    )}
+                    {activeModalTab === tab && <motion.span layoutId="os-tab-underline" className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-600" />}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+                {activeModalTab === 'client' ? (
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-0">
+                      <section aria-labelledby="os-client-heading" className="space-y-4 md:pr-8">
+                        <h4 id="os-client-heading" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                          <User size={14} aria-hidden="true" /> Cliente
+                        </h4>
+                        <Field id="os-customer-name" label="Nome">
+                          <input
+                            id="os-customer-name"
+                            className={fieldClass}
+                            value={customerName}
+                            onChange={e => setCustomerName(e.target.value)}
+                            placeholder="Nome do proprietário"
+                            autoComplete="off"
+                            autoFocus={!selectedOS}
+                            disabled={!canManageOS}
+                            required
+                          />
+                        </Field>
+                        <Field id="os-customer-phone" label="Telefone" hint="WhatsApp">
+                          <input
+                            id="os-customer-phone"
+                            type="tel"
+                            inputMode="tel"
+                            className={`${fieldClass} font-mono`}
+                            value={customerPhone}
+                            onChange={e => setCustomerPhone(e.target.value)}
+                            placeholder="(11) 98765-4321"
+                            disabled={!canManageOS}
+                          />
+                        </Field>
+                      </section>
+
+                      <section aria-labelledby="os-vehicle-heading" className="space-y-4 md:border-l md:border-zinc-200 md:pl-8 dark:md:border-zinc-800">
+                        <h4 id="os-vehicle-heading" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                          <Car size={14} aria-hidden="true" /> Veículo
+                        </h4>
+                        <Field id="os-vehicle-plate" label="Placa">
+                          <PlateInput id="os-vehicle-plate" value={vehiclePlate} onChange={setVehiclePlate} disabled={!canManageOS} />
+                        </Field>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <Field id="os-vehicle-model" label="Marca e modelo">
+                            <input
+                              id="os-vehicle-model"
+                              className={fieldClass}
+                              value={vehicleModel}
+                              onChange={e => setVehicleModel(e.target.value)}
+                              placeholder="Jeep Compass 2.0"
+                              disabled={!canManageOS}
+                            />
+                          </Field>
+                          <Field id="os-scheduled-date" label="Entrada">
+                            <input
+                              id="os-scheduled-date"
+                              type="datetime-local"
+                              className={`${fieldClass} font-mono text-sm`}
+                              value={scheduledDate}
+                              onChange={e => setScheduledDate(e.target.value)}
+                              disabled={!canManageOS}
+                            />
+                          </Field>
+                        </div>
+                      </section>
+                    </div>
+
+                    <Field id="os-observations" label="Relato e diagnóstico" hint="o que o cliente contou e o que foi encontrado">
+                      <textarea
+                        id="os-observations"
+                        className={`${fieldClass} h-32 resize-y leading-relaxed`}
+                        value={observations}
+                        onChange={e => setObservations(e.target.value)}
+                        placeholder="Ex.: barulho na suspensão dianteira ao passar em lombada; bucha da bandeja esquerda com folga."
+                        disabled={!canManageOS}
+                      />
+                    </Field>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {canManageOS && (
+                      <div className="relative">
+                        <label htmlFor="os-product-search" className="sr-only">Adicionar peça do estoque</label>
+                        <SearchIcon size={18} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          id="os-product-search"
+                          placeholder="Adicionar peça do estoque: nome ou SKU"
+                          className={`${fieldClass} pl-10`}
+                          value={productSearch}
+                          onChange={e => { setProductSearch(e.target.value); setIsProductDropdownOpen(true); }}
+                          onFocus={() => setIsProductDropdownOpen(true)}
+                          autoComplete="off"
+                        />
+                        {isProductDropdownOpen && productSearch && (
+                          <div className="absolute inset-x-0 top-full z-10 mt-1.5 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                            {(() => {
+                              const q = productSearch.toLowerCase();
+                              const results = (products || []).filter(p => p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q)).slice(0, 6);
+                              if (!results.length) return <p className="px-4 py-3 text-sm text-zinc-500">Nenhuma peça encontrada.</p>;
+                              return results.map(p => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => { handleAddItem(p); setProductSearch(''); setIsProductDropdownOpen(false); }}
+                                  className="flex w-full items-center justify-between gap-4 border-b border-zinc-100 px-4 py-2.5 text-left last:border-0 hover:bg-zinc-50 focus-visible:bg-zinc-50 focus-visible:outline-none dark:border-zinc-800 dark:hover:bg-zinc-800 dark:focus-visible:bg-zinc-800"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
+                                    <span className="font-mono text-[11px] text-zinc-500">{p.sku || 'sem SKU'} · {p.quantity} em estoque</span>
+                                  </span>
+                                  <span className="shrink-0 font-mono text-sm text-zinc-700 dark:text-zinc-300">{brl.format(p.price || 0)}</span>
+                                </button>
+                              ));
+                            })()}
                           </div>
                         )}
                       </div>
+                    )}
 
-                      <div className="flex flex-col md:flex-row gap-8 items-end justify-between bg-zinc-900 p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
-                         <div className="absolute top-0 right-0 p-10 text-white/5">
-                           <DollarSign size={200} />
-                         </div>
-                         <div className="space-y-2 relative z-10">
-                            <label className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">Mão de Obra de Reparo Geral</label>
-                            <input 
-                              type="number"
-                              className="bg-transparent text-5xl font-black text-white outline-none w-64 border-b-2 border-white/10 focus:border-blue-500 transition-colors"
-                              value={generalLaborCost}
-                              onChange={e => setGeneralLaborCost(Number(e.target.value))}
-                            />
-                            <p className="text-white/40 text-[10px] font-medium uppercase tracking-widest">Valor adicional de diagnóstico ou serviço principal</p>
-                         </div>
-                         <div className="text-right relative z-10">
-                            <p className="text-[11px] font-black text-white/40 uppercase tracking-widest mb-1">Total Geral da Auditoria</p>
-                            <p className="text-6xl font-black text-white tabular-nums tracking-tighter">
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalOSAmount)}
-                            </p>
-                         </div>
+                    <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+                      <table className="w-full text-sm">
+                        <thead className="bg-zinc-50 text-left text-xs text-zinc-500 dark:bg-zinc-800/50 dark:text-zinc-400">
+                          <tr>
+                            <th scope="col" className="px-4 py-2.5 font-medium">Item</th>
+                            <th scope="col" className="px-4 py-2.5 text-center font-medium">Qtd.</th>
+                            <th scope="col" className="px-4 py-2.5 text-right font-medium">Peça</th>
+                            <th scope="col" className="px-4 py-2.5 text-right font-medium">Mão de obra</th>
+                            <th scope="col" className="px-4 py-2.5 text-right font-medium">Subtotal</th>
+                            {canManageOS && <th scope="col" className="w-10 px-2"><span className="sr-only">Remover</span></th>}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                          {items.map(item => (
+                            <tr key={item.productId}>
+                              <td className="px-4 py-2.5 font-medium text-zinc-900 dark:text-zinc-100">{item.name}</td>
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center justify-center gap-1">
+                                  {canManageOS && (
+                                    <button type="button" aria-label={`Diminuir ${item.name}`} disabled={item.quantity <= 1} onClick={() => handleUpdateItemQuantity(item.productId, item.quantity - 1)} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"><MinusCircle size={16} /></button>
+                                  )}
+                                  <span className="w-7 text-center font-mono tabular-nums">{item.quantity}</span>
+                                  {canManageOS && (
+                                    <button type="button" aria-label={`Aumentar ${item.name}`} onClick={() => handleUpdateItemQuantity(item.productId, item.quantity + 1)} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"><PlusCircle size={16} /></button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2.5 text-right font-mono tabular-nums text-zinc-600 dark:text-zinc-400">{brl.format(item.price)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono tabular-nums text-zinc-600 dark:text-zinc-400">{brl.format(item.laborCost)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-zinc-900 dark:text-zinc-100">{brl.format(item.total)}</td>
+                              {canManageOS && (
+                                <td className="px-2 py-2.5 text-right">
+                                  <button type="button" aria-label={`Remover ${item.name}`} onClick={() => handleRemoveItem(item.productId)} className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"><Trash2 size={16} /></button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {items.length === 0 && (
+                        <div className="flex flex-col items-center gap-1 px-6 py-10 text-center">
+                          <Package size={22} aria-hidden="true" className="text-zinc-300 dark:text-zinc-600" />
+                          <p className="text-sm text-zinc-500">Nenhuma peça lançada ainda.</p>
+                          {canManageOS && <p className="text-xs text-zinc-400">Use a busca acima para adicionar do estoque.</p>}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Fechamento em formato de recibo */}
+                    <dl className="ml-auto w-full max-w-sm space-y-2 rounded-lg bg-zinc-50 p-4 text-sm dark:bg-zinc-800/40">
+                      <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
+                        <dt>Peças</dt><dd className="font-mono tabular-nums">{brl.format(totalParts)}</dd>
                       </div>
-                   </div>
-                 )}
+                      <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
+                        <dt>Mão de obra dos itens</dt><dd className="font-mono tabular-nums">{brl.format(totalItemsLabor)}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 text-zinc-600 dark:text-zinc-400">
+                        <dt><label htmlFor="os-general-labor">Mão de obra geral</label></dt>
+                        <dd className="relative">
+                          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-zinc-400">R$</span>
+                          <input
+                            id="os-general-labor"
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            inputMode="decimal"
+                            className="w-32 rounded-md border border-zinc-200 bg-white py-1 pl-8 pr-2 text-right font-mono text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                            value={generalLaborCost}
+                            onChange={e => setGeneralLaborCost(Math.max(0, Number(e.target.value)))}
+                            disabled={!canManageOS}
+                          />
+                        </dd>
+                      </div>
+                      <div className="flex items-baseline justify-between border-t border-dashed border-zinc-300 pt-3 dark:border-zinc-600">
+                        <dt className="font-semibold text-zinc-900 dark:text-white">Total</dt>
+                        <dd className="font-mono text-xl font-bold tabular-nums text-zinc-900 dark:text-white">{brl.format(totalOSAmount)}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                )}
               </div>
 
-              <div className="p-8 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-4 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.1)]">
-                <div>
-                  {!canManageOS && (
-                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700">
-                      Modo Somente Leitura
-                    </span>
+              <footer className="flex flex-col-reverse gap-3 border-t border-zinc-200 bg-zinc-50/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-zinc-800 dark:bg-zinc-900">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  {!canManageOS ? (
+                    'Somente leitura: seu perfil não pode editar OS.'
+                  ) : (
+                    <>
+                      {items.length} {items.length === 1 ? 'item' : 'itens'} · total{' '}
+                      <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">{brl.format(totalOSAmount)}</span>
+                    </>
                   )}
-                </div>
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => setIsModalOpen(false)} 
-                    className="px-8 py-4 bg-zinc-50 dark:bg-zinc-800 text-zinc-400 font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-zinc-100 transition-all border border-zinc-100 dark:border-zinc-700"
+                </p>
+                <div className="flex gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:flex-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                   >
-                    {canManageOS ? 'Descartar Alterações' : 'Fechar'}
+                    {canManageOS ? 'Cancelar' : 'Fechar'}
                   </button>
                   {canManageOS && (
-                    <button 
+                    <button
+                      type="button"
                       onClick={handleSaveOS}
                       disabled={isSaving}
-                      className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl transition-all shadow-xl shadow-blue-600/30 active:scale-95 disabled:opacity-50 flex items-center gap-3"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-60 sm:flex-none dark:focus-visible:ring-offset-zinc-900"
                     >
-                      {isSaving ? <History size={18} className="animate-spin" /> : <Save size={18} />}
-                      {selectedOS ? 'Atualizar OS' : 'Gerar & Registrar'}
+                      {isSaving ? <History size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+                      {isSaving ? 'Salvando…' : selectedOS ? 'Salvar alterações' : 'Abrir OS'}
                     </button>
                   )}
                 </div>
-              </div>
+              </footer>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Delete Confirmation */}
+      {/* Confirmação de exclusão */}
       <AnimatePresence>
         {deleteConfirm && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-zinc-900 p-10 rounded-[3rem] shadow-2xl max-w-sm w-full text-center border border-zinc-100 dark:border-zinc-800"
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm"
+            onMouseDown={e => { if (e.target === e.currentTarget) setDeleteConfirm(null); }}
+          >
+            <motion.div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="os-delete-title"
+              aria-describedby="os-delete-desc"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6"
             >
-              <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
-                <Trash2 size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-zinc-900 dark:text-white mb-2 uppercase tracking-tight">Excluir OS?</h3>
-              <p className="text-zinc-500 dark:text-zinc-400 font-bold mb-8 leading-relaxed">Esta ação é irreversível e removerá o registro financeiro desta ordem.</p>
-              <div className="flex gap-3">
-                <button 
+              <span className="inline-flex p-2.5 rounded-xl border bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40">
+                <AlertTriangle size={20} aria-hidden="true" />
+              </span>
+              <h3 id="os-delete-title" className="mt-4 text-lg font-bold text-zinc-900 dark:text-white">Excluir esta OS?</h3>
+              <p id="os-delete-desc" className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                O registro e o valor dela saem do faturamento. Não dá para desfazer.
+              </p>
+              <div className="mt-6 flex gap-2">
+                <button
+                  type="button"
+                  autoFocus
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 px-6 py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-zinc-200 transition-all"
+                  className="flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={async () => {
-                     try {
-                       await deleteServiceOrder(deleteConfirm);
-                       toast.success('Serviço removido!');
-                       setDeleteConfirm(null);
-                     } catch (err) {
-                       toast.error('Vínculo ativo: Não foi possível excluir.');
-                     }
+                    try {
+                      await deleteServiceOrder(deleteConfirm);
+                      toast.success('OS excluída.');
+                      setDeleteConfirm(null);
+                    } catch {
+                      toast.error('Não foi possível excluir esta OS.');
+                    }
                   }}
-                  className="flex-1 px-6 py-4 bg-red-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-600 transition-all shadow-xl shadow-red-500/20"
+                  className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 cursor-pointer"
                 >
-                  Excluir Permanente
+                  Excluir
                 </button>
               </div>
             </motion.div>

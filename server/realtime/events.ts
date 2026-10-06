@@ -6,7 +6,7 @@ export type Resource =
 
 /**
  * Avisa quem está ouvindo (SSE) que um recurso mudou; o cliente refaz o GET.
- * Em memória: funciona com uma instância do servidor. Para várias, trocar por LISTEN/NOTIFY.
+ * Alimentado pelas rotas e pelo LISTEN/NOTIFY do banco (pgListener), que cobre escritas de fora da API.
  */
 export class ChangeBus extends EventEmitter {
   emitChange(...resources: Resource[]) {

@@ -63,15 +63,18 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
     <motion.aside 
       className={`hidden lg:flex flex-col fixed inset-y-0 left-0 ${isCollapsed ? 'w-20' : 'w-72'} bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 z-40 transform transition-all duration-300 shadow-xl`}
     >
-      <button 
+      <button
+        type="button"
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-4 top-10 w-8 h-8 bg-blue-600 text-white rounded-full items-center justify-center shadow-lg z-50 hover:scale-110 transition-all group border-b-2 border-blue-700"
+        aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+        aria-expanded={!isCollapsed}
+        className={`absolute -right-3 ${isCollapsed ? 'top-[26px]' : 'top-[34px]'} w-6 h-6 flex items-center justify-center bg-white dark:bg-zinc-800 text-zinc-500 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-md z-50 hover:text-blue-600 hover:border-blue-600 dark:hover:text-blue-400 dark:hover:border-blue-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer`}
       >
-        {isCollapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
+        {isCollapsed ? <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" /> : <ChevronLeft size={14} strokeWidth={2.5} aria-hidden="true" />}
       </button>
 
       <div className={`flex flex-col h-full w-full ${isCollapsed ? 'p-4' : 'p-6'}`}>
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} mb-10`}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} mb-8`}>
           <div className="flex items-center gap-3">
             <div 
               className="w-9 h-9 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg flex items-center justify-center font-black text-xs tracking-wider shrink-0 shadow-sm"
@@ -89,23 +92,26 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
           </div>
         </div>
 
-        <nav className="flex-1 space-y-2">
+        <nav className="flex-1 space-y-1" aria-label="Menu principal">
           {menuItems.map((item) => (
-            <div key={item.id} className="relative group px-1">
+            <div key={item.id} className="relative group">
               <button
+                type="button"
                 onClick={() => {
                    if (item.id === 'inventory') setInventoryLowStockFilter(false);
                    setActiveTab(item.id);
                 }}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-4'} py-3.5 rounded-2xl transition-all active:scale-95 group/btn ${
+                aria-current={activeTab === item.id ? 'page' : undefined}
+                aria-label={isCollapsed ? item.label : undefined}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-4'} py-3 rounded-xl transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 group/btn ${
                   activeTab === item.id 
                     ? 'bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/20 dark:shadow-blue-500/20' 
                     : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-blue-600 dark:hover:text-blue-400'
                 }`}
               >
-                <item.icon size={20} className={activeTab === item.id ? 'text-white' : 'transition-colors'} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                <item.icon size={20} className={`shrink-0 ${activeTab === item.id ? 'text-white' : 'transition-colors'}`} strokeWidth={activeTab === item.id ? 2.5 : 2} aria-hidden="true" />
                 {!isCollapsed && (
-                  <span className="text-sm font-bold tracking-tight">{item.label}</span>
+                  <span className="text-sm font-bold tracking-tight truncate">{item.label}</span>
                 )}
                 
                 {item.id === 'alerts' && unreadCount > 0 && !isCollapsed && (
@@ -125,8 +131,22 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
           ))}
         </nav>
 
-        <div className={`mt-auto pt-4 border-t border-zinc-200 dark:border-zinc-800 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 bg-zinc-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800'} mb-3`}>
+        <div className="mt-auto pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-1">
+          <button
+            type="button"
+            onClick={() => {
+              setIsMonitorMode(true);
+              toast.info('Modo Monitor ativado: a tela selecionada agora ocupa 100% do display.');
+            }}
+            aria-label={isCollapsed ? 'Modo Monitor' : undefined}
+            className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-4'} py-2.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-semibold text-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 group`}
+            title="Entrar em Modo Monitor (Ocultar menu lateral e focar na tela selecionada)"
+          >
+            <Maximize2 size={18} className="shrink-0 group-hover:scale-110 transition-transform" aria-hidden="true" />
+            {!isCollapsed && 'Modo Monitor'}
+          </button>
+
+          <div className={`flex items-center ${isCollapsed ? 'justify-center py-2' : 'gap-3 bg-zinc-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800'} !mt-3`}>
             <div className="relative flex-shrink-0">
               {profile?.photoURL ? (
                 <img 
@@ -150,28 +170,30 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
                 </p>
               </div>
             )}
+            {!isCollapsed && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Desconectar"
+                title="Desconectar"
+                className="shrink-0 p-2 rounded-lg text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 cursor-pointer"
+              >
+                <LogOut size={16} aria-hidden="true" />
+              </button>
+            )}
           </div>
-          
-          <button 
-            type="button"
-            onClick={() => {
-              setIsMonitorMode(true);
-              toast.info('Modo Monitor ativado: a tela selecionada agora ocupa 100% do display.');
-            }}
-            className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-2.5 px-3'} py-2 mb-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-semibold text-xs active:scale-95 group`}
-            title="Entrar em Modo Monitor (Ocultar menu lateral e focar na tela selecionada)"
-          >
-            <Maximize2 size={16} className="group-hover:scale-110 transition-transform" />
-            {!isCollapsed && 'Modo Monitor'}
-          </button>
-          
-          <button 
-            onClick={handleLogout}
-            className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-2.5 px-3'} py-2 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-red-600 transition-colors font-semibold text-xs active:scale-95 group`}
-          >
-            <LogOut size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-            {!isCollapsed && 'Desconectar'}
-          </button>
+
+          {isCollapsed && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Desconectar"
+              title="Desconectar"
+              className="w-full flex items-center justify-center py-2.5 rounded-xl text-zinc-500 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 cursor-pointer"
+            >
+              <LogOut size={18} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
     </motion.aside>
