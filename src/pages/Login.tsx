@@ -16,9 +16,10 @@ import {
   AlertCircle,
   ShieldCheck,
   TrendingUp,
-  CheckCircle2
+  CheckCircle2,
+  ArrowLeft
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import { useApp } from '../context/AppContext';
 import { apiPost } from '../lib/api';
@@ -47,7 +48,9 @@ const Login: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Form for Access Request
-  const [showRegistration, setShowRegistration] = useState(false);
+  // Troca de tela: 1 = indo para a solicitação (desliza para a esquerda), -1 = voltando
+  const [view, setView] = useState<'login' | 'request'>('login');
+  const [direction, setDirection] = useState<1 | -1>(1);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registrationLoading, setRegistrationLoading] = useState(false);
   const [regForm, setRegForm] = useState({
@@ -76,6 +79,31 @@ const Login: React.FC = () => {
     } finally {
       setRegistrationLoading(false);
     }
+  };
+
+  const reduceMotion = useReducedMotion();
+
+  // Só transform/opacity (composição na GPU); com "reduzir movimento" fica só o fade.
+  const screenVariants = {
+    enter: (d: number) => ({ opacity: 0, x: reduceMotion ? 0 : 48 * d }),
+    center: { opacity: 1, x: 0 },
+    exit: (d: number) => ({ opacity: 0, x: reduceMotion ? 0 : -48 * d }),
+  };
+  const screenTransition = { duration: reduceMotion ? 0.15 : 0.32, ease: [0.22, 1, 0.36, 1] as const };
+
+  const goTo = (next: 'login' | 'request') => {
+    if (next === view) return;
+    setDirection(next === 'request' ? 1 : -1);
+    if (next === 'request') setRegistrationSuccess(false);
+    setLoginError('');
+    setView(next);
+  };
+
+  // Leva o foco do teclado para a tela que acabou de entrar.
+  const focusCurrentView = () => {
+    requestAnimationFrame(() => {
+      document.getElementById(view === 'request' ? 'reg-name-input' : 'btn-trigger-registration')?.focus();
+    });
   };
 
   const backToLogin = () => {
@@ -180,13 +208,37 @@ const Login: React.FC = () => {
               <span className="font-black text-3xl tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">Munago <span className="text-blue-200">Estoque</span></span>
             </div>
             
-            <h2 className="text-5xl font-black text-white leading-[1.1] mb-6 drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]">
-              Gestão Inteligente <br />
-              <span className="text-blue-200">Para sua Oficina.</span>
-            </h2>
-            <p className="text-blue-50 text-lg font-medium max-w-md leading-relaxed opacity-80">
-              Controle de estoque, ordens de serviço e inteligência artificial em uma única plataforma robusta e intuitiva.
-            </p>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={view}
+                initial={{ opacity: 0, y: reduceMotion ? 0 : 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: reduceMotion ? 0 : -12 }}
+                transition={screenTransition}
+              >
+                {view === 'login' ? (
+                  <>
+                    <h2 className="text-5xl font-black text-white leading-[1.1] mb-6 drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                      Gestão Inteligente <br />
+                      <span className="text-blue-200">Para sua Oficina.</span>
+                    </h2>
+                    <p className="text-blue-50 text-lg font-medium max-w-md leading-relaxed opacity-80">
+                      Controle de estoque, ordens de serviço e inteligência artificial em uma única plataforma robusta e intuitiva.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-5xl font-black text-white leading-[1.1] mb-6 drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                      Faça parte <br />
+                      <span className="text-blue-200">da plataforma.</span>
+                    </h2>
+                    <p className="text-blue-50 text-lg font-medium max-w-md leading-relaxed opacity-80">
+                      Envie seus dados e um administrador analisa o pedido. Quando aprovado, o acesso chega no seu e-mail.
+                    </p>
+                  </>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           <div className="relative z-10 space-y-6">
@@ -215,334 +267,308 @@ const Login: React.FC = () => {
           />
         </div>
 
-        {/* Right Side: Login Form */}
-        <div className="w-full lg:w-[450px] p-8 md:p-12 lg:p-16 flex flex-col justify-center bg-white dark:bg-zinc-900">
-          <div className="mb-10">
-            <h1 className="text-3xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">
-              {titles[authStep][0]}
-            </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
-              {titles[authStep][1]}
-            </p>
-          </div>
-
-          <form onSubmit={handleAuth} className="space-y-4" aria-busy={isLoggingIn}>
-            {authStep === 'login' && (
-              <>
-                <div className="space-y-1.5">
-                  <label htmlFor="login-email-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">E-mail</label>
-                  <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
-                    <input
-                      id="login-email-input"
-                      type="email"
-                      autoComplete="username"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      placeholder="exemplo@email.com"
-                      aria-invalid={!!loginError}
-                      aria-describedby={loginError ? 'login-error' : undefined}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 font-sans">
-                  <label htmlFor="login-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Senha</label>
-                  <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
-                    <input
-                      id="login-password-input"
-                      type="password"
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      placeholder="••••••••"
-                      aria-invalid={!!loginError}
-                      aria-describedby={loginError ? 'login-error' : undefined}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="flex justify-end pr-1">
-                    <button
-                      id="btn-forgot-password"
-                      type="button"
-                      onClick={handleForgotPassword}
-                      className="text-[10px] font-bold text-zinc-400 hover:text-blue-600 transition-colors uppercase tracking-widest cursor-pointer"
-                    >
-                      Esqueceu a senha?
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {authStep === 'resetCode' && (
-              <div className="space-y-1.5">
-                <label htmlFor="reset-code-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Código de verificação</label>
-                <div className="relative group">
-                  <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
-                  <input
-                    id="reset-code-input"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    value={resetCode}
-                    onChange={(e) => setResetCode(e.target.value)}
-                    required
-                    placeholder="123456"
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            )}
-
-            {authStep !== 'login' && (
-              <>
-                <div className="space-y-1.5">
-                  <label htmlFor="new-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Nova senha</label>
-                  <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
-                    <input
-                      id="new-password-input"
-                      type="password"
-                      autoComplete="new-password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      required
-                      minLength={8}
-                      placeholder="••••••••"
-                      aria-describedby="new-password-hint"
-                      className={inputClass}
-                    />
-                  </div>
-                  <p id="new-password-hint" className="text-[11px] text-zinc-500 dark:text-zinc-400 ml-1">
-                    Mínimo de 8 caracteres, com letras minúsculas e números.
+        {/* Right Side: troca animada entre login e solicitação de acesso */}
+        <div className="w-full lg:w-[450px] p-8 md:p-12 lg:p-14 flex flex-col justify-center bg-white dark:bg-zinc-900 overflow-hidden">
+          <AnimatePresence mode="wait" initial={false} custom={direction} onExitComplete={focusCurrentView}>
+            {view === 'login' ? (
+              <motion.div
+                key="login"
+                custom={direction}
+                variants={screenVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={screenTransition}
+              >
+                <div className="mb-10">
+                  <h1 className="text-3xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">
+                    {titles[authStep][0]}
+                  </h1>
+                  <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
+                    {titles[authStep][1]}
                   </p>
                 </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="confirm-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Confirmar nova senha</label>
-                  <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
-                    <input
-                      id="confirm-password-input"
-                      type="password"
-                      autoComplete="new-password"
-                      value={confirmNewPassword}
-                      onChange={(e) => setConfirmNewPassword(e.target.value)}
-                      required
-                      minLength={8}
-                      placeholder="••••••••"
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
 
-            {loginError && (
-              <motion.div
-                id="login-error"
-                role="alert"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs font-bold"
-              >
-                <AlertCircle size={16} aria-hidden="true" />
-                <p>{loginError}</p>
-              </motion.div>
-            )}
+                <form onSubmit={handleAuth} className="space-y-4" aria-busy={isLoggingIn}>
+                  {authStep === 'login' && (
+                    <>
+                      <div className="space-y-1.5">
+                        <label htmlFor="login-email-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">E-mail</label>
+                        <div className="relative group">
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
+                          <input
+                            id="login-email-input"
+                            type="email"
+                            autoComplete="username"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            placeholder="exemplo@email.com"
+                            aria-invalid={!!loginError}
+                            aria-describedby={loginError ? 'login-error' : undefined}
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
 
-            <button
-              id="btn-login-submit"
-              type="submit"
-              disabled={isLoggingIn}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black transition-all transform active:scale-95 shadow-xl shadow-blue-600/20 dark:shadow-blue-500/40 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-widest mt-6 cursor-pointer"
-            >
-              {isLoggingIn ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-                  <span className="sr-only">Aguarde...</span>
-                </>
-              ) : (
-                <>
-                  <span>{authStep === 'login' ? 'Entrar no Sistema' : 'Salvar nova senha'}</span>
-                  <ChevronRight size={18} aria-hidden="true" />
-                </>
-              )}
-            </button>
+                      <div className="space-y-1.5 font-sans">
+                        <label htmlFor="login-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Senha</label>
+                        <div className="relative group">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
+                          <input
+                            id="login-password-input"
+                            type="password"
+                            autoComplete="current-password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            placeholder="••••••••"
+                            aria-invalid={!!loginError}
+                            aria-describedby={loginError ? 'login-error' : undefined}
+                            className={inputClass}
+                          />
+                        </div>
+                        <div className="flex justify-end pr-1">
+                          <button
+                            id="btn-forgot-password"
+                            type="button"
+                            onClick={handleForgotPassword}
+                            className="text-[10px] font-bold text-zinc-400 hover:text-blue-600 transition-colors uppercase tracking-widest cursor-pointer"
+                          >
+                            Esqueceu a senha?
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-            {authStep !== 'login' && (
-              <div className="text-center mt-2">
-                <button
-                  type="button"
-                  onClick={backToLogin}
-                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                >
-                  Voltar para o login
-                </button>
-              </div>
-            )}
-          </form>
-
-          {/* Prompt request access manually */}
-          <div className="mt-8 text-center">
-            <span className="text-neutral-400 text-xs">Precisa de acesso à plataforma? </span>
-            <button
-              id="btn-trigger-registration"
-              onClick={() => { setShowRegistration(true); setRegistrationSuccess(false); }}
-              className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer"
-            >
-              Solicitar Acesso
-            </button>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Access Request Form Overlay Modal */}
-      <AnimatePresence>
-        {showRegistration && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md"
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-zinc-900 w-full max-w-xl rounded-[2.5rem] overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.3)] border border-neutral-200 dark:border-neutral-800"
-            >
-              <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-800/50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-600 rounded-xl text-white">
-                    <UserPlus size={20} />
-                  </div>
-                  <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tight">Solicitar Acesso</h3>
-                </div>
-                <button 
-                  id="btn-close-registration"
-                  onClick={() => { setShowRegistration(false); setRegistrationSuccess(false); }} 
-                  className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all cursor-pointer"
-                >
-                  <X size={24} className="text-zinc-400" />
-                </button>
-              </div>
-
-              <div className="p-8">
-                {registrationSuccess ? (
-                  <div className="text-center py-10 space-y-6">
-                    <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto shadow-lg">
-                      <CheckCircle2 size={48} />
+                  {authStep === 'resetCode' && (
+                    <div className="space-y-1.5">
+                      <label htmlFor="reset-code-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Código de verificação</label>
+                      <div className="relative group">
+                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
+                        <input
+                          id="reset-code-input"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          value={resetCode}
+                          onChange={(e) => setResetCode(e.target.value)}
+                          required
+                          placeholder="123456"
+                          className={inputClass}
+                        />
+                      </div>
                     </div>
+                  )}
+
+                  {authStep !== 'login' && (
+                    <>
+                      <div className="space-y-1.5">
+                        <label htmlFor="new-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Nova senha</label>
+                        <div className="relative group">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
+                          <input
+                            id="new-password-input"
+                            type="password"
+                            autoComplete="new-password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            placeholder="••••••••"
+                            aria-describedby="new-password-hint"
+                            className={inputClass}
+                          />
+                        </div>
+                        <p id="new-password-hint" className="text-[11px] text-zinc-500 dark:text-zinc-400 ml-1">
+                          Mínimo de 8 caracteres, com letras minúsculas e números.
+                        </p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label htmlFor="confirm-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Confirmar nova senha</label>
+                        <div className="relative group">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
+                          <input
+                            id="confirm-password-input"
+                            type="password"
+                            autoComplete="new-password"
+                            value={confirmNewPassword}
+                            onChange={(e) => setConfirmNewPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            placeholder="••••••••"
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {loginError && (
+                    <motion.div
+                      id="login-error"
+                      role="alert"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs font-bold"
+                    >
+                      <AlertCircle size={16} aria-hidden="true" />
+                      <p>{loginError}</p>
+                    </motion.div>
+                  )}
+
+                  <button
+                    id="btn-login-submit"
+                    type="submit"
+                    disabled={isLoggingIn}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black transition-all transform active:scale-95 shadow-xl shadow-blue-600/20 dark:shadow-blue-500/40 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-widest mt-6 cursor-pointer"
+                  >
+                    {isLoggingIn ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                        <span className="sr-only">Aguarde...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>{authStep === 'login' ? 'Entrar no Sistema' : 'Salvar nova senha'}</span>
+                        <ChevronRight size={18} aria-hidden="true" />
+                      </>
+                    )}
+                  </button>
+
+                  {authStep !== 'login' && (
+                    <div className="text-center mt-2">
+                      <button
+                        type="button"
+                        onClick={backToLogin}
+                        className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        Voltar para o login
+                      </button>
+                    </div>
+                  )}
+                </form>
+
+                {/* Prompt request access manually */}
+                <div className="mt-8 text-center">
+                  <span className="text-neutral-400 text-xs">Precisa de acesso à plataforma? </span>
+                  <button
+                    id="btn-trigger-registration"
+                    type="button"
+                    onClick={() => goTo('request')}
+                    className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer"
+                  >
+                    Solicitar Acesso
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="request"
+                custom={direction}
+                variants={screenVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={screenTransition}
+              >
+                <div className="mb-8 flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => goTo('login')}
+                    aria-label="Voltar para o login"
+                    className="mt-1 p-2 -ml-2 rounded-xl text-zinc-400 hover:text-blue-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft size={20} aria-hidden="true" />
+                  </button>
+                  <div>
+                    <h1 className="text-3xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">Solicitar Acesso</h1>
+                    <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
+                      {registrationSuccess ? 'Pedido recebido' : 'Preencha os dados e um administrador analisa seu pedido'}
+                    </p>
+                  </div>
+                </div>
+
+                {registrationSuccess ? (
+                  <div className="text-center py-6 space-y-6" role="status">
+                    <motion.div
+                      initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                      className="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto shadow-lg"
+                    >
+                      <CheckCircle2 size={48} aria-hidden="true" />
+                    </motion.div>
                     <div>
-                      <h4 className="text-2xl font-black text-zinc-900 dark:text-white mb-2">Solicitação Enviada!</h4>
+                      <h2 className="text-2xl font-black text-zinc-900 dark:text-white mb-2">Solicitação Enviada!</h2>
                       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto text-sm">
-                        Recebemos seu pedido. Nossa equipe entrará em contato via e-mail em breve para liberar seu acesso.
+                        Recebemos seu pedido. Quando for aprovado, você recebe por e-mail uma senha temporária para entrar.
                       </p>
                     </div>
-                    <button 
+                    <button
                       id="btn-success-reg-ok"
-                      onClick={() => { setShowRegistration(false); setRegistrationSuccess(false); }}
+                      type="button"
+                      onClick={() => goTo('login')}
                       className="px-8 py-3 bg-zinc-900 dark:bg-zinc-700 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all cursor-pointer"
                     >
-                      Entendi
+                      Voltar para o login
                     </button>
                   </div>
                 ) : (
-                  <form onSubmit={handleRequestAccess} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 font-sans">
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Nome Completo</label>
+                  <form onSubmit={handleRequestAccess} className="space-y-3" aria-busy={registrationLoading}>
+                    {([
+                      { id: 'reg-name-input', key: 'name', label: 'Nome Completo', icon: User, placeholder: 'Seu nome', type: 'text', autoComplete: 'name', required: true },
+                      { id: 'reg-email-input', key: 'email', label: 'E-mail Profissional', icon: Mail, placeholder: 'seu@email.com', type: 'email', autoComplete: 'email', required: true },
+                      { id: 'reg-workshop-input', key: 'workshopName', label: 'Nome da Oficina', icon: Building, placeholder: 'Nome da empresa', type: 'text', autoComplete: 'organization', required: true },
+                      { id: 'reg-phone-input', key: 'phone', label: 'Telefone / WhatsApp', icon: Phone, placeholder: '(00) 00000-0000', type: 'tel', autoComplete: 'tel', required: true },
+                    ] as const).map(({ id, key, label, icon: Icon, ...input }) => (
+                      <div key={id} className="space-y-1">
+                        <label htmlFor={id} className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">{label}</label>
                         <div className="relative group">
-                          <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600" size={16} />
-                          <input 
-                            id="reg-name-input"
-                            required
-                            value={regForm.name}
-                            onChange={e => setRegForm({...regForm, name: e.target.value})}
-                            placeholder="Seu nome"
-                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-600 dark:text-white font-medium"
+                          <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600" size={16} aria-hidden="true" />
+                          <input
+                            id={id}
+                            {...input}
+                            value={regForm[key]}
+                            onChange={e => setRegForm({ ...regForm, [key]: e.target.value })}
+                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 dark:text-white font-medium transition-all"
                           />
                         </div>
                       </div>
-                      <div className="space-y-1.5 font-sans">
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">E-mail Profissional</label>
-                        <div className="relative group">
-                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600" size={16} />
-                          <input 
-                            id="reg-email-input"
-                            type="email"
-                            required
-                            value={regForm.email}
-                            onChange={e => setRegForm({...regForm, email: e.target.value})}
-                            placeholder="seu@email.com"
-                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-600 dark:text-white font-medium"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    ))}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 font-sans">
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Nome da Oficina</label>
-                        <div className="relative group">
-                          <Building className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600" size={16} />
-                          <input 
-                            id="reg-workshop-input"
-                            required
-                            value={regForm.workshopName}
-                            onChange={e => setRegForm({...regForm, workshopName: e.target.value})}
-                            placeholder="Nome da empresa"
-                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-600 dark:text-white font-medium"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5 font-sans">
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Telefone / WhatsApp</label>
-                        <div className="relative group">
-                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600" size={16} />
-                          <input 
-                            id="reg-phone-input"
-                            required
-                            value={regForm.phone}
-                            onChange={e => setRegForm({...regForm, phone: e.target.value})}
-                            placeholder="(00) 00000-0000"
-                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-600 dark:text-white font-medium"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 font-sans">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Mensagem (Opcional)</label>
-                      <textarea 
+                    <div className="space-y-1">
+                      <label htmlFor="reg-message-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Mensagem (Opcional)</label>
+                      <textarea
                         id="reg-message-input"
                         value={regForm.message}
-                        onChange={e => setRegForm({...regForm, message: e.target.value})}
+                        onChange={e => setRegForm({ ...regForm, message: e.target.value })}
                         placeholder="Conte-nos um pouco sobre sua necessidade..."
-                        rows={3}
-                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 px-4 text-sm outline-none focus:border-blue-600 dark:text-white resize-none font-medium"
+                        rows={2}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 px-4 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 dark:text-white resize-none font-medium transition-all"
                       />
                     </div>
 
-                    <button 
+                    <button
                       id="btn-reg-submit"
                       type="submit"
                       disabled={registrationLoading}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:opacity-50 mt-4 cursor-pointer"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:opacity-50 mt-2 cursor-pointer active:scale-95"
                     >
-                      {registrationLoading ? <Loader2 className="animate-spin" /> : 'Enviar Solicitação'}
+                      {registrationLoading ? (
+                        <>
+                          <Loader2 className="animate-spin" aria-hidden="true" />
+                          <span className="sr-only">Enviando...</span>
+                        </>
+                      ) : 'Enviar Solicitação'}
                     </button>
                   </form>
                 )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
 
       {/* Footer info */}
       <div className="absolute bottom-6 inset-x-4 flex justify-center pointer-events-none">
