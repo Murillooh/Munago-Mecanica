@@ -171,17 +171,17 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
   }, [trendData]);
 
   return (
-    <div className="p-6 sm:p-7 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors">
+    <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors">
       <div>
         {/* Header with Title, Controls & Timeframe Selector */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="p-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-200/50 dark:border-emerald-900/40">
-                <Activity size={18} />
+                <Activity size={16} />
               </span>
               <div>
-                <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
+                <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
                   Tendência de Entradas e Saídas
                   <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-full border border-blue-200/60 dark:border-blue-800/50">
                     Últimos {daysRange} dias
@@ -261,7 +261,7 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
         </div>
 
         {/* Quick KPI Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-6 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-4 text-xs">
           <div className="space-y-0.5">
             <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Entradas ({daysRange}d)</span>
             <div className="flex items-baseline gap-1.5">
@@ -304,7 +304,7 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
         </div>
 
         {/* Dynamic Recharts Chart Area */}
-        <div className="h-[280px] w-full">
+        <div className="h-[220px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'area' ? (
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

@@ -30,18 +30,27 @@ export const Notifications = () => {
     markNotificationAsRead
   } = useApp();
 
-  const [filter, setFilter] = useState<Filter>('unread');
+  // Abre em "Todos": marcar como lido não tira o alerta da lista, só muda o visual.
+  const [filter, setFilter] = useState<Filter>('all');
   const [markingAll, setMarkingAll] = useState(false);
+  // Lidos nesta visita continuam visíveis em "Não lidos" até trocar de aba (a lista não pula).
+  const [readHere, setReadHere] = useState<Set<string>>(() => new Set());
 
   const sorted = useMemo(
     () => [...(notifications || [])].sort((a, b) => (parseDate(b.timestamp)?.getTime() ?? 0) - (parseDate(a.timestamp)?.getTime() ?? 0)),
     [notifications]
   );
   const unread = sorted.filter(n => !n.read);
-  const visible = filter === 'unread' ? unread : sorted;
+  const visible = filter === 'unread' ? sorted.filter(n => !n.read || readHere.has(n.id)) : sorted;
   const productById = useMemo(() => new Map((products || []).map(p => [p.id, p])), [products]);
 
+  const changeFilter = (f: Filter) => {
+    setFilter(f);
+    setReadHere(new Set());
+  };
+
   const markRead = async (id: string) => {
+    setReadHere(prev => new Set(prev).add(id));
     try {
       await markNotificationAsRead(id);
     } catch (err) {
@@ -53,6 +62,7 @@ export const Notifications = () => {
   const markAllRead = async () => {
     setMarkingAll(true);
     try {
+      setReadHere(prev => new Set([...prev, ...unread.map(n => n.id)]));
       await Promise.all(unread.map(n => markNotificationAsRead(n.id)));
       toast.success('Todos os alertas foram marcados como lidos.');
     } catch (err) {
@@ -92,7 +102,7 @@ export const Notifications = () => {
               <button
                 key={value}
                 type="button"
-                onClick={() => setFilter(value)}
+                onClick={() => changeFilter(value)}
                 aria-pressed={filter === value}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                   filter === value

@@ -38,7 +38,7 @@ export const RevenueSplitCard: React.FC<{ serviceOrders: ServiceOrder[] }> = ({ 
     <section aria-labelledby="split-card-title" className={cardClass}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 id="split-card-title" className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">Repasses do mês</h2>
+          <h2 id="split-card-title" className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Repasses do mês</h2>
           <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
             OS pagas em {monthName} · {cur.count} {cur.count === 1 ? 'ordem' : 'ordens'}
           </p>
@@ -46,26 +46,26 @@ export const RevenueSplitCard: React.FC<{ serviceOrders: ServiceOrder[] }> = ({ 
         <span className={`rounded-xl border p-2 ${iconBadge.emerald}`}><ArrowLeftRight size={16} aria-hidden="true" /></span>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">Recebido</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-zinc-900 dark:text-white">{formatBRL(cur.total)}</p>
+          <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-zinc-900 dark:text-white">{formatBRL(cur.total)}</p>
           <p className="mt-1 text-xs text-zinc-500 tabular-nums">mês anterior {formatBRL(prev.total)}</p>
         </div>
         <div>
           <p className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400"><span className="h-2 w-2 rounded-sm bg-blue-600" aria-hidden="true" /> Empresa</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-zinc-900 dark:text-white">{formatBRL(cur.company)}</p>
+          <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-zinc-900 dark:text-white">{formatBRL(cur.company)}</p>
           <p className="mt-1 text-xs text-zinc-500 tabular-nums">{companyPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% do recebido</p>
         </div>
         <div>
           <p className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400"><span className="h-2 w-2 rounded-sm bg-emerald-500" aria-hidden="true" /> Oficina</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-zinc-900 dark:text-white">{formatBRL(cur.workshop)}</p>
+          <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-zinc-900 dark:text-white">{formatBRL(cur.workshop)}</p>
           <p className="mt-1 text-xs text-zinc-500 tabular-nums">{(cur.total ? 100 - companyPct : 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% do recebido</p>
         </div>
       </div>
 
       <div
-        className="mt-6 flex h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
+        className="mt-4 flex h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
         role="img"
         aria-label={`Empresa ${formatBRL(cur.company)}, oficina ${formatBRL(cur.workshop)}`}
       >

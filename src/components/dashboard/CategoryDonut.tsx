@@ -59,18 +59,18 @@ export const CategoryDonut: React.FC<{ products: Product[]; darkMode: boolean }>
     <div className={cardClass}>
       <div>
         <div className="flex items-center gap-2.5 mb-4">
-          <span className={`p-2 rounded-xl border ${iconBadge.violet}`}>
-            <PieChartIcon size={18} aria-hidden="true" />
+          <span className={`p-1.5 rounded-xl border ${iconBadge.violet}`}>
+            <PieChartIcon size={16} aria-hidden="true" />
           </span>
           <div>
-            <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">Valor por Categoria</h2>
+            <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Valor por Categoria</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Onde está o dinheiro parado no estoque</p>
           </div>
         </div>
 
         {hasValue ? (
           <>
-            <div className="relative h-[190px] w-full" role="img" aria-label={`Valor do estoque por categoria, total ${formatBRL(total)}`}>
+            <div className="relative h-[160px] w-full" role="img" aria-label={`Valor do estoque por categoria, total ${formatBRL(total)}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie

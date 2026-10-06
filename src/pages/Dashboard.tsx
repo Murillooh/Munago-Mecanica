@@ -448,7 +448,7 @@ export const Dashboard = ({
   };
 
   return (
-    <div className="w-full space-y-8">
+    <div className="w-full space-y-5">
       {/* Top Operational Command Bar with Generous Spacing */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 pb-6 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div>
@@ -680,25 +680,25 @@ export const Dashboard = ({
       {/* ========================================================================= */}
       {/* BENTO GRID ARCHITECTURE (VARYING SIZES, SUBTLE BORDERS & GENEROUS GAPS) */}
       {/* ========================================================================= */}
-      <div className="space-y-6 lg:space-y-8">
+      <div className="space-y-4">
 
         {/* ----------------------------------------------------------------------- */}
         {/* SEÇÃO 1: INDICADORES GERAIS & RUPTURA (BENTO 1, 2, 3)                   */}
         {/* ----------------------------------------------------------------------- */}
         <div
           id="widget-section-kpis"
-          className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-kpis')}`}
+          className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-kpis')}`}
         >
           {/* KPI 1: PATRIMÔNIO VALORADO */}
-          <div className="p-6 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
+          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Patrimônio em Estoque</span>
-                <span className={`p-2 rounded-xl border ${iconBadge.blue}`}>
+                <span className={`p-1.5 rounded-xl border ${iconBadge.blue}`}>
                   <Package size={16} aria-hidden="true" />
                 </span>
               </div>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
+              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
                 {formatBRL(totalStockValue)}
               </p>
               <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">{totalItems} referências cadastradas</p>
@@ -712,15 +712,15 @@ export const Dashboard = ({
           </div>
 
           {/* KPI 2: FATURAMENTO DE OS (30 DIAS) */}
-          <div className="p-6 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
+          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Faturamento 30 dias</span>
-                <span className={`p-2 rounded-xl border ${iconBadge.emerald}`}>
+                <span className={`p-1.5 rounded-xl border ${iconBadge.emerald}`}>
                   <TrendingUp size={16} aria-hidden="true" />
                 </span>
               </div>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
+              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
                 {formatBRL(revenue30.total)}
               </p>
               <div className="mt-1.5 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
@@ -739,15 +739,15 @@ export const Dashboard = ({
           </div>
 
           {/* KPI 3: DISPONIBILIDADE & VOLUME */}
-          <div className="p-6 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
+          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Disponibilidade</span>
-                <span className={`p-2 rounded-xl border ${iconBadge.indigo}`}>
+                <span className={`p-1.5 rounded-xl border ${iconBadge.indigo}`}>
                   <Boxes size={16} aria-hidden="true" />
                 </span>
               </div>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
+              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
                 {healthyRate}%
               </p>
               <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
@@ -777,7 +777,7 @@ export const Dashboard = ({
                   {lowStockProducts.length > 0 ? <AlertTriangle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
                 </span>
               </div>
-              <p className={`mt-3 text-3xl font-bold tracking-tight tabular-nums ${
+              <p className={`mt-2 text-2xl font-bold tracking-tight tabular-nums ${
                 lowStockProducts.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-white'
               }`}>
                 {lowStockProducts.length} <span className="text-lg font-normal text-zinc-500">itens</span>
@@ -802,7 +802,7 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div 
           id="widget-section-logistics-os"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
         >
           {/* BENTO 4: VISUALIZAÇÃO DE TENDÊNCIA DE ENTRADAS E SAÍDAS (RECHARTS) - col-span-12 xl:col-span-8 */}
           <div className="col-span-12 xl:col-span-8 flex flex-col justify-between">
@@ -814,11 +814,11 @@ export const Dashboard = ({
           </div>
 
           {/* BENTO 5: PÁTIO DE SERVIÇOS & OFICINA (TOWER CELL) - col-span-12 xl:col-span-4 */}
-          <div className="col-span-12 xl:col-span-4 p-6 sm:p-7 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
+          <div className="col-span-12 xl:col-span-4 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">
+                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
                     Pátio de Ordens de Serviço
                   </h2>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -921,7 +921,7 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div
           id="widget-section-revenue"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-revenue')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-revenue')}`}
         >
           <div className="col-span-12 xl:col-span-8 flex flex-col">
             <OSRevenueChart serviceOrders={serviceOrders || []} darkMode={darkMode} onOpenOS={canManageOS ? onNewOS : undefined} />
@@ -939,15 +939,15 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div 
           id="widget-section-replenishment-cat"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-replenishment-cat')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-replenishment-cat')}`}
         >
           {/* BENTO 6: CENTRAL DE REPOSIÇÃO (EXPANSIVE TABLE) - col-span-12 xl:col-span-8 */}
-          <div className="col-span-12 xl:col-span-8 p-6 sm:p-7 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
+          <div className="col-span-12 xl:col-span-8 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
-                    <ShieldAlert size={18} className={lowStockProducts.length > 0 ? "text-red-500" : "text-zinc-400"} />
+                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
+                    <ShieldAlert size={16} className={lowStockProducts.length > 0 ? "text-red-500" : "text-zinc-400"} />
                     Central de Reposição & Itens Críticos
                   </h2>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -1069,10 +1069,10 @@ export const Dashboard = ({
           className={`col-span-12 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-audit')}`}
         >
           {/* BENTO 8: AUDITORIA OPERACIONAL RECENTE (WIDE STRIP) - col-span-12       */}
-          <div className="p-6 sm:p-7 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
+          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
-                <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">
+                <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
                   Auditoria de Movimentações Recentes
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -1173,7 +1173,7 @@ export const Dashboard = ({
                   onClick={() => setIsDiagnosticOpen(false)}
                   className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               </div>
 

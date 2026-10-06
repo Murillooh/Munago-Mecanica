@@ -57,11 +57,11 @@ export const StockCoverage: React.FC<{ products: Product[]; transactions: Transa
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <div className="flex items-center gap-2.5">
-            <span className={`p-2 rounded-xl border ${iconBadge.indigo}`}>
-              <Hourglass size={18} aria-hidden="true" />
+            <span className={`p-1.5 rounded-xl border ${iconBadge.indigo}`}>
+              <Hourglass size={16} aria-hidden="true" />
             </span>
             <div>
-              <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">Cobertura de Estoque</h2>
+              <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Cobertura de Estoque</h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Quantos dias cada peça dura no ritmo de consumo dos últimos {WINDOW_DAYS} dias
               </p>
@@ -113,7 +113,7 @@ export const StockCoverage: React.FC<{ products: Product[]; transactions: Transa
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-4 mt-6 border-t border-zinc-100 dark:border-zinc-800/80 text-xs text-zinc-500">
+      <div className="flex items-center justify-between pt-4 mt-4 border-t border-zinc-100 dark:border-zinc-800/80 text-xs text-zinc-500">
         <span>Crítico: até {CRITICAL_DAYS} dias · Atenção: até {WARNING_DAYS} dias · Barra cheia = {BAR_SCALE_DAYS}+ dias</span>
         {onSeeAll && (
           <button type="button" onClick={onSeeAll} className="text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer shrink-0">

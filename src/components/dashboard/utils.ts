@@ -40,7 +40,7 @@ export const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181
 export const OTHER_LIGHT = '#a1a1aa';
 export const OTHER_DARK = '#52525b';
 
-export const cardClass = 'p-6 sm:p-7 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors';
+export const cardClass = 'p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors';
 
 export const iconBadge = {
   blue: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/40',

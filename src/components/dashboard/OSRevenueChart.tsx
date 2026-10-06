@@ -109,13 +109,13 @@ export const OSRevenueChart: React.FC<{ serviceOrders: ServiceOrder[]; darkMode:
   return (
     <div className={cardClass}>
       <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2.5">
-            <span className={`p-2 rounded-xl border ${iconBadge.blue}`}>
-              <DollarSign size={18} aria-hidden="true" />
+            <span className={`p-1.5 rounded-xl border ${iconBadge.blue}`}>
+              <DollarSign size={16} aria-hidden="true" />
             </span>
             <div>
-              <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">Faturamento de Ordens de Serviço</h2>
+              <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Faturamento de Ordens de Serviço</h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">OS concluídas e pagas no período</p>
             </div>
           </div>
@@ -137,7 +137,7 @@ export const OSRevenueChart: React.FC<{ serviceOrders: ServiceOrder[]; darkMode:
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-6 text-xs">
+        <div className="grid grid-cols-3 gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-4 text-xs">
           <div className="space-y-0.5">
             <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Total faturado</span>
             <p className="text-base font-bold text-zinc-900 dark:text-white tabular-nums">{formatBRL(total)}</p>
@@ -161,7 +161,7 @@ export const OSRevenueChart: React.FC<{ serviceOrders: ServiceOrder[]; darkMode:
           </div>
         </div>
 
-        <div className="h-[240px] w-full" role="img" aria-label={`Gráfico de faturamento: ${formatBRL(total)} em ${count} OS`}>
+        <div className="h-[200px] w-full" role="img" aria-label={`Gráfico de faturamento: ${formatBRL(total)} em ${count} OS`}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={buckets} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>

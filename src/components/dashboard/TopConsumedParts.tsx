@@ -37,12 +37,12 @@ export const TopConsumedParts: React.FC<{ transactions: Transaction[]; products:
   return (
     <div className={cardClass}>
       <div>
-        <div className="flex items-center gap-2.5 mb-6">
-          <span className={`p-2 rounded-xl border ${iconBadge.amber}`}>
-            <Flame size={18} aria-hidden="true" />
+        <div className="flex items-center gap-2.5 mb-4">
+          <span className={`p-1.5 rounded-xl border ${iconBadge.amber}`}>
+            <Flame size={16} aria-hidden="true" />
           </span>
           <div>
-            <h2 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">Peças Mais Consumidas</h2>
+            <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Peças Mais Consumidas</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Saídas nos últimos {WINDOW_DAYS} dias</p>
           </div>
         </div>
@@ -78,7 +78,7 @@ export const TopConsumedParts: React.FC<{ transactions: Transaction[]; products:
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-4 mt-6 border-t border-zinc-100 dark:border-zinc-800/80 text-xs text-zinc-500">
+      <div className="flex items-center justify-between pt-4 mt-4 border-t border-zinc-100 dark:border-zinc-800/80 text-xs text-zinc-500">
         <span className="tabular-nums">{totalOut} un consumidas no período</span>
         {onSeeAllHistory && (
           <button type="button" onClick={onSeeAllHistory} className="text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer">
