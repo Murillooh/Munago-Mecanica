@@ -27,6 +27,8 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
+  // Proxies na frente do Express (produção: Vercel → CloudFront → nginx = 3), para req.ip ser o do cliente.
+  TRUST_PROXY: z.coerce.number().int().min(0).default(1),
   // Opcional: sem a chave o servidor sobe e as rotas de IA respondem 500.
   GEMINI_API_KEY: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -67,7 +69,7 @@ const ai = new GoogleGenAI({
 
 async function startServer() {
   const app = express();
-  app.set('trust proxy', 1);
+  app.set('trust proxy', env.TRUST_PROXY);
   const PORT = env.PORT;
 
   // CORS Configuration

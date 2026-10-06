@@ -10,3 +10,4 @@ coverage/
 project.zip
 scripts/migrate/out/
 firebase-applet-config.json
+eb-bundle.zip
