@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade · Munago Estoque</title>
+<meta name="description" content="Como o Munago Estoque coleta, usa e protege dados, incluindo dados recebidos das APIs do Google.">
+<style>
+  :root { --bg:#fafafa; --fg:#18181b; --muted:#52525b; --line:#e4e4e7; --accent:#2563eb; --card:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#09090b; --fg:#f4f4f5; --muted:#a1a1aa; --line:#27272a; --accent:#60a5fa; --card:#18181b; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
+  header { border-bottom:1px solid var(--line); padding-bottom:24px; margin-bottom:32px; }
+  .brand { font-weight:700; letter-spacing:-.01em; color:var(--accent); text-decoration:none; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); line-height:1.15; margin:12px 0 8px; letter-spacing:-.02em; }
+  h2 { font-size:1.15rem; margin:36px 0 8px; }
+  p, li { color:var(--fg); } .muted { color:var(--muted); font-size:.95rem; }
+  ul { padding-left: 1.2rem; } li { margin: 4px 0; }
+  .note { background:var(--card); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:8px; padding:14px 16px; }
+  a { color: var(--accent); }
+  footer { margin-top:56px; padding-top:20px; border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <a class="brand" href="/">Munago Estoque</a>
+    <h1>Política de Privacidade</h1>
+    <p class="muted">Última atualização: 6 de outubro de 2026</p>
+  </header>
+
+  <p>Esta política explica quais dados o <strong>Munago Estoque</strong> (o "sistema"), desenvolvido pela Munago Desenvolvedora de Software ("nós"), coleta, como usa e como protege esses dados. O sistema é uma ferramenta de gestão de estoque e ordens de serviço para oficinas mecânicas, usada por empresas e suas equipes.</p>
+
+  <h2>1. Dados que coletamos</h2>
+  <ul>
+    <li><strong>Conta de acesso:</strong> nome e e-mail. O login é feito pelo Amazon Cognito; não armazenamos sua senha.</li>
+    <li><strong>Dados operacionais inseridos pela sua empresa:</strong> cadastro de peças, preços, movimentações de estoque e ordens de serviço, que podem conter nome e telefone de clientes, modelo e placa de veículos e observações técnicas.</li>
+    <li><strong>Dados técnicos:</strong> endereço IP e registros de acesso, usados para segurança, prevenção de abuso e limite de requisições.</li>
+  </ul>
+
+  <h2>2. Como usamos os dados</h2>
+  <ul>
+    <li>Prestar o serviço: autenticar usuários, controlar permissões e exibir estoque, ordens de serviço e relatórios.</li>
+    <li>Gerar alertas (por exemplo, estoque abaixo do mínimo) e backups.</li>
+    <li>Manter a segurança e o funcionamento do sistema.</li>
+  </ul>
+  <p>Não vendemos dados e não os usamos para publicidade.</p>
+
+  <h2>3. Dados recebidos das APIs do Google</h2>
+  <p>A conexão com o Google é opcional e só acontece quando um usuário clica para conectar a conta. O sistema pede apenas o necessário para cada função:</p>
+  <ul>
+    <li><strong>Backup no Google Drive</strong> (<code>drive.file</code>): permite criar e ler <em>somente os arquivos de backup criados pelo próprio sistema</em>. Não temos acesso aos demais arquivos do seu Drive.</li>
+    <li><strong>Nome e e-mail da conta Google</strong> (<code>userinfo.profile</code>, <code>userinfo.email</code>): identificam a conta conectada.</li>
+    <li><strong>Sincronização com planilhas</strong> (<code>spreadsheets.readonly</code>, pedido só a quem usa essa função): lê a planilha indicada pelo usuário para importar peças. Não alteramos planilhas.</li>
+  </ul>
+  <p>Os tokens de acesso do Google ficam no navegador de quem conectou a conta e não são gravados no nosso banco de dados. Você pode revogar o acesso a qualquer momento em <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a>.</p>
+  <p class="note">O uso e a transferência, para qualquer outro aplicativo, de informações recebidas das APIs do Google obedecem à <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Política de Dados do Usuário dos Serviços de API do Google</a>, incluindo os requisitos de Uso Limitado.</p>
+
+  <h2>4. Inteligência artificial</h2>
+  <p>Funções de IA (como resumo do estoque e assistente de mercado) enviam à API do Google Gemini os dados necessários para a resposta, como nomes, quantidades e preços de peças, apenas quando o usuário aciona essas funções. Esse processamento segue os termos do Google para a API Gemini.</p>
+
+  <h2>5. Onde os dados ficam e com quem são compartilhados</h2>
+  <p>Usamos fornecedores que processam dados em nosso nome, apenas para operar o sistema:</p>
+  <ul>
+    <li><strong>Amazon Web Services</strong> (região São Paulo, Brasil): banco de dados, autenticação e servidor da aplicação.</li>
+    <li><strong>Vercel</strong>: hospedagem da interface web.</li>
+    <li><strong>Google</strong>: Drive, Planilhas e Gemini, quando usados.</li>
+  </ul>
+  <p>Também podemos divulgar dados quando exigido por lei ou ordem judicial.</p>
+
+  <h2>6. Retenção</h2>
+  <p>Os dados ficam armazenados enquanto a conta da empresa estiver ativa. Após o encerramento ou mediante solicitação, os dados são excluídos, exceto quando a lei exigir a guarda por mais tempo.</p>
+
+  <h2>7. Seus direitos (LGPD)</h2>
+  <p>Nos termos da Lei Geral de Proteção de Dados (Lei 13.709/2018), você pode pedir confirmação de tratamento, acesso, correção, anonimização, portabilidade e exclusão dos seus dados, além de revogar consentimentos. Pedidos podem ser feitos pelo contato abaixo; respondemos em até 15 dias.</p>
+
+  <h2>8. Segurança</h2>
+  <p>As conexões são criptografadas (HTTPS/TLS), o banco de dados exige conexão segura, e o acesso dentro do sistema é controlado por perfis (administrador, editor e visualizador).</p>
+
+  <h2>9. Cookies e armazenamento local</h2>
+  <p>Usamos apenas cookies e armazenamento local essenciais, para manter a sessão, preferências de tela (como tema) e a conexão opcional com o Google. Não usamos cookies de publicidade ou rastreamento.</p>
+
+  <h2>10. Alterações</h2>
+  <p>Podemos atualizar esta política. A data no topo indica a versão vigente; mudanças relevantes serão comunicadas no sistema.</p>
+
+  <h2>11. Contato</h2>
+  <p>Dúvidas ou pedidos sobre seus dados: <a href="mailto:muurisattos@gmail.com">muurisattos@gmail.com</a>.</p>
+
+  <footer class="muted">
+    Munago Desenvolvedora de Software · <a href="/termos">Termos de Serviço</a>
+  </footer>
+</main>
+</body>
+</html>
