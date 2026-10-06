@@ -322,7 +322,7 @@ const AIAssistant = () => {
       {/* Cabeçalho */}
       <div className="shrink-0 flex items-center justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">IA Specialist</h1>
+          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Assistente IA</h1>
           <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Analisa seu estoque e suas OS e pesquisa preços e fornecedores na web.</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">

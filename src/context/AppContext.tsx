@@ -769,14 +769,11 @@ export const AppProvider = ({ children }: { children: any }) => {
     _userName: string
   ) => {
     if (!canPerformTransactions) {
-      toast.error('Acesso restrito: Você não tem permissão para realizar movimentações no estoque.');
-      return;
+      throw new Error('Acesso restrito: você não tem permissão para movimentar o estoque.');
     }
-    try {
-      await apiPost('/transactions', { productId, type, quantity, reason: reason || undefined });
-    } catch (error) {
-      handleApiError(error);
-    }
+    // O servidor aplica a movimentação no saldo e registra o histórico numa transação só.
+    // Erros sobem para a tela (ex.: estoque insuficiente), que mostra a mensagem.
+    await apiPost('/transactions', { productId, type, quantity, reason: reason || undefined });
   };
 
   const updateSettingsAction = async (updates: Partial<SystemSettings>) => {

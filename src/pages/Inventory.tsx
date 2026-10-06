@@ -41,6 +41,7 @@ import {
 import * as XLSX from 'xlsx';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
+import { MovementModal } from '../components/inventory/MovementModal';
 import CategoryManager from '../components/CategoryManager';
 import { exportInventoryToPDF } from '../lib/pdfExport';
 
@@ -182,39 +183,20 @@ export const Inventory = () => {
     }
   };
 
-  const handleMovement = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const qty = Number(formData.get('quantity'));
-    const reason = formData.get('reason') as string;
-
-    if (movementType === 'out' && (selectedProduct.quantity < qty)) {
-       toast.error('Saldo insuficiente para esta saída.');
-       return;
-    }
-
-    try {
-      const newQty = movementType === 'in' ? 
-        selectedProduct.quantity + qty : 
-        selectedProduct.quantity - qty;
-
-      await updateProduct(selectedProduct.id, { quantity: newQty });
-      await registerTransaction(
-        selectedProduct.id,
-        selectedProduct.name,
-        movementType,
-        qty,
-        reason,
-        user?.uid || '',
-        user?.displayName || user?.email || 'Sistema'
-      );
-
-      toast.success(`Estoque atualizado: ${movementType === 'in' ? '+' : '-'}${qty}`);
-      setIsMovementModalOpen(false);
-    } catch (error) {
-      console.error('Error recording movement:', error);
-      toast.error('Erro ao processar movimentação.');
-    }
+  // Só o POST /transactions: o servidor ajusta o saldo e grava o histórico juntos.
+  // (Antes a tela também fazia PATCH do saldo e a movimentação era contada em dobro.)
+  const handleMovement = async (qty: number, reason: string) => {
+    await registerTransaction(
+      selectedProduct.id,
+      selectedProduct.name,
+      movementType,
+      qty,
+      reason,
+      user?.uid || '',
+      user?.displayName || user?.email || 'Sistema'
+    );
+    toast.success(`Estoque atualizado: ${movementType === 'in' ? '+' : '−'}${qty} un · ${selectedProduct.name}`);
+    setIsMovementModalOpen(false);
   };
 
   const generateCategoryImage = async () => {
@@ -1313,104 +1295,14 @@ export const Inventory = () => {
         )}
       </AnimatePresence>
 
-       {/* Movement Modal - Refined Enterprise Design */}
-       <AnimatePresence>
-        {isMovementModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-950/70 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMovementModalOpen(false)}
-              className="fixed inset-0"
-            />
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden z-10"
-            >
-              <div className="p-5 sm:p-6 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-xs ${movementType === 'in' ? 'bg-emerald-600' : 'bg-red-600'}`}>
-                    {movementType === 'in' ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-                      {movementType === 'in' ? 'Registrar Entrada de Estoque' : 'Registrar Saída de Estoque'}
-                    </h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-[240px]">
-                      {selectedProduct?.name} ({selectedProduct?.sku || 'S/SKU'})
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsMovementModalOpen(false)}
-                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleMovement} className="p-5 sm:p-6 space-y-5 text-xs sm:text-sm">
-                <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200/70 dark:border-zinc-700 text-center space-y-1">
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold">Volume da Operação</span>
-                  <div className="flex items-center justify-center gap-2">
-                    <span className={`text-2xl font-bold font-mono ${movementType === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {movementType === 'in' ? '+' : '-'}
-                    </span>
-                    <input 
-                      name="quantity" 
-                      type="number" 
-                      min="1" 
-                      defaultValue={1}
-                      required 
-                      autoFocus
-                      className="w-24 text-center text-3xl font-bold font-mono text-zinc-900 dark:text-white bg-transparent border-b-2 border-zinc-300 dark:border-zinc-600 outline-none focus:border-blue-600 transition-colors py-1 tabular-nums" 
-                    />
-                    <span className="text-xs font-semibold text-zinc-400">un</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 pt-1">
-                    Saldo atual: <strong>{selectedProduct?.quantity || 0} un</strong>
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    Justificativa / Ordem de Serviço Destino
-                  </label>
-                  <textarea 
-                    name="reason" 
-                    required
-                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-xs sm:text-sm font-normal text-zinc-900 dark:text-white outline-none focus:border-blue-600 transition-colors h-20 resize-none" 
-                    placeholder="Ex: Compra NF 1829 / Requisição para OS #1234" 
-                  />
-                </div>
-
-                <div className="flex items-center gap-2.5 pt-2">
-                  <button 
-                    type="button" 
-                    onClick={() => setIsMovementModalOpen(false)} 
-                    className="flex-1 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-zinc-200 dark:border-zinc-700"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit" 
-                    className={`flex-1 py-2 text-xs font-semibold text-white rounded-lg transition-all shadow-xs active:scale-95 ${
-                      movementType === 'in' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
-                    }`}
-                  >
-                    Confirmar {movementType === 'in' ? 'Entrada' : 'Saída'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <MovementModal
+        open={isMovementModalOpen}
+        type={movementType}
+        product={selectedProduct}
+        allowNegativeStock={settings?.allowNegativeStock}
+        onClose={() => setIsMovementModalOpen(false)}
+        onConfirm={handleMovement}
+      />
 
       {/* Delete Modal - Refined Enterprise Design */}
       <AnimatePresence>

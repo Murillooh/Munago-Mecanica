@@ -156,7 +156,7 @@ const AppContent = () => {
         className={`transition-all duration-300 ${
           isMonitorMode 
             ? 'w-full min-h-screen p-0 m-0 pb-6 lg:pl-0' 
-            : `pb-24 lg:pb-0 ${isCollapsed ? 'lg:pl-20' : 'lg:pl-72'}`
+            : `pb-24 lg:pb-0 ${isCollapsed ? 'lg:pl-[4.25rem]' : 'lg:pl-64'}`
         }`}
       >
         <div className={`w-full ${isMonitorMode ? 'px-4 sm:px-6 lg:px-8 2xl:px-12 py-5 max-w-none' : 'px-4 sm:px-6 lg:px-8 2xl:px-10 py-6 max-w-none'}`}>
