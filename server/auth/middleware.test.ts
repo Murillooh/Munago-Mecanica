@@ -68,10 +68,20 @@ describe('authMiddleware', () => {
     expect(res.body.role).toBe('viewer');
   });
 
-  it('vincula usuário migrado pelo e-mail e guarda UID antigo', async () => {
+  it('acha usuário existente pelo e-mail verificado sem trocar o id interno', async () => {
     await db.insert(users).values({ id: 'firebase-uid', email: 'c@x.com', name: 'C', role: 'editor', status: 'approved' });
     const res = await request(buildApp(db)).get('/me').set(auth('s3|C@x.com')).expect(200);
-    expect(res.body).toMatchObject({ id: 's3', role: 'editor', status: 'approved', legacyFirebaseUid: 'firebase-uid' });
+    expect(res.body).toMatchObject({ id: 'firebase-uid', role: 'editor', status: 'approved' });
+  });
+
+  it('senha e Google (subs diferentes, mesmo e-mail) caem no mesmo usuário', async () => {
+    const app = buildApp(db);
+    const first = await request(app).get('/me').set(auth('cognito-sub|boss@x.com')).expect(200);
+    const viaGoogle = await request(app).get('/me').set(auth('google-sub|boss@x.com')).expect(200);
+    const again = await request(app).get('/me').set(auth('cognito-sub|boss@x.com')).expect(200);
+    expect(viaGoogle.body.id).toBe(first.body.id);
+    expect(again.body.id).toBe(first.body.id);
+    expect(await db.select().from(users)).toHaveLength(1);
   });
 
   it('não vincula por e-mail não verificado', async () => {

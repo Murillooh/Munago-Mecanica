@@ -21,8 +21,10 @@ import {
   logout as cognitoLogout,
   completeNewPassword as cognitoCompleteNewPassword,
   getIdToken,
+  isOAuthReturn,
   type LoginResult,
 } from '../lib/auth';
+import { Hub } from 'aws-amplify/utils';
 import { apiGet, apiPost, apiPatch, apiDelete, hydrateDates, subscribeChanges, ApiRequestError } from '../lib/api';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 
@@ -446,9 +448,21 @@ export const AppProvider = ({ children }: { children: any }) => {
   }, []);
 
   useEffect(() => {
-    loadSession()
+    const finish = () => loadSession()
       .catch((e) => handleApiError(e, 'Não foi possível carregar sua sessão.'))
       .finally(() => setLoading(false));
+
+    // Volta do Google: o Amplify troca o ?code= por tokens e avisa pelo Hub.
+    const stopListening = Hub.listen('auth', ({ payload }) => {
+      if (payload.event === 'signInWithRedirect') finish();
+      if (payload.event === 'signInWithRedirect_failure') {
+        console.error('Google sign-in failed:', payload.data);
+        toast.error('Não foi possível entrar com o Google. Tente novamente.');
+        setLoading(false);
+      }
+    });
+    if (!isOAuthReturn()) finish();
+    return stopListening;
   }, [loadSession]);
 
   const isAdmin = profile?.role === 'admin';

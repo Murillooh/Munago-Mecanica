@@ -2,21 +2,52 @@ import { Amplify } from 'aws-amplify';
 import {
   signIn,
   signOut,
+  signInWithRedirect,
   confirmSignIn,
   fetchAuthSession,
   resetPassword,
   confirmResetPassword,
 } from 'aws-amplify/auth';
+// Conclui o login do Google quando o navegador volta do Cognito com ?code=...
+import 'aws-amplify/auth/enable-oauth-listener';
+
+const appUrl = `${window.location.origin}/`;
+const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN;
 
 Amplify.configure({
   Auth: {
     Cognito: {
       userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
       userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID,
-      loginWith: { email: true },
+      loginWith: {
+        email: true,
+        ...(cognitoDomain && {
+          oauth: {
+            domain: cognitoDomain,
+            scopes: ['openid', 'email', 'profile'],
+            redirectSignIn: [appUrl],
+            redirectSignOut: [appUrl],
+            responseType: 'code' as const,
+          },
+        }),
+      },
     },
   },
 });
+
+export const isGoogleLoginEnabled = Boolean(cognitoDomain);
+
+/** True quando a página carregou na volta do Google (?code=&state=); a sessão chega pelo Hub. */
+export const isOAuthReturn = () => {
+  const p = new URLSearchParams(window.location.search);
+  return p.has('code') && p.has('state');
+};
+
+/** Vai para a tela do Google; volta para o app já autenticado. */
+export async function loginWithGoogle() {
+  await signOut().catch(() => {});
+  await signInWithRedirect({ provider: 'Google' });
+}
 
 /** ID token (traz email/name) — renovado automaticamente pelo Amplify quando expira. */
 export async function getIdToken(): Promise<string | null> {

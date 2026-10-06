@@ -72,11 +72,9 @@ export function authMiddleware(opts: { db: DB; verifier: TokenVerifier; bootstra
         if (byEmail) {
           // Sem e-mail verificado, qualquer um poderia assumir a conta de outro pelo e-mail.
           if (!emailVerified) return { denied: deny(403, 'EMAIL_NOT_VERIFIED', 'E-mail não verificado.') };
-          const [linked] = await tx.update(users)
-            .set({ id: claims.sub, legacyFirebaseUid: byEmail.legacyFirebaseUid ?? byEmail.id })
-            .where(eq(users.id, byEmail.id))
-            .returning();
-          return { user: linked };
+          // Mesma pessoa por outro login (senha × Google têm subs diferentes no Cognito,
+          // ou usuário migrado): o id interno não muda, para não quebrar o histórico.
+          return { user: byEmail };
         }
 
         const isBootstrap = emailVerified && admins.has(email);
