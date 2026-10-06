@@ -1,8 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import nodemailer from "nodemailer";
-import admin from "firebase-admin";
 import dotenv from "dotenv";
 import fs from "fs";
 import { google } from "googleapis";
@@ -11,19 +9,16 @@ import { GoogleGenAI } from "@google/genai";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
 // Custom modular imports
 import logger from "./server/utils/logger.js";
-import { errorHandler, asyncHandler, ApiError } from "./server/middleware/errorHandler";
-import { 
-  emailValidator, 
-  passwordValidator, 
-  nameValidator, 
-  roleValidator, 
-  handleValidationErrors 
-} from "./server/middleware/validation";
+import { errorHandler } from "./server/middleware/errorHandler";
+import { createDb } from "./server/db/client";
+import { ChangeBus } from "./server/realtime/events";
+import { createApiRouter } from "./server/api";
+import { authMiddleware, requireAdmin, requirePermission } from "./server/auth/middleware";
+import { createCognitoAdmin, createCognitoVerifier } from "./server/auth/cognito";
 
 dotenv.config();
 
@@ -35,12 +30,13 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().optional(),
-  FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
-  EMAIL_USER: z.string().email().optional(),
-  EMAIL_PASS: z.string().optional(),
   APP_URL: z.string().url().default('http://localhost:3000'),
-  JWT_SECRET: z.string().default('loc-estoque-default-secret-change-me'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  AWS_REGION: z.string().default('sa-east-1'),
+  COGNITO_USER_POOL_ID: z.string().min(1, 'COGNITO_USER_POOL_ID is required'),
+  COGNITO_CLIENT_ID: z.string().min(1, 'COGNITO_CLIENT_ID is required'),
+  BOOTSTRAP_ADMIN_EMAILS: z.string().default(''),
 });
 
 const envResult = envSchema.safeParse(process.env);
@@ -50,7 +46,13 @@ if (!envResult.success) {
 }
 const env = envResult.data;
 
-const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
+const cognitoConfig = { region: env.AWS_REGION, userPoolId: env.COGNITO_USER_POOL_ID, clientId: env.COGNITO_CLIENT_ID };
+const db = createDb(env.DATABASE_URL);
+const bus = new ChangeBus();
+const verifier = createCognitoVerifier(cognitoConfig);
+const bootstrapAdmins = env.BOOTSTRAP_ADMIN_EMAILS.split(',');
+// Rotas legadas fora do /api/v1 (Gemini, Sheets, download) também exigem login.
+const requireLogin = [authMiddleware({ db, verifier, bootstrapAdmins }), requirePermission()];
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || "",
@@ -82,7 +84,7 @@ async function startServer() {
       }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Google-Tokens']
   }));
 
@@ -103,11 +105,13 @@ async function startServer() {
     legacyHeaders: false
   });
 
-  const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
-    skipSuccessfulRequests: true
+  // Formulário público "solicitar acesso"
+  const accessRequestLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    message: { error: 'Muitas solicitações. Tente novamente mais tarde.', code: 'RATE_LIMITED' },
+    standardHeaders: true,
+    legacyHeaders: false
   });
 
   app.use("/api", globalLimiter);
@@ -138,181 +142,11 @@ async function startServer() {
     GOOGLE_REDIRECT_URI
   );
 
-  // Initialize Firebase Admin
-  if (admin.apps.length === 0) {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      try {
-        const serviceAccount = JSON.parse(
-          process.env.FIREBASE_SERVICE_ACCOUNT_JSON.startsWith("{")
-            ? process.env.FIREBASE_SERVICE_ACCOUNT_JSON
-            : Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_JSON, "base64").toString()
-        );
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-        });
-        console.log("Firebase Admin initialized with service account.");
-      } catch (error) {
-        console.error("Error initializing Firebase Admin with service account:", error);
-        try {
-          admin.initializeApp();
-          console.log("Firebase Admin initialized with default credentials (fallback).");
-        } catch (fallbackError) {
-          console.error("Error initializing Firebase Admin with default credentials (fallback):", fallbackError);
-        }
-      }
-    } else {
-      try {
-        admin.initializeApp();
-        console.log("Firebase Admin initialized with default credentials.");
-      } catch (error) {
-        console.warn("FIREBASE_SERVICE_ACCOUNT_JSON not found and default credentials failed. User creation will likely fail.", error);
-      }
-    }
-  }
-
-  // API Routes
-  app.post("/api/users/create", 
-    emailValidator,
-    nameValidator,
-    roleValidator,
-    handleValidationErrors,
-    asyncHandler(async (req: any, res: any) => {
-      const { email, name, role, permissions } = req.body;
-
-      logger.info({ email, role }, 'Creating new user with secure password flow');
-      
-      // 1. Generate secure temporary password
-      const tempPassword = crypto.randomBytes(12).toString('hex');
-
-      // 2. Create user in Firebase Auth
-      const userRecord = await admin.auth().createUser({
-        email,
-        password: tempPassword,
-        displayName: name,
-      });
-
-      // 3. Create JWT for setup
-      const resetToken = jwt.sign(
-        {
-          uid: userRecord.uid,
-          email: email,
-          type: 'initial_password_setup',
-          iat: Math.floor(Date.now() / 1000)
-        },
-        env.JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      const tokenHash = crypto
-        .createHash('sha256')
-        .update(resetToken)
-        .digest('hex');
-
-      // 4. Create user document in Firestore
-      const db = admin.firestore(firebaseConfig.firestoreDatabaseId);
-      const emailId = email.toLowerCase().trim();
-      
-      await db.collection("users").doc(userRecord.uid).set({
-        email: emailId,
-        name,
-        role: role === 'user' ? 'viewer' : role,
-        ...(permissions && { permissions }),
-        uid: userRecord.uid,
-        status: 'pending',
-        passwordResetToken: tokenHash,
-        passwordResetExpires: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      // 5. Send Welcome Email with link
-      if (env.EMAIL_USER && env.EMAIL_PASS) {
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: env.EMAIL_USER,
-            pass: env.EMAIL_PASS,
-          },
-        });
-
-        const resetLink = `${env.APP_URL}/auth/set-password?token=${encodeURIComponent(resetToken)}`;
-
-        const mailOptions = {
-          from: `"Munago Estoque" <${env.EMAIL_USER}>`,
-          to: email,
-          subject: "Bem-vindo ao Munago Estoque - Configure sua Senha",
-          html: `
-            <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto;">
-              <h2 style="color: #2563eb;">Bem-vindo ao Munago Estoque, ${name}!</h2>
-              <p>Sua conta de acesso foi criada com sucesso pelo administrador.</p>
-              <div style="background: #fdf2f2; border-left: 4px solid #ef4444; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                <p><strong>Usuário (Email):</strong> ${email}</p>
-                <p>Para sua segurança, você deve configurar sua senha pessoal clicando no botão abaixo:</p>
-              </div>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${resetLink}" style="background-color: #2563eb; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">CONFIGURAR MINHA SENHA</a>
-              </div>
-              <p style="font-size: 0.9em; color: #666;">Este link é válido por 24 horas. Se não funcionar, copie este link no navegador:</p>
-              <p style="font-size: 0.8em; word-break: break-all; color: #999;">${resetLink}</p>
-              <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-              <p style="font-size: 0.8em; color: #999;">Equipe de Gestão Munago Estoque.</p>
-            </div>
-          `,
-        };
-
-        await transporter.sendMail(mailOptions);
-        logger.info({ email }, 'Setup link sent to user');
-      }
-
-      res.status(201).json({ 
-        uid: userRecord.uid,
-        message: 'Usuário criado. Link de configuração enviado por e-mail.'
-      });
-    })
-  );
-
-  app.post("/api/auth/set-password", asyncHandler(async (req: any, res: any) => {
-    const { token, newPassword } = req.body;
-
-    if (!token || !newPassword || newPassword.length < 8) {
-      throw new ApiError(400, 'INVALID_INPUT', 'Dados inválidos para alteração de senha.');
-    }
-
-    // 1. Verify JWT
-    const decoded = jwt.verify(token, env.JWT_SECRET) as any;
-    if (decoded.type !== 'initial_password_setup') {
-      throw new ApiError(400, 'INVALID_TOKEN_TYPE', 'Tipo de token inválido.');
-    }
-
-    // 2. Hash and check in Firestore
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const db = admin.firestore(firebaseConfig.firestoreDatabaseId);
-    const userSnapshot = await db.collection("users").where('uid', '==', decoded.uid).get();
-
-    if (userSnapshot.empty) {
-      throw new ApiError(404, 'USER_NOT_FOUND', 'Usuário não encontrado.');
-    }
-
-    const userDoc = userSnapshot.docs[0];
-    const userData = userDoc.data();
-
-    if (!userData.passwordResetToken || userData.passwordResetToken !== tokenHash) {
-      throw new ApiError(401, 'LINK_EXPIRED_OR_USED', 'O link expirou ou já foi utilizado.');
-    }
-
-    // 3. Update Firebase Auth
-    await admin.auth().updateUser(decoded.uid, {
-      password: newPassword
-    });
-
-    // 4. Update Firestore and Approve
-    await userDoc.ref.update({
-      passwordResetToken: admin.firestore.FieldValue.delete(),
-      passwordResetExpires: admin.firestore.FieldValue.delete(),
-      status: 'approved'
-    });
-
-    logger.info({ uid: decoded.uid }, 'Password set successfully via secure link');
-    res.json({ success: true, message: 'Senha configurada com sucesso!' });
+  // API v1: Postgres (RDS) + Cognito. Substitui Firestore, firestore.rules e Firebase Auth.
+  app.use("/api/v1", createApiRouter({
+    db, bus, verifier, bootstrapAdmins,
+    cognito: createCognitoAdmin(cognitoConfig),
+    publicLimiter: accessRequestLimiter,
   }));
 
   // Google Auth Routes
@@ -325,7 +159,7 @@ async function startServer() {
   });
 
   // Gemini API Routes
-  app.post("/api/gemini/generate", geminiLimiter, async (req, res, next) => {
+  app.post("/api/gemini/generate", ...requireLogin, geminiLimiter, async (req, res, next) => {
     const { model, contents, config, systemInstruction } = req.body;
     try {
       const response = await ai.models.generateContent({
@@ -349,7 +183,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/gemini/chat-stream", geminiLimiter, async (req, res, next) => {
+  app.post("/api/gemini/chat-stream", ...requireLogin, geminiLimiter, async (req, res, next) => {
     const { model, contents, config, systemInstruction } = req.body;
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -398,7 +232,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/gemini/generate-image", async (req, res) => {
+  app.post("/api/gemini/generate-image", ...requireLogin, geminiLimiter, async (req, res) => {
     const { model, prompt, config } = req.body;
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
@@ -493,7 +327,10 @@ async function startServer() {
 
       const nonce = (state as string) || crypto.createHash('sha256').update(Math.random().toString()).digest('hex');
       const tokensJson = JSON.stringify(tokens);
-      const escapedJson = JSON.stringify(tokensJson); // Double escaped for script injection safety
+      // Serializa para dentro de <script> sem permitir fechar a tag (XSS).
+      const LT_ESCAPED = String.fromCharCode(92) + "u003c"; // "\u003c": JSON.parse devolve <, mas o HTML não vê </script>
+      const inlineJson = (v: unknown) => JSON.stringify(v).replace(/</g, LT_ESCAPED);
+      const escapedJson = inlineJson(tokensJson);
 
       res.send(`
         <!DOCTYPE html>
@@ -517,9 +354,9 @@ async function startServer() {
                   type: 'OAUTH_AUTH_SUCCESS', 
                   provider: 'google',
                   tokens: tokens,
-                  nonce: '${nonce}',
+                  nonce: ${inlineJson(nonce)},
                   timestamp: Date.now()
-                }, env.FRONTEND_URL || window.location.origin);
+                }, ${inlineJson(env.FRONTEND_URL)});
                 
                 setTimeout(() => window.close(), 1000);
               } catch(e) {
@@ -541,7 +378,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/sheets/data", async (req, res) => {
+  app.get("/api/sheets/data", ...requireLogin, async (req, res) => {
     const spreadsheetId = req.query.spreadsheetId as string;
     const range = (req.query.range as string) || "A1:Z100";
     
@@ -585,7 +422,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/download-project", async (req, res) => {
+  app.get("/api/download-project", ...requireLogin, requireAdmin, async (req, res) => {
     const { exec } = await import("child_process");
     const { promisify } = await import("util");
     const execPromise = promisify(exec);
@@ -604,9 +441,6 @@ async function startServer() {
         "vite.config.ts",
         "index.html",
         "metadata.json",
-        "firestore.rules",
-        "firebase-blueprint.json",
-        "firebase-applet-config.json",
         ".env.example",
         ".gitignore"
       ].join(" ");

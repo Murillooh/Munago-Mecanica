@@ -1,5 +1,6 @@
 import { Router, type RequestHandler } from 'express';
-import { authMiddleware, type TokenVerifier } from './auth/middleware';
+import { authMiddleware, requirePermission, type TokenVerifier } from './auth/middleware';
+import { sseHandler, sseTokenFromQuery } from './realtime/sse';
 import type { ApiDeps } from './routes/deps';
 import { createSettingsRouter } from './routes/settings';
 import { createProductsRouter } from './routes/products';
@@ -28,7 +29,9 @@ export function createApiRouter(opts: ApiOptions): Router {
   if (opts.publicLimiter) api.post('/access-requests', opts.publicLimiter);
   api.use(pub);
 
+  api.use(sseTokenFromQuery);
   api.use(authMiddleware({ db: opts.db, verifier: opts.verifier, bootstrapAdmins: opts.bootstrapAdmins }));
+  api.get('/events', requirePermission(), sseHandler(opts.bus));
   opts.extra?.(api);
 
   for (const make of [
