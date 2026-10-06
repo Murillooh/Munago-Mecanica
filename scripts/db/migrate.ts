@@ -21,5 +21,7 @@ async function main() {
 
 main().catch((e) => {
   console.error('Falhou:', e instanceof Error ? e.message : e);
+  // drizzle embrulha o erro real do driver em `cause`.
+  if (e instanceof Error && e.cause) console.error('Causa:', e.cause instanceof Error ? e.cause.message : e.cause);
   process.exit(1);
 });
