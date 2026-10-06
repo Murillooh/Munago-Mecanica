@@ -1,0 +1,308 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (auth.uid)
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - role: string (required, 'admin', 'editor', or 'viewer')
+    //   - photoURL: string (optional)
+    //
+    // Collection: products
+    // Document ID: productId
+    // Fields:
+    //   - name: string (required)
+    //   - description: string (optional)
+    //   - category: string (optional)
+    //   - price: number (optional)
+    //   - quantity: number (required)
+    //   - minQuantity: number (required)
+    //   - imageUrl: string (optional)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: transactions
+    // Document ID: transactionId
+    // Fields:
+    //   - productId: string (required)
+    //   - productName: string (required)
+    //   - type: string (required, 'in' or 'out')
+    //   - quantity: number (required)
+    //   - reason: string (optional)
+    //   - timestamp: timestamp (required)
+    //   - userId: string (required)
+    //   - userName: string (required)
+    //
+    // Collection: notifications
+    // Document ID: notificationId
+    // Fields:
+    //   - title: string (required)
+    //   - message: string (required)
+    //   - productId: string (optional)
+    //   - type: string (required, 'low_stock')
+    //   - timestamp: timestamp (required)
+    //   - read: boolean (required)
+    //
+    // Collection: categories
+    // Document ID: categoryId
+    // Fields:
+    //   - name: string (required)
+    //   - description: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: serviceOrders
+    // Document ID: osId
+    // Fields:
+    //   - customerName: string (required)
+    //   - customerPhone: string (optional)
+    //   - vehicleModel: string (optional)
+    //   - vehiclePlate: string (optional)
+    //   - items: list (required)
+    //   - generalLaborCost: number (required)
+    //   - totalLaborCost: number (required)
+    //   - totalPartsCost: number (required)
+    //   - totalAmount: number (required)
+    //   - status: string (required, 'draft', 'in_progress', 'completed', 'paid')
+    //   - scheduledDate: string (required)
+    //   - observations: string (optional)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (required)
+    //   - createdBy: string (userId, required)
+    //
+    // Collection: access_requests
+    // Document ID: requestId
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - workshopName: string (required)
+    //   - phone: string (optional)
+    //   - message: string (optional)
+    //   - status: string (required, 'pending', 'approved', 'rejected')
+    //   - timestamp: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        isBootstrapAdmin() ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
+      );
+    }
+
+    function isBootstrapAdmin() {
+      return request.auth != null && (
+        request.auth.uid == 'a7HqhynN5fdfjrK3eG5yHAOEAGx2' ||
+        (
+          'email' in request.auth.token &&
+          request.auth.token.email != null &&
+          (
+            request.auth.token.email.matches("(?i).*murillo.*") ||
+            request.auth.token.email.matches("(?i).*locgrupo.*") ||
+            request.auth.token.email == 'murillo.silva@locgrupo.com.br' ||
+            request.auth.token.email == 'servidorarquivos@locgrupo.com.br' ||
+            request.auth.token.email == 'Murillo.Silva@locgrupo.com.br' ||
+            request.auth.token.email == 'ServidorArquivos@locgrupo.com.br'
+          )
+        )
+      );
+    }
+
+    function isApproved() {
+      return isAuthenticated() && (
+        isBootstrapAdmin() ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+          )
+        )
+      );
+    }
+
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function hasPermission(permission) {
+      return isApproved() && (
+        isAdmin() || 
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions[permission] == true
+        )
+      );
+    }
+
+    function canManageInventory() { return hasPermission('canManageInventory'); }
+    function canManageOS() { return hasPermission('canManageOS'); }
+    function canManageUsers() { return hasPermission('canManageUsers'); }
+    function canViewReports() { return hasPermission('canViewReports'); }
+    function canPerformTransactions() { return hasPermission('canPerformTransactions'); }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'role']) &&
+             data.name is string && data.name.size() < 100 &&
+             (!('email' in data) || data.email is string) &&
+             data.role in ['admin', 'editor', 'viewer'] &&
+             (!('permissions' in data) || data.permissions is map);
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'quantity', 'minQuantity', 'status']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.minQuantity is number && data.minQuantity >= 0 &&
+             data.status in ['ativo', 'inativo'] &&
+             (!('laborCost' in data) || data.laborCost is number) &&
+             (!('price' in data) || data.price is number) &&
+             (!('sku' in data) || data.sku is string) &&
+             (!('category' in data) || data.category is string) &&
+             (!('description' in data) || data.description is string) &&
+             (!('imageUrl' in data) || data.imageUrl is string) &&
+             (!('expirationDate' in data) || data.expirationDate is string) &&
+             (!('batch' in data) || data.batch is string);
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['productId', 'type', 'quantity', 'timestamp', 'userId']) &&
+             data.productId is string &&
+             data.type in ['in', 'out'] &&
+             data.quantity is number && data.quantity > 0 &&
+             data.userId == request.auth.uid;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['title', 'message', 'type', 'timestamp', 'read']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.message is string && data.message.size() > 0 && data.message.size() < 1000 &&
+             data.type in ['low_stock'] &&
+             data.read is bool;
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (!('description' in data) || data.description is string);
+    }
+
+    function isValidServiceOrder(data) {
+      return data.keys().hasAll(['customerName', 'items', 'generalLaborCost', 'totalLaborCost', 'totalPartsCost', 'totalAmount', 'status', 'createdBy', 'scheduledDate']) &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() < 200 &&
+             data.items is list &&
+             data.generalLaborCost is number && data.generalLaborCost >= 0 &&
+             data.totalLaborCost is number && data.totalLaborCost >= 0 &&
+             data.totalPartsCost is number && data.totalPartsCost >= 0 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.status in ['draft', 'in_progress', 'completed', 'paid'] &&
+             data.createdBy is string &&
+             data.scheduledDate is string &&
+             (!('observations' in data) || (data.observations is string && data.observations.size() < 2000)) &&
+             (!('customerPhone' in data) || data.customerPhone is string) &&
+             (!('vehicleModel' in data) || data.vehicleModel is string) &&
+             (!('vehiclePlate' in data) || data.vehiclePlate is string);
+    }
+
+    function isValidAccessRequest(data) {
+      return data.keys().hasAll(['name', 'email', 'workshopName', 'status', 'timestamp']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.workshopName is string && data.workshopName.size() > 0 && data.workshopName.size() < 200 &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             (!('phone' in data) || data.phone is string) &&
+             (!('message' in data) || data.message is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || (request.auth.token.email != null && request.auth.token.email == userId) || canManageUsers());
+      allow create: if canManageUsers() || isOwner(userId);
+      allow update: if canManageUsers() ||
+                       (isOwner(userId) && request.resource.data.role == resource.data.role && (!('permissions' in request.resource.data) || request.resource.data.permissions == resource.data.permissions));
+      allow delete: if canManageUsers() || (isAuthenticated() && request.auth.token.email != null && request.auth.token.email == userId);
+    }
+
+    match /products/{productId} {
+      allow read: if isApproved();
+      allow create: if canManageInventory() && isValidProduct(request.resource.data) && 
+                    request.resource.data.keys().hasAll(['createdAt', 'updatedAt']);
+      allow update: if (canManageInventory() || canPerformTransactions()) && isValidProduct(request.resource.data) && 
+                    request.resource.data.updatedAt == request.time &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if canManageInventory();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isApproved();
+      allow create: if canPerformTransactions() && isValidTransaction(request.resource.data);
+      allow update, delete: if false; // Transactions are immutable
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if canManageInventory() || canManageOS();
+      allow create: if isAuthenticated() && isValidNotification(request.resource.data);
+      allow update: if (canManageInventory() || canManageOS()) && isValidNotification(request.resource.data) &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if canManageInventory() || canManageOS();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isApproved();
+      allow create: if canManageInventory() && isValidCategory(request.resource.data);
+      allow update: if canManageInventory() && isValidCategory(request.resource.data) &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if canManageInventory();
+    }
+
+    match /serviceOrders/{osId} {
+      allow read: if isApproved();
+      allow create: if canManageOS() && isValidServiceOrder(request.resource.data) &&
+                    request.resource.data.createdBy == request.auth.uid;
+      allow update: if canManageOS() && 
+                    isValidServiceOrder(request.resource.data) &&
+                    request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if canManageOS();
+    }
+
+    match /ai_searches/{searchId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isAdmin() || isApproved());
+    }
+
+    match /access_requests/{requestId} {
+      allow read: if isAdmin();
+      allow create: if isValidAccessRequest(request.resource.data) && 
+                    request.resource.data.status == 'pending';
+      allow update: if isAdmin() && isValidAccessRequest(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}

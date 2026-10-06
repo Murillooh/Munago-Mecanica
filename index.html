@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Munago Estoque - Gestão Operacional</title>
+    <meta name="description" content="Sistema profissional de gestão de estoque e almoxarifado com atualizações em tempo real e controle de ordens de serviço." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        try {
+          var pref = localStorage.getItem('munago_theme_preference') || localStorage.getItem('theme_preference');
+          var isDark = true;
+          if (pref === 'light') {
+            isDark = false;
+          } else if (pref === 'dark') {
+            isDark = true;
+          } else if (pref === 'system') {
+            isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          } else {
+            var legacy = localStorage.getItem('darkMode');
+            if (legacy !== null) {
+              isDark = legacy !== 'false';
+            }
+          }
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.style.colorScheme = 'light';
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+    <div id="root">
+      <div id="initial-preloader" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#09090b;color:#f4f4f5;font-family:'Plus Jakarta Sans',system-ui,sans-serif;z-index:99999;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:18px;">
+          <div style="width:52px;height:52px;background:#18181b;border:1px solid rgba(255,255,255,0.15);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 25px -5px rgba(0,0,0,0.5);">
+            <span style="font-weight:900;font-size:18px;letter-spacing:1px;color:#ffffff;">ME</span>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:15px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;">Munago Estoque</div>
+            <div style="font-size:11px;font-weight:500;color:#71717a;margin-top:2px;">Gestão Operacional</div>
+          </div>
+          <div style="width:140px;height:3px;background:#27272a;border-radius:999px;overflow:hidden;position:relative;">
+            <div style="width:50%;height:100%;background:#2563eb;border-radius:999px;position:absolute;animation:preloadSlide 1.2s infinite ease-in-out;"></div>
+          </div>
+        </div>
+        <style>
+          @keyframes preloadSlide {
+            0% { left: -50%; width: 30%; }
+            50% { left: 35%; width: 45%; }
+            100% { left: 100%; width: 30%; }
+          }
+        </style>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
