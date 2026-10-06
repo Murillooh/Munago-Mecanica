@@ -26,7 +26,7 @@
 3. **Estoque atômico:** movimentação e criação de OS rodam em transação SQL com `SELECT ... FOR UPDATE`. Corrige corrida que existe hoje (cliente lia estoque local e depois fazia `increment`).
 4. **Notificação de estoque baixo:** gerada no servidor, dentro da mesma transação.
 5. **Usuários:** tabela `users.id` = `sub` do Cognito. Senhas do Firebase **não** podem ser importadas (hash scrypt do Firebase não é aceito pelo Cognito). Cada usuário migrado recebe e-mail do Cognito com senha temporária e troca no primeiro login.
-6. **Admins bootstrap:** e-mails hoje fixos no código (`murillo.silva@locgrupo.com.br`, `servidorarquivos@locgrupo.com.br`, regex `murillo`/`locgrupo` nas rules) viram env `BOOTSTRAP_ADMIN_EMAILS`. Regex por substring some (era brecha: qualquer e-mail contendo "murillo" virava admin).
+6. **Admins bootstrap:** e-mails hoje fixos no código (`murillo.silva@locgrupo.com.br`, `servidorarquivos@locgrupo.com.br`, regex `murillo`/`locgrupo` nas rules) deixam de valer. `BOOTSTRAP_ADMIN_EMAILS` = `muurisattos@gmail.com` (único admin geral). Regex por substring some (era brecha: qualquer e-mail contendo "murillo" virava admin).
 7. **Google Drive backup:** hoje usa token do popup Google do Firebase. Passa a usar o OAuth Google que já existe em `server.ts` (`/api/auth/google/url`). Login com Google via Cognito (IdP federado) fica fora deste plano — pode entrar depois.
 8. **Região AWS:** `sa-east-1` (São Paulo).
 
@@ -205,7 +205,7 @@ VITE_COGNITO_USER_POOL_ID="sa-east-1_XXXXXXX"
 VITE_COGNITO_CLIENT_ID="xxxxxxxxxxxxxxxxxxxx"
 
 # E-mails com admin automático no primeiro login (vírgula)
-BOOTSTRAP_ADMIN_EMAILS="murillo.silva@locgrupo.com.br,servidorarquivos@locgrupo.com.br"
+BOOTSTRAP_ADMIN_EMAILS="muurisattos@gmail.com"
 ```
 
 Server precisa de credenciais AWS para chamadas admin do Cognito: em dev, vêm do `aws configure`; em produção, role IAM da máquina.
@@ -1187,7 +1187,7 @@ Skills: `verification-before-completion`, `webapp-testing`.
 
 Com `.env` apontando para RDS + Cognito reais e banco vazio:
 
-1. Criar seu usuário no Cognito: `aws cognito-idp admin-create-user --user-pool-id $POOL_ID --username murillo.silva@locgrupo.com.br --user-attributes Name=email,Value=murillo.silva@locgrupo.com.br Name=email_verified,Value=true Name=name,Value="Murillo"`.
+1. Criar seu usuário no Cognito: `aws cognito-idp admin-create-user --user-pool-id $POOL_ID --username muurisattos@gmail.com --user-attributes Name=email,Value=muurisattos@gmail.com Name=email_verified,Value=true Name=name,Value="Murillo"`.
 2. Login com senha temporária → pede nova senha → entra como admin (bootstrap).
 3. Criar categoria, produto (estoque 5, mínimo 2), entrada +3, saída -7 → notificação de estoque baixo aparece **sem recarregar** em outra aba (SSE).
 4. Saída maior que estoque → toast de erro, estoque inalterado.
