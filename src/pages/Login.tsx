@@ -7,22 +7,19 @@ import {
   Moon, 
   Sun, 
   X, 
-  User, 
-  Building, 
-  Phone, 
-  UserPlus, 
+  User,
   ChevronRight, 
   Loader2, 
   AlertCircle,
   ShieldCheck,
   TrendingUp,
-  CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import { useApp } from '../context/AppContext';
-import { apiPost } from '../lib/api';
 import {
   authErrorMessage,
   confirmPasswordReset,
@@ -34,10 +31,59 @@ import {
   resendRegistrationCode,
 } from '../lib/auth';
 
-// login: e-mail e senha | signup/confirmSignup: criar conta + código do e-mail | newPassword: primeiro acesso (senha temporária do convite) | resetCode: código recebido por e-mail
-type AuthStep = 'login' | 'signup' | 'confirmSignup' | 'newPassword' | 'resetCode';
+// login: e-mail e senha | newPassword: primeiro acesso (senha temporária do convite) | resetCode: código recebido por e-mail
+type AuthStep = 'login' | 'newPassword' | 'resetCode';
+// Cadastro (tela "Criar Conta"): form = dados + senha | code = código enviado ao e-mail
+type SignupStep = 'form' | 'code';
 
 const inputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 pl-12 pr-5 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all text-sm font-medium";
+const passwordInputClass = inputClass.replace('pr-5', 'pr-12');
+
+const PasswordToggle: React.FC<{ visible: boolean; onToggle: () => void }> = ({ visible, onToggle }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}
+    aria-pressed={visible}
+    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 focus-visible:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/40 transition-colors cursor-pointer"
+  >
+    {visible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+  </button>
+);
+
+const regInputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 dark:text-white font-medium transition-all";
+const regPasswordInputClass = regInputClass.replace('pr-4', 'pr-12');
+const regLabelClass = "text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1";
+const regIconClass = "absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600";
+
+const SocialDivider: React.FC<{ label: string }> = ({ label }) => (
+  <div className="relative py-6">
+    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+      <div className="w-full border-t border-zinc-100 dark:border-zinc-800"></div>
+    </div>
+    <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em]">
+      <span className="bg-white dark:bg-zinc-900 px-4 text-zinc-400 font-bold">{label}</span>
+    </div>
+  </div>
+);
+
+const GoogleButton: React.FC<{ id: string; label: string; onClick: () => void; disabled: boolean }> = ({ id, label, onClick, disabled }) => (
+  <button
+    id={id}
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className="w-full flex items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-8 py-3.5 rounded-2xl font-bold transition-all border border-zinc-200 dark:border-zinc-700 shadow-sm disabled:opacity-50 cursor-pointer active:scale-95"
+  >
+    <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+    </svg>
+    <span className="text-sm">{label}</span>
+  </button>
+);
 
 const Login: React.FC = () => {
   const {
@@ -49,6 +95,8 @@ const Login: React.FC = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [authStep, setAuthStep] = useState<AuthStep>('login');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -56,35 +104,67 @@ const Login: React.FC = () => {
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Form for Access Request
-  // Troca de tela: 1 = indo para a solicitação (desliza para a esquerda), -1 = voltando
+  // Cadastro de conta
+  // Troca de tela: 1 = indo para o cadastro (desliza para a esquerda), -1 = voltando
   const [view, setView] = useState<'login' | 'request'>('login');
   const [direction, setDirection] = useState<1 | -1>(1);
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [signupStep, setSignupStep] = useState<SignupStep>('form');
+  const [signupError, setSignupError] = useState('');
   const [registrationLoading, setRegistrationLoading] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [signupCode, setSignupCode] = useState('');
   const [regForm, setRegForm] = useState({
     name: '',
     email: '',
-    workshopName: '',
-    phone: ''
+    password: '',
+    confirmPassword: ''
   });
 
-  const handleRequestAccess = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSignupError('');
+    if (regForm.password !== regForm.confirmPassword) {
+      setSignupError('As senhas não coincidem.');
+      return;
+    }
     setRegistrationLoading(true);
     try {
-      const { phone, ...required } = regForm;
-      await apiPost('/access-requests', {
-        ...required,
-        ...(phone ? { phone } : {}),
-      });
-      setRegistrationSuccess(true);
-      toast.success('Solicitação enviada com sucesso!');
+      await register(regForm.name, regForm.email, regForm.password);
+      setSignupCode('');
+      setSignupStep('code');
+      toast.success(`Enviamos um código de verificação para ${regForm.email}.`);
     } catch (error) {
-      console.error('Error requesting access:', error);
-      toast.error(error instanceof Error && error.message ? error.message : 'Erro ao enviar solicitação. Tente novamente.');
+      console.error('Signup error:', error);
+      setSignupError(authErrorMessage(error));
     } finally {
       setRegistrationLoading(false);
+    }
+  };
+
+  const handleConfirmSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSignupError('');
+    setRegistrationLoading(true);
+    try {
+      await confirmRegistration(regForm.email, signupCode);
+      // Conta confirmada: entra direto. O admin ainda precisa aprovar o acesso.
+      await loginEmail(regForm.email, regForm.password);
+      toast.success('Conta criada! Aguarde a liberação do administrador.');
+    } catch (error) {
+      console.error('Confirm signup error:', error);
+      setSignupError(authErrorMessage(error));
+    } finally {
+      setRegistrationLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setSignupError('');
+    try {
+      await resendRegistrationCode(regForm.email);
+      toast.success(`Enviamos um novo código para ${regForm.email}.`);
+    } catch (error) {
+      setSignupError(authErrorMessage(error));
     }
   };
 
@@ -124,37 +204,24 @@ const Login: React.FC = () => {
   const goTo = (next: 'login' | 'request') => {
     if (next === view) return;
     setDirection(next === 'request' ? 1 : -1);
-    if (next === 'request') setRegistrationSuccess(false);
     setLoginError('');
+    setSignupError('');
     setView(next);
   };
 
   // Leva o foco do teclado para a tela que acabou de entrar.
   const focusCurrentView = () => {
     requestAnimationFrame(() => {
-      document.getElementById(view === 'request' ? 'reg-name-input' : 'btn-trigger-registration')?.focus();
+      const target = view === 'request'
+        ? (signupStep === 'code' ? 'signup-code-input' : 'reg-name-input')
+        : 'btn-toggle-auth-mode';
+      document.getElementById(target)?.focus();
     });
   };
 
-  const showsCredentials = authStep === 'login' || authStep === 'signup';
-  const showsCode = authStep === 'resetCode' || authStep === 'confirmSignup';
+  const showsCredentials = authStep === 'login';
+  const showsCode = authStep === 'resetCode';
   const showsNewPassword = authStep === 'newPassword' || authStep === 'resetCode';
-
-  const switchStep = (step: AuthStep) => {
-    setAuthStep(step);
-    setResetCode('');
-    setLoginError('');
-  };
-
-  const handleResendCode = async () => {
-    setLoginError('');
-    try {
-      await resendRegistrationCode(email);
-      toast.success(`Enviamos um novo código para ${email}.`);
-    } catch (error) {
-      setLoginError(authErrorMessage(error));
-    }
-  };
 
   const backToLogin = () => {
     setAuthStep('login');
@@ -183,15 +250,6 @@ const Login: React.FC = () => {
           return;
         }
         toast.success('Login realizado com sucesso!');
-      } else if (authStep === 'signup') {
-        await register(email, password);
-        setAuthStep('confirmSignup');
-        toast.success(`Enviamos um código de verificação para ${email}.`);
-      } else if (authStep === 'confirmSignup') {
-        await confirmRegistration(email, resetCode);
-        // Conta confirmada: entra direto. O admin ainda precisa aprovar o acesso.
-        await loginEmail(email, password);
-        toast.success('Conta criada! Aguarde a liberação do administrador.');
       } else if (authStep === 'newPassword') {
         await completeNewPassword(newPassword);
         toast.success('Senha definida! Bem-vindo.');
@@ -209,10 +267,11 @@ const Login: React.FC = () => {
   };
 
   // Sai do app para a tela do Google; a volta é tratada no AppContext.
-  const handleGoogleLogin = async () => {
-    setLoginError('');
+  // No primeiro acesso o servidor cria a conta com nome e e-mail do Google (pendente de aprovação).
+  const handleGoogleLogin = async (setError: (msg: string) => void) => {
+    setError('');
     if (!isGoogleLoginEnabled) {
-      setLoginError('O login com Google ainda não foi configurado.');
+      setError('O login com Google ainda não foi configurado.');
       return;
     }
     setIsLoggingIn(true);
@@ -220,7 +279,7 @@ const Login: React.FC = () => {
       await loginWithGoogle();
     } catch (error) {
       console.error('Google login error:', error);
-      setLoginError('Não foi possível abrir o login do Google. Tente novamente.');
+      setError('Não foi possível abrir o login do Google. Tente novamente.');
       setIsLoggingIn(false);
     }
   };
@@ -242,8 +301,6 @@ const Login: React.FC = () => {
 
   const titles: Record<AuthStep, [string, string]> = {
     login: ['Acessar Painel', 'Entre com suas credenciais para continuar'],
-    signup: ['Criar Conta', 'Preencha os dados para criar seu acesso'],
-    confirmSignup: ['Confirme seu e-mail', `Digite o código enviado para ${email}`],
     newPassword: ['Defina sua senha', 'Primeiro acesso: crie uma senha pessoal para substituir a temporária'],
     resetCode: ['Redefinir senha', `Digite o código enviado para ${email} e a nova senha`],
   };
@@ -317,7 +374,7 @@ const Login: React.FC = () => {
                       <span className="text-blue-200">da plataforma.</span>
                     </h2>
                     <p className="text-blue-50 text-lg font-medium max-w-md leading-relaxed opacity-80">
-                      Envie seus dados e um administrador analisa o pedido. Quando aprovado, o acesso chega no seu e-mail.
+                      Crie sua conta em poucos passos. Assim que um administrador liberar, você já entra no sistema.
                     </p>
                   </>
                 )}
@@ -407,23 +464,18 @@ const Login: React.FC = () => {
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
                           <input
                             id="login-password-input"
-                            type="password"
-                            autoComplete={authStep === 'signup' ? 'new-password' : 'current-password'}
-                            minLength={authStep === 'signup' ? 8 : undefined}
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete="current-password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
                             placeholder="••••••••"
                             aria-invalid={!!loginError}
                             aria-describedby={loginError ? 'login-error' : undefined}
-                            className={inputClass}
+                            className={passwordInputClass}
                           />
+                          <PasswordToggle visible={showPassword} onToggle={() => setShowPassword(v => !v)} />
                         </div>
-                        {authStep === 'signup' ? (
-                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 ml-1">
-                            Mínimo de 8 caracteres, com letras minúsculas e números.
-                          </p>
-                        ) : (
                         <div className="flex justify-end pr-1">
                           <button
                             id="btn-forgot-password"
@@ -434,7 +486,6 @@ const Login: React.FC = () => {
                             Esqueceu a senha?
                           </button>
                         </div>
-                        )}
                       </div>
                     </>
                   )}
@@ -466,7 +517,7 @@ const Login: React.FC = () => {
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
                           <input
                             id="new-password-input"
-                            type="password"
+                            type={showNewPassword ? 'text' : 'password'}
                             autoComplete="new-password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
@@ -474,8 +525,9 @@ const Login: React.FC = () => {
                             minLength={8}
                             placeholder="••••••••"
                             aria-describedby="new-password-hint"
-                            className={inputClass}
+                            className={passwordInputClass}
                           />
+                          <PasswordToggle visible={showNewPassword} onToggle={() => setShowNewPassword(v => !v)} />
                         </div>
                         <p id="new-password-hint" className="text-[11px] text-zinc-500 dark:text-zinc-400 ml-1">
                           Mínimo de 8 caracteres, com letras minúsculas e números.
@@ -487,15 +539,16 @@ const Login: React.FC = () => {
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
                           <input
                             id="confirm-password-input"
-                            type="password"
+                            type={showNewPassword ? 'text' : 'password'}
                             autoComplete="new-password"
                             value={confirmNewPassword}
                             onChange={(e) => setConfirmNewPassword(e.target.value)}
                             required
                             minLength={8}
                             placeholder="••••••••"
-                            className={inputClass}
+                            className={passwordInputClass}
                           />
+                          <PasswordToggle visible={showNewPassword} onToggle={() => setShowNewPassword(v => !v)} />
                         </div>
                       </div>
                     </>
@@ -527,79 +580,35 @@ const Login: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <span>{({ login: 'Entrar no Sistema', signup: 'Criar minha Conta', confirmSignup: 'Confirmar e Entrar', newPassword: 'Salvar nova senha', resetCode: 'Salvar nova senha' } as const)[authStep]}</span>
+                        <span>{authStep === 'login' ? 'Entrar no Sistema' : 'Salvar nova senha'}</span>
                         <ChevronRight size={18} aria-hidden="true" />
                       </>
                     )}
                   </button>
 
                   <div className="text-center mt-2 flex flex-col items-center gap-2">
-                    {authStep === 'confirmSignup' && (
-                      <button
-                        type="button"
-                        onClick={handleResendCode}
-                        className="text-xs font-bold text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
-                      >
-                        Não recebeu? Reenviar código
-                      </button>
-                    )}
                     <button
                       id="btn-toggle-auth-mode"
                       type="button"
-                      onClick={() => (authStep === 'login' ? switchStep('signup') : backToLogin())}
+                      onClick={() => (authStep === 'login' ? goTo('request') : backToLogin())}
                       className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                     >
-                      {authStep === 'login'
-                        ? 'Não tem uma conta? Crie uma agora'
-                        : authStep === 'signup'
-                          ? 'Já tem uma conta? Faça login'
-                          : 'Voltar para o login'}
+                      {authStep === 'login' ? 'Não tem uma conta? Crie uma agora' : 'Voltar para o login'}
                     </button>
                   </div>
                 </form>
 
                 {showsCredentials && (
                   <>
-                    {/* Social Divider */}
-                    <div className="relative py-6">
-                      <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                        <div className="w-full border-t border-zinc-100 dark:border-zinc-800"></div>
-                      </div>
-                      <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em]">
-                        <span className="bg-white dark:bg-zinc-900 px-4 text-zinc-400 font-bold">Ou continue com</span>
-                      </div>
-                    </div>
-
-                    <button
+                    <SocialDivider label="Ou continue com" />
+                    <GoogleButton
                       id="btn-login-google"
-                      type="button"
-                      onClick={handleGoogleLogin}
+                      label="Conta Google"
+                      onClick={() => handleGoogleLogin(setLoginError)}
                       disabled={isLoggingIn}
-                      className="w-full flex items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-8 py-3.5 rounded-2xl font-bold transition-all border border-zinc-200 dark:border-zinc-700 shadow-sm disabled:opacity-50 cursor-pointer active:scale-95"
-                    >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                      </svg>
-                      <span className="text-sm">Conta Google</span>
-                    </button>
+                    />
                   </>
                 )}
-
-                {/* Prompt request access manually */}
-                <div className="mt-8 text-center">
-                  <span className="text-neutral-400 text-xs">Precisa de acesso à plataforma? </span>
-                  <button
-                    id="btn-trigger-registration"
-                    type="button"
-                    onClick={() => goTo('request')}
-                    className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer"
-                  >
-                    Solicitar Acesso
-                  </button>
-                </div>
               </motion.div>
             ) : (
               <motion.div
@@ -614,82 +623,172 @@ const Login: React.FC = () => {
                 <div className="mb-8 flex items-start gap-3">
                   <button
                     type="button"
-                    onClick={() => goTo('login')}
-                    aria-label="Voltar para o login"
+                    onClick={() => (signupStep === 'code' ? (setSignupStep('form'), setSignupError('')) : goTo('login'))}
+                    aria-label={signupStep === 'code' ? 'Voltar e corrigir os dados' : 'Voltar para o login'}
                     className="mt-1 p-2 -ml-2 rounded-xl text-zinc-400 hover:text-blue-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                   >
                     <ArrowLeft size={20} aria-hidden="true" />
                   </button>
                   <div>
-                    <h1 className="text-3xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">Solicitar Acesso</h1>
+                    <h1 className="text-3xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">
+                      {signupStep === 'code' ? 'Confirme seu e-mail' : 'Criar Conta'}
+                    </h1>
                     <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
-                      {registrationSuccess ? 'Pedido recebido' : 'Preencha os dados e um administrador analisa seu pedido'}
+                      {signupStep === 'code'
+                        ? `Digite o código enviado para ${regForm.email}`
+                        : 'Preencha seus dados ou cadastre-se com o Google'}
                     </p>
                   </div>
                 </div>
 
-                {registrationSuccess ? (
-                  <div className="text-center py-6 space-y-6" role="status">
-                    <motion.div
-                      initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-                      className="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto shadow-lg"
-                    >
-                      <CheckCircle2 size={48} aria-hidden="true" />
-                    </motion.div>
-                    <div>
-                      <h2 className="text-2xl font-black text-zinc-900 dark:text-white mb-2">Solicitação Enviada!</h2>
-                      <p className="text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto text-sm">
-                        Recebemos seu pedido. Quando for aprovado, você recebe por e-mail uma senha temporária para entrar.
-                      </p>
-                    </div>
-                    <button
-                      id="btn-success-reg-ok"
-                      type="button"
-                      onClick={() => goTo('login')}
-                      className="px-8 py-3 bg-zinc-900 dark:bg-zinc-700 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all cursor-pointer"
-                    >
-                      Voltar para o login
-                    </button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleRequestAccess} className="space-y-3" aria-busy={registrationLoading}>
-                    {([
-                      { id: 'reg-name-input', key: 'name', label: 'Nome Completo', icon: User, placeholder: 'Seu nome', type: 'text', autoComplete: 'name', required: true },
-                      { id: 'reg-email-input', key: 'email', label: 'E-mail Profissional', icon: Mail, placeholder: 'seu@email.com', type: 'email', autoComplete: 'email', required: true },
-                      { id: 'reg-workshop-input', key: 'workshopName', label: 'Nome da Oficina', icon: Building, placeholder: 'Nome da empresa', type: 'text', autoComplete: 'organization', required: true },
-                      { id: 'reg-phone-input', key: 'phone', label: 'Telefone / WhatsApp', icon: Phone, placeholder: '(00) 00000-0000', type: 'tel', autoComplete: 'tel', required: true },
-                    ] as const).map(({ id, key, label, icon: Icon, ...input }) => (
-                      <div key={id} className="space-y-1">
-                        <label htmlFor={id} className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">{label}</label>
+                <form
+                  onSubmit={signupStep === 'code' ? handleConfirmSignup : handleSignup}
+                  className="space-y-3"
+                  aria-busy={registrationLoading}
+                >
+                  {signupStep === 'form' ? (
+                    <>
+                      {([
+                        { id: 'reg-name-input', key: 'name', label: 'Nome Completo', icon: User, placeholder: 'Seu nome', type: 'text', autoComplete: 'name' },
+                        { id: 'reg-email-input', key: 'email', label: 'E-mail', icon: Mail, placeholder: 'seu@email.com', type: 'email', autoComplete: 'email' },
+                      ] as const).map(({ id, key, label, icon: Icon, ...input }) => (
+                        <div key={id} className="space-y-1">
+                          <label htmlFor={id} className={regLabelClass}>{label}</label>
+                          <div className="relative group">
+                            <Icon className={regIconClass} size={16} aria-hidden="true" />
+                            <input
+                              id={id}
+                              {...input}
+                              required
+                              value={regForm[key]}
+                              onChange={e => setRegForm({ ...regForm, [key]: e.target.value })}
+                              className={regInputClass}
+                            />
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="space-y-1">
+                        <label htmlFor="reg-password-input" className={regLabelClass}>Senha</label>
                         <div className="relative group">
-                          <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600" size={16} aria-hidden="true" />
+                          <Lock className={regIconClass} size={16} aria-hidden="true" />
                           <input
-                            id={id}
-                            {...input}
-                            value={regForm[key]}
-                            onChange={e => setRegForm({ ...regForm, [key]: e.target.value })}
-                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 dark:text-white font-medium transition-all"
+                            id="reg-password-input"
+                            type={showSignupPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            required
+                            minLength={8}
+                            placeholder="••••••••"
+                            value={regForm.password}
+                            onChange={e => setRegForm({ ...regForm, password: e.target.value })}
+                            aria-describedby="reg-password-hint"
+                            className={regPasswordInputClass}
                           />
+                          <PasswordToggle visible={showSignupPassword} onToggle={() => setShowSignupPassword(v => !v)} />
+                        </div>
+                        <p id="reg-password-hint" className="text-[11px] text-zinc-500 dark:text-zinc-400 ml-1">
+                          Mínimo de 8 caracteres, com letras minúsculas e números.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label htmlFor="reg-confirm-password-input" className={regLabelClass}>Confirmar Senha</label>
+                        <div className="relative group">
+                          <Lock className={regIconClass} size={16} aria-hidden="true" />
+                          <input
+                            id="reg-confirm-password-input"
+                            type={showSignupPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            required
+                            minLength={8}
+                            placeholder="••••••••"
+                            value={regForm.confirmPassword}
+                            onChange={e => setRegForm({ ...regForm, confirmPassword: e.target.value })}
+                            className={regPasswordInputClass}
+                          />
+                          <PasswordToggle visible={showSignupPassword} onToggle={() => setShowSignupPassword(v => !v)} />
                         </div>
                       </div>
-                    ))}
+                    </>
+                  ) : (
+                    <div className="space-y-1">
+                      <label htmlFor="signup-code-input" className={regLabelClass}>Código de verificação</label>
+                      <div className="relative group">
+                        <ShieldCheck className={regIconClass} size={16} aria-hidden="true" />
+                        <input
+                          id="signup-code-input"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          required
+                          placeholder="123456"
+                          value={signupCode}
+                          onChange={e => setSignupCode(e.target.value)}
+                          aria-invalid={!!signupError}
+                          aria-describedby={signupError ? 'signup-error' : undefined}
+                          className={regInputClass}
+                        />
+                      </div>
+                    </div>
+                  )}
 
-                    <button
-                      id="btn-reg-submit"
-                      type="submit"
-                      disabled={registrationLoading}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:opacity-50 mt-2 cursor-pointer active:scale-95"
+                  {signupError && (
+                    <div
+                      id="signup-error"
+                      role="alert"
+                      className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs font-bold"
                     >
-                      {registrationLoading ? (
-                        <>
-                          <Loader2 className="animate-spin" aria-hidden="true" />
-                          <span className="sr-only">Enviando...</span>
-                        </>
-                      ) : 'Enviar Solicitação'}
-                    </button>
-                  </form>
+                      <AlertCircle size={16} aria-hidden="true" />
+                      <p>{signupError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    id="btn-reg-submit"
+                    type="submit"
+                    disabled={registrationLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:opacity-50 mt-2 cursor-pointer active:scale-95"
+                  >
+                    {registrationLoading ? (
+                      <>
+                        <Loader2 className="animate-spin" aria-hidden="true" />
+                        <span className="sr-only">Aguarde...</span>
+                      </>
+                    ) : signupStep === 'code' ? 'Confirmar e Entrar' : 'Criar minha Conta'}
+                  </button>
+
+                  {signupStep === 'code' && (
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={handleResendCode}
+                        className="text-xs font-bold text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
+                      >
+                        Não recebeu? Reenviar código
+                      </button>
+                    </div>
+                  )}
+                </form>
+
+                {signupStep === 'form' && (
+                  <>
+                    <SocialDivider label="Ou cadastre-se com" />
+                    <GoogleButton
+                      id="btn-signup-google"
+                      label="Conta Google"
+                      onClick={() => handleGoogleLogin(setSignupError)}
+                      disabled={isLoggingIn || registrationLoading}
+                    />
+                    <p className="mt-6 text-center text-xs text-zinc-400">
+                      Já tem uma conta?{' '}
+                      <button
+                        type="button"
+                        onClick={() => goTo('login')}
+                        className="font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        Faça login
+                      </button>
+                    </p>
+                  </>
                 )}
               </motion.div>
             )}

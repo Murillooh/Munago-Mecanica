@@ -74,9 +74,9 @@ export async function login(email: string, password: string): Promise<LoginResul
 }
 
 /** Cadastro pelo próprio usuário: o Cognito manda um código para confirmar o e-mail. */
-export async function register(email: string, password: string) {
+export async function register(name: string, email: string, password: string) {
   const normalized = email.trim().toLowerCase();
-  await signUp({ username: normalized, password, options: { userAttributes: { email: normalized } } });
+  await signUp({ username: normalized, password, options: { userAttributes: { email: normalized, name: name.trim() } } });
 }
 
 export const confirmRegistration = (email: string, code: string) =>
