@@ -4,7 +4,7 @@ import * as schema from './schema';
 
 export type DB = NodePgDatabase<typeof schema>;
 
-export function createDb(url = process.env.DATABASE_URL): DB {
+export function createDb(url = process.env.DATABASE_URL): DB & { $client: pg.Pool } {
   if (!url) throw new Error('DATABASE_URL não definida');
   const pool = new pg.Pool({
     connectionString: url,

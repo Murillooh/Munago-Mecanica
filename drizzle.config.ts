@@ -6,4 +6,6 @@ export default defineConfig({
   out: './server/db/migrations',
   dialect: 'postgresql',
   dbCredentials: { url: process.env.DATABASE_URL ?? '' },
+  // mecanica_app só tem CREATE no schema public (não pode criar o schema "drizzle" padrão).
+  migrations: { schema: 'public', table: '__drizzle_migrations' },
 });

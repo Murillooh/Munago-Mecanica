@@ -43,7 +43,8 @@ async function main() {
   const exists = (await master.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [APP_USER])).rowCount;
   // Identificador e senha não aceitam parâmetro ($1) em DDL; valores são constantes/hex gerados aqui.
   await master.query(`${exists ? 'ALTER' : 'CREATE'} ROLE ${APP_USER} LOGIN PASSWORD '${appPassword}'`);
-  await master.query(`GRANT CONNECT ON DATABASE ${DB_NAME} TO ${APP_USER}`);
+  // CREATE no banco: o migrator do drizzle roda CREATE SCHEMA IF NOT EXISTS, e o Postgres checa permissão antes de existência.
+  await master.query(`GRANT CONNECT, CREATE ON DATABASE ${DB_NAME} TO ${APP_USER}`);
   await master.query(`GRANT USAGE, CREATE ON SCHEMA public TO ${APP_USER}`);
   await master.end();
 
