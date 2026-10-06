@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from './schema';
@@ -7,7 +7,8 @@ import * as schema from './schema';
 export type DB = NodePgDatabase<typeof schema>;
 
 // CA pública da AWS para RDS (https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem).
-const RDS_CA_PATH = fileURLToPath(new URL('./certs/rds-global-bundle.pem', import.meta.url));
+// Relativo ao cwd (raiz do app): no bundle CJS de produção `import.meta.url` fica vazio.
+const RDS_CA_PATH = path.join(process.cwd(), 'server', 'db', 'certs', 'rds-global-bundle.pem');
 
 /**
  * Com `sslmode` na URL, o pg passa a mandar no SSL e ignora o objeto `ssl`.
