@@ -6,5 +6,6 @@ export default defineConfig({
     include: ['server/**/*.test.ts', 'scripts/**/*.test.ts'],
     pool: 'forks',
     testTimeout: 20000,
+    env: { LOG_LEVEL: 'silent' },
   },
 });

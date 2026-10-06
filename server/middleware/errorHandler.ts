@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
 import logger from '../utils/logger';
 
 // Classe customizada para erros esperados
@@ -26,7 +27,7 @@ export const errorHandler = (
     timestamp: new Date().toISOString(),
     method: req.method,
     path: req.path,
-    userId: (req as any).user?.uid || 'anonymous',
+    userId: (req as any).user?.id || 'anonymous',
     ip: req.ip,
     error: {
       name: err.name,
@@ -44,6 +45,15 @@ export const errorHandler = (
       error: err.message,
       code: err.code,
       ...(process.env.NODE_ENV === 'development' && { details: err.details })
+    });
+  }
+
+  if (err instanceof ZodError) {
+    logger.info(errorData, 'Validation error');
+    return res.status(400).json({
+      error: 'Dados inválidos.',
+      code: 'VALIDATION',
+      issues: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
     });
   }
 
