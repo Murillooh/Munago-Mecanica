@@ -168,7 +168,7 @@ const Login: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-6xl flex flex-col lg:flex-row items-stretch justify-center gap-0 z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]"
+        className="w-full max-w-6xl lg:min-h-[680px] flex flex-col lg:flex-row items-stretch justify-center gap-0 z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]"
       >
         {/* Left Side: Branding & Info */}
         <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 to-indigo-700 p-16 flex-col justify-between relative overflow-hidden">
