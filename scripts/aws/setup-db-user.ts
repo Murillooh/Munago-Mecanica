@@ -22,6 +22,10 @@ function aws(args: string[]): string {
 
 async function main() {
   const instance = JSON.parse(aws(['rds', 'describe-db-instances', '--db-instance-identifier', INSTANCE])).DBInstances[0];
+  if (instance.DBInstanceStatus !== 'available' || !instance.Endpoint) {
+    console.error(`RDS ${INSTANCE} ainda não está pronto (status: ${instance.DBInstanceStatus}). Aguarde e rode de novo.`);
+    process.exit(1);
+  }
   const host: string = instance.Endpoint.Address;
   const port: number = instance.Endpoint.Port;
   const secretArn: string = instance.MasterUserSecret.SecretArn;
