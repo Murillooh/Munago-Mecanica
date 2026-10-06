@@ -1,0 +1,12 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+*.service-account*.json
+project.zip
+scripts/migrate/out/
+firebase-applet-config.json

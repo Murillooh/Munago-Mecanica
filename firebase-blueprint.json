@@ -1,0 +1,189 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A product in the inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the product" },
+        "description": { "type": "string", "description": "Product description" },
+        "category": { "type": "string", "description": "Category of the product" },
+        "price": { "type": "number", "description": "Unit price" },
+        "laborCost": { "type": "number", "description": "Labor cost (M.O)" },
+        "quantity": { "type": "number", "description": "Current stock quantity" },
+        "minQuantity": { "type": "number", "description": "Minimum quantity for low stock alert" },
+        "status": { "type": "string", "enum": ["ativo", "inativo"], "description": "Product status" },
+        "imageUrl": { "type": "string", "description": "URL of the product image" },
+        "expirationDate": { "type": "string", "format": "date", "description": "Product expiration date" },
+        "batch": { "type": "string", "description": "Product lot/batch number" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["name", "quantity", "minQuantity"]
+    },
+    "ServiceOrder": {
+      "title": "Service Order",
+      "description": "A service order (OS) for a customer.",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string", "description": "Customer name" },
+        "customerPhone": { "type": "string", "description": "Customer phone number" },
+        "vehicleModel": { "type": "string", "description": "Vehicle model" },
+        "vehiclePlate": { "type": "string", "description": "Vehicle license plate" },
+        "items": { 
+          "type": "array", 
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "quantity": { "type": "number" },
+              "price": { "type": "number" },
+              "laborCost": { "type": "number" },
+              "total": { "type": "number" }
+            }
+          }
+        },
+        "generalLaborCost": { "type": "number" },
+        "totalLaborCost": { "type": "number" },
+        "totalPartsCost": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "in_progress", "completed", "paid"], "description": "Status: draft (Pendente), in_progress (Em Andamento), completed (Concluído), paid (Pago)" },
+        "scheduledDate": { "type": "string", "description": "Scheduled date and time for the service" },
+        "completionDate": { "type": "string", "description": "Actual completion date and time for the service" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["customerName", "items", "totalAmount", "status"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A stock movement (in or out).",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string", "description": "ID of the product" },
+        "productName": { "type": "string", "description": "Name of the product at the time of transaction" },
+        "type": { "type": "string", "enum": ["in", "out"], "description": "Type of movement" },
+        "quantity": { "type": "number", "description": "Quantity moved" },
+        "reason": { "type": "string", "description": "Reason for the movement" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When it happened" },
+        "userId": { "type": "string", "description": "User who performed the action" },
+        "userName": { "type": "string", "description": "Name of the user" }
+      },
+      "required": ["productId", "type", "quantity", "timestamp", "userId"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Application user.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "User's display name" },
+        "email": { "type": "string", "description": "User's email" },
+        "role": { "type": "string", "enum": ["admin", "editor", "viewer"], "description": "User's role" },
+        "photoURL": { "type": "string", "description": "User's photo URL" },
+        "permissions": {
+          "type": "object",
+          "description": "Granular user permissions",
+          "properties": {
+            "canManageInventory": { "type": "boolean", "description": "Can add, edit, or delete products and categories" },
+            "canManageOS": { "type": "boolean", "description": "Can create and manage service orders" },
+            "canManageUsers": { "type": "boolean", "description": "Can manage other users and their permissions" },
+            "canViewReports": { "type": "boolean", "description": "Can view dashboards and reports" },
+            "canPerformTransactions": { "type": "boolean", "description": "Can perform stock movements (in/out)" }
+          }
+        }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A system notification for low stock or other alerts.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Notification title" },
+        "message": { "type": "string", "description": "Notification message" },
+        "productId": { "type": "string", "description": "ID of the related product" },
+        "type": { "type": "string", "enum": ["low_stock"], "description": "Type of alert" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the alert was triggered" },
+        "read": { "type": "boolean", "description": "Whether the notification has been read" }
+      },
+      "required": ["title", "message", "type", "timestamp", "read"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A product category.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the category" },
+        "description": { "type": "string", "description": "Category description" },
+        "imageUrl": { "type": "string", "description": "URL of the category icon image" },
+        "aiSuggestion": { "type": "string", "description": "AI generated suggestion for the category" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["name"]
+    },
+    "AISearch": {
+      "title": "AI Search",
+      "description": "A saved AI search or interaction.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the user who performed the search" },
+        "query": { "type": "string", "description": "The user's question" },
+        "response": { "type": "string", "description": "The AI's response" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the search was performed" },
+        "metadata": { "type": "object", "description": "Optional grounding metadata or other info" }
+      },
+      "required": ["userId", "query", "response", "timestamp"]
+    },
+    "AccessRequest": {
+      "title": "Access Request",
+      "description": "A request for access to the platform.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the requester" },
+        "email": { "type": "string", "description": "Email of the requester" },
+        "workshopName": { "type": "string", "description": "Name of the workshop/company" },
+        "phone": { "type": "string", "description": "Phone number of the requester" },
+        "message": { "type": "string", "description": "Optional message or reason" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Status of the request" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the request was made" }
+      },
+      "required": ["name", "email", "workshopName", "status", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of products."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "History of stock movements."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "System alerts and notifications."
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Product categories."
+    },
+    "/serviceOrders/{osId}": {
+      "schema": "ServiceOrder",
+      "description": "Collection of service orders."
+    },
+    "/ai_searches/{searchId}": {
+      "schema": "AISearch",
+      "description": "History of AI assistant interactions."
+    },
+    "/access_requests/{requestId}": {
+      "schema": "AccessRequest",
+      "description": "Collection of access requests from new users."
+    }
+  }
+}

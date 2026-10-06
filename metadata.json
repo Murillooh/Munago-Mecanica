@@ -1,0 +1,6 @@
+{
+  "name": "Loc Estoque",
+  "description": "Sistema profissional de gestão de estoque com atualizações em tempo real, alertas de estoque baixo e histórico de movimentações.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
