@@ -3,6 +3,9 @@ import {
   signIn,
   signOut,
   signInWithRedirect,
+  signUp,
+  confirmSignUp,
+  resendSignUpCode,
   confirmSignIn,
   fetchAuthSession,
   resetPassword,
@@ -70,6 +73,17 @@ export async function login(email: string, password: string): Promise<LoginResul
   throw new Error(`Etapa de login não suportada: ${r.nextStep.signInStep}`);
 }
 
+/** Cadastro pelo próprio usuário: o Cognito manda um código para confirmar o e-mail. */
+export async function register(email: string, password: string) {
+  const normalized = email.trim().toLowerCase();
+  await signUp({ username: normalized, password, options: { userAttributes: { email: normalized } } });
+}
+
+export const confirmRegistration = (email: string, code: string) =>
+  confirmSignUp({ username: email.trim().toLowerCase(), confirmationCode: code.trim() });
+
+export const resendRegistrationCode = (email: string) => resendSignUpCode({ username: email.trim().toLowerCase() });
+
 /** Primeiro acesso: troca a senha temporária enviada por e-mail. */
 export async function completeNewPassword(newPassword: string) {
   const r = await confirmSignIn({ challengeResponse: newPassword });
@@ -91,7 +105,11 @@ export function authErrorMessage(e: unknown): string {
     case 'UserNotFoundException':
       return 'E-mail ou senha incorretos.';
     case 'UserNotConfirmedException':
-      return 'Conta ainda não confirmada. Fale com o administrador.';
+      return 'Confirme seu e-mail com o código que enviamos antes de entrar.';
+    case 'UsernameExistsException':
+      return 'Este e-mail já está cadastrado. Faça login ou use "Esqueceu a senha?".';
+    case 'CodeDeliveryFailureException':
+      return 'Não foi possível enviar o código para este e-mail. Verifique o endereço.';
     case 'PasswordResetRequiredException':
       return 'É preciso redefinir sua senha. Use "Esqueceu a senha?".';
     case 'InvalidPasswordException':

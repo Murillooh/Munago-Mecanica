@@ -23,10 +23,19 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import { useApp } from '../context/AppContext';
 import { apiPost } from '../lib/api';
-import { authErrorMessage, confirmPasswordReset, isGoogleLoginEnabled, loginWithGoogle, requestPasswordReset } from '../lib/auth';
+import {
+  authErrorMessage,
+  confirmPasswordReset,
+  confirmRegistration,
+  isGoogleLoginEnabled,
+  loginWithGoogle,
+  register,
+  requestPasswordReset,
+  resendRegistrationCode,
+} from '../lib/auth';
 
-// login: e-mail e senha | newPassword: primeiro acesso (senha temporária do convite) | resetCode: código recebido por e-mail
-type AuthStep = 'login' | 'newPassword' | 'resetCode';
+// login: e-mail e senha | signup/confirmSignup: criar conta + código do e-mail | newPassword: primeiro acesso (senha temporária do convite) | resetCode: código recebido por e-mail
+type AuthStep = 'login' | 'signup' | 'confirmSignup' | 'newPassword' | 'resetCode';
 
 const inputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 pl-12 pr-5 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all text-sm font-medium";
 
@@ -127,6 +136,26 @@ const Login: React.FC = () => {
     });
   };
 
+  const showsCredentials = authStep === 'login' || authStep === 'signup';
+  const showsCode = authStep === 'resetCode' || authStep === 'confirmSignup';
+  const showsNewPassword = authStep === 'newPassword' || authStep === 'resetCode';
+
+  const switchStep = (step: AuthStep) => {
+    setAuthStep(step);
+    setResetCode('');
+    setLoginError('');
+  };
+
+  const handleResendCode = async () => {
+    setLoginError('');
+    try {
+      await resendRegistrationCode(email);
+      toast.success(`Enviamos um novo código para ${email}.`);
+    } catch (error) {
+      setLoginError(authErrorMessage(error));
+    }
+  };
+
   const backToLogin = () => {
     setAuthStep('login');
     setNewPassword('');
@@ -139,7 +168,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     setLoginError('');
 
-    if (authStep !== 'login' && newPassword !== confirmNewPassword) {
+    if (showsNewPassword && newPassword !== confirmNewPassword) {
       setLoginError('As senhas não coincidem.');
       return;
     }
@@ -154,6 +183,15 @@ const Login: React.FC = () => {
           return;
         }
         toast.success('Login realizado com sucesso!');
+      } else if (authStep === 'signup') {
+        await register(email, password);
+        setAuthStep('confirmSignup');
+        toast.success(`Enviamos um código de verificação para ${email}.`);
+      } else if (authStep === 'confirmSignup') {
+        await confirmRegistration(email, resetCode);
+        // Conta confirmada: entra direto. O admin ainda precisa aprovar o acesso.
+        await loginEmail(email, password);
+        toast.success('Conta criada! Aguarde a liberação do administrador.');
       } else if (authStep === 'newPassword') {
         await completeNewPassword(newPassword);
         toast.success('Senha definida! Bem-vindo.');
@@ -173,6 +211,10 @@ const Login: React.FC = () => {
   // Sai do app para a tela do Google; a volta é tratada no AppContext.
   const handleGoogleLogin = async () => {
     setLoginError('');
+    if (!isGoogleLoginEnabled) {
+      setLoginError('O login com Google ainda não foi configurado.');
+      return;
+    }
     setIsLoggingIn(true);
     try {
       await loginWithGoogle();
@@ -200,6 +242,8 @@ const Login: React.FC = () => {
 
   const titles: Record<AuthStep, [string, string]> = {
     login: ['Acessar Painel', 'Entre com suas credenciais para continuar'],
+    signup: ['Criar Conta', 'Preencha os dados para criar seu acesso'],
+    confirmSignup: ['Confirme seu e-mail', `Digite o código enviado para ${email}`],
     newPassword: ['Defina sua senha', 'Primeiro acesso: crie uma senha pessoal para substituir a temporária'],
     resetCode: ['Redefinir senha', `Digite o código enviado para ${email} e a nova senha`],
   };
@@ -336,7 +380,7 @@ const Login: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleAuth} className="space-y-4" aria-busy={isLoggingIn}>
-                  {authStep === 'login' && (
+                  {showsCredentials && (
                     <>
                       <div className="space-y-1.5">
                         <label htmlFor="login-email-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">E-mail</label>
@@ -364,7 +408,8 @@ const Login: React.FC = () => {
                           <input
                             id="login-password-input"
                             type="password"
-                            autoComplete="current-password"
+                            autoComplete={authStep === 'signup' ? 'new-password' : 'current-password'}
+                            minLength={authStep === 'signup' ? 8 : undefined}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
@@ -374,6 +419,11 @@ const Login: React.FC = () => {
                             className={inputClass}
                           />
                         </div>
+                        {authStep === 'signup' ? (
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 ml-1">
+                            Mínimo de 8 caracteres, com letras minúsculas e números.
+                          </p>
+                        ) : (
                         <div className="flex justify-end pr-1">
                           <button
                             id="btn-forgot-password"
@@ -384,11 +434,12 @@ const Login: React.FC = () => {
                             Esqueceu a senha?
                           </button>
                         </div>
+                        )}
                       </div>
                     </>
                   )}
 
-                  {authStep === 'resetCode' && (
+                  {showsCode && (
                     <div className="space-y-1.5">
                       <label htmlFor="reset-code-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Código de verificação</label>
                       <div className="relative group">
@@ -407,7 +458,7 @@ const Login: React.FC = () => {
                     </div>
                   )}
 
-                  {authStep !== 'login' && (
+                  {showsNewPassword && (
                     <>
                       <div className="space-y-1.5">
                         <label htmlFor="new-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Nova senha</label>
@@ -476,26 +527,38 @@ const Login: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <span>{authStep === 'login' ? 'Entrar no Sistema' : 'Salvar nova senha'}</span>
+                        <span>{({ login: 'Entrar no Sistema', signup: 'Criar minha Conta', confirmSignup: 'Confirmar e Entrar', newPassword: 'Salvar nova senha', resetCode: 'Salvar nova senha' } as const)[authStep]}</span>
                         <ChevronRight size={18} aria-hidden="true" />
                       </>
                     )}
                   </button>
 
-                  {authStep !== 'login' && (
-                    <div className="text-center mt-2">
+                  <div className="text-center mt-2 flex flex-col items-center gap-2">
+                    {authStep === 'confirmSignup' && (
                       <button
                         type="button"
-                        onClick={backToLogin}
-                        className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        onClick={handleResendCode}
+                        className="text-xs font-bold text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
                       >
-                        Voltar para o login
+                        Não recebeu? Reenviar código
                       </button>
-                    </div>
-                  )}
+                    )}
+                    <button
+                      id="btn-toggle-auth-mode"
+                      type="button"
+                      onClick={() => (authStep === 'login' ? switchStep('signup') : backToLogin())}
+                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      {authStep === 'login'
+                        ? 'Não tem uma conta? Crie uma agora'
+                        : authStep === 'signup'
+                          ? 'Já tem uma conta? Faça login'
+                          : 'Voltar para o login'}
+                    </button>
+                  </div>
                 </form>
 
-                {authStep === 'login' && isGoogleLoginEnabled && (
+                {showsCredentials && (
                   <>
                     {/* Social Divider */}
                     <div className="relative py-6">
