@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { 
   Lock, 
   Mail, 
@@ -92,7 +92,27 @@ const Login: React.FC = () => {
   };
   const screenTransition = { duration: reduceMotion ? 0.15 : 0.25, ease: [0.22, 1, 0.36, 1] as const };
   // Troca de lado animada via layout (FLIP: anima transform, sem recalcular layout a cada quadro).
-  const sideSwapTransition = { layout: { duration: reduceMotion ? 0 : 0.7, ease: [0.65, 0, 0.35, 1] as const } };
+  const sideSwapTransition = { duration: reduceMotion ? 0 : 0.75, ease: [0.65, 0, 0.35, 1] as const };
+
+  // Deslize dos painéis: cada um anda (transform) até a posição do outro.
+  // Larguras medidas do DOM; no celular o painel azul fica oculto e nada se move.
+  const brandPanelRef = useRef<HTMLDivElement>(null);
+  const formPanelRef = useRef<HTMLDivElement>(null);
+  const [panelWidths, setPanelWidths] = useState({ brand: 0, form: 0 });
+  useLayoutEffect(() => {
+    const measure = () => setPanelWidths({
+      brand: brandPanelRef.current?.offsetWidth ?? 0,
+      form: formPanelRef.current?.offsetWidth ?? 0,
+    });
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (brandPanelRef.current) ro.observe(brandPanelRef.current);
+    if (formPanelRef.current) ro.observe(formPanelRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const swapped = view === 'request' && panelWidths.brand > 0;
+  const brandX = swapped ? panelWidths.form : 0;
+  const formX = swapped ? -panelWidths.brand : 0;
 
   const goTo = (next: 'login' | 'request') => {
     if (next === view) return;
@@ -199,11 +219,13 @@ const Login: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`w-full max-w-6xl lg:min-h-[680px] flex flex-col ${view === 'request' ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-stretch justify-center gap-0 z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]`}
+        className={`w-full max-w-6xl lg:min-h-[680px] flex flex-col lg:flex-row items-stretch relative justify-center gap-0 z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]`}
       >
         {/* Left Side: Branding & Info */}
         <motion.div
-          layout
+          ref={brandPanelRef}
+          initial={false}
+          animate={{ x: brandX }}
           transition={sideSwapTransition}
           className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 to-indigo-700 p-16 flex-col justify-between relative overflow-hidden z-10"
         >
@@ -276,7 +298,9 @@ const Login: React.FC = () => {
 
         {/* Right Side: troca animada entre login e solicitação de acesso */}
         <motion.div
-          layout
+          ref={formPanelRef}
+          initial={false}
+          animate={{ x: formX }}
           transition={sideSwapTransition}
           className="w-full lg:w-[450px] p-8 md:p-12 lg:p-14 flex flex-col justify-center bg-white dark:bg-zinc-900 overflow-hidden"
         >
