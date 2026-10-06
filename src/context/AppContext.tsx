@@ -1,27 +1,8 @@
 import { toast } from 'sonner';
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  serverTimestamp, 
-  increment,
-  setDoc,
-  getDoc,
-  getDocs,
-  deleteDoc,
-  writeBatch,
-  where
-} from 'firebase/firestore';
-import { onAuthStateChanged, User as FirebaseUser, GoogleAuthProvider } from 'firebase/auth';
-import { useState, useEffect, createContext, useContext } from 'react';
-import { db, auth, loginWithGoogle, logout, loginWithEmail, registerWithEmail } from '../firebase';
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
 import { createBackupFile, listBackups, getFileContent } from '../lib/googleDrive';
-import { 
-  applyAccentColorToDOM, 
+import {
+  applyAccentColorToDOM,
   getStoredAccentColor,
   ThemePreference,
   getStoredThemePreference,
@@ -29,12 +10,21 @@ import {
   applyThemeToDOM,
   LOCAL_STORAGE_THEME_KEY
 } from '../lib/theme';
-import { 
-  playLowStockAlertIfEnabled, 
-  getStoredSoundAlertsEnabled, 
+import {
+  playLowStockAlertIfEnabled,
+  getStoredSoundAlertsEnabled,
   setStoredSoundAlertsEnabled,
   soundManager
 } from '../lib/audioAlert';
+import {
+  login as cognitoLogin,
+  logout as cognitoLogout,
+  completeNewPassword as cognitoCompleteNewPassword,
+  getIdToken,
+  type LoginResult,
+} from '../lib/auth';
+import { apiGet, apiPost, apiPatch, apiDelete, hydrateDates, subscribeChanges, ApiRequestError } from '../lib/api';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
 
 // Types
 export interface Product {
@@ -86,6 +76,14 @@ export interface UserProfile {
   permissions?: UserPermissions;
   status: 'pending' | 'approved' | 'denied';
   createdAt?: any;
+}
+
+/** Usuário autenticado (Cognito). Mesmos nomes de campo que as telas usavam do Firebase. */
+export interface AppUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string | null;
 }
 
 export interface Notification {
@@ -152,45 +150,49 @@ export interface ServiceOrder {
   createdBy: string;
 }
 
-// Error Handling
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
+/** Formato do usuário na API (/api/v1/me, /users). */
+interface ApiUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserProfile['role'];
+  status: UserProfile['status'];
+  permissions: UserPermissions;
+  photoUrl?: string | null;
+  createdAt?: string;
 }
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-  }
+const toProfile = (u: ApiUser): UserProfile => ({
+  uid: u.id,
+  name: u.name,
+  email: u.email,
+  role: u.role,
+  status: u.status,
+  permissions: u.permissions,
+  photoURL: u.photoUrl ?? undefined,
+  createdAt: hydrateDates({ createdAt: u.createdAt }).createdAt,
+});
+
+// Campos aceitos por PATCH /settings (o resto do formulário é só exibição).
+const SETTINGS_KEYS = [
+  'storeName', 'logoUrl', 'contactPhone', 'contactEmail', 'address', 'allowNegativeStock', 'accentColor',
+  'autoBackupEnabled', 'enableSoundAlerts', 'monitorAutoScrollEnabled', 'monitorScrollIntervalSeconds',
+] as const;
+
+/** Remove null/undefined para não violar a validação da API em campos opcionais. */
+function compact<T extends object>(obj: T): Partial<T> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
 
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  // Throwing here causes uncaught errors in snapshot listeners.
+function handleApiError(error: unknown, fallback = 'Erro ao comunicar com o servidor.') {
+  console.error('API Error:', error);
+  const message = error instanceof ApiRequestError || error instanceof Error ? error.message : fallback;
+  toast.error(message || fallback);
 }
 
 // Context
 interface AppContextType {
-  user: FirebaseUser | null;
+  user: AppUser | null;
   profile: UserProfile | null;
   products: Product[];
   transactions: Transaction[];
@@ -210,9 +212,9 @@ interface AppContextType {
   canPerformTransactions: boolean;
   canViewInventory: boolean;
   canViewOS: boolean;
-  login: () => Promise<void>;
-  loginEmail: (email: string, pass: string) => Promise<void>;
-  registerEmail: (email: string, pass: string) => Promise<void>;
+  /** 'NEW_PASSWORD_REQUIRED' no primeiro acesso (senha temporária do convite). */
+  loginEmail: (email: string, pass: string) => Promise<LoginResult>;
+  completeNewPassword: (newPassword: string) => Promise<void>;
   handleLogout: () => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -234,10 +236,10 @@ interface AppContextType {
   deleteUser: (uid: string) => Promise<void>;
   addUserByEmail: (email: string, name: string, role: 'admin' | 'editor' | 'viewer', permissions?: UserPermissions) => Promise<void>;
   registerTransaction: (
-    productId: string, 
-    productName: string, 
-    type: 'in' | 'out', 
-    quantity: number, 
+    productId: string,
+    productName: string,
+    type: 'in' | 'out',
+    quantity: number,
     reason: string,
     userId: string,
     userName: string
@@ -304,8 +306,18 @@ export const getDefaultPermissions = (role: 'admin' | 'editor' | 'viewer'): User
   return ROLE_PRESETS[role]?.permissions || ROLE_PRESETS.viewer.permissions;
 };
 
+/** Token OAuth do Google (popup do servidor) salvo por useGoogleAuth; usado no backup do Drive. */
+function getStoredGoogleAccessToken(): string | null {
+  try {
+    const raw = localStorage.getItem('google_tokens');
+    return raw ? JSON.parse(raw).access_token ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
 export const AppProvider = ({ children }: { children: any }) => {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -326,10 +338,16 @@ export const AppProvider = ({ children }: { children: any }) => {
     lastFirestoreBackup: '',
   }));
 
-  const [driveToken, setDriveToken] = useState<string | null>(null);
+  const [driveToken, setDriveToken] = useState<string | null>(() => getStoredGoogleAccessToken());
+  const { openGoogleAuth } = useGoogleAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [inventoryLowStockFilter, setInventoryLowStockFilter] = useState(false);
   const [isMonitorMode, setIsMonitorMode] = useState(false);
+
+  // Som de estoque baixo toca quando chega notificação nova não lida (inclusive gerada por outro usuário).
+  const soundEnabledRef = useRef(settings.enableSoundAlerts);
+  soundEnabledRef.current = settings.enableSoundAlerts;
+  const unreadIdsRef = useRef<Set<string> | null>(null);
 
   const toggleMonitorMode = () => {
     setIsMonitorMode(prev => !prev);
@@ -394,196 +412,51 @@ export const AppProvider = ({ children }: { children: any }) => {
     }
   }, [settings.accentColor]);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        setUser(u);
-        const emailId = u.email?.toLowerCase() || '';
-        const path = `users/${u.uid}`;
-        try {
-          const userRef = doc(db, 'users', u.uid);
-          const userSnap = await getDoc(userRef);
-          
-          if (userSnap.exists()) {
-            const data = userSnap.data() as UserProfile;
-            if (!data.status) {
-              const status = (data.role === 'admin' || data.role === 'editor') ? 'approved' : 'pending';
-              await updateDoc(userRef, { status });
-              setProfile({ ...data, status });
-            } else {
-              setProfile(data);
-            }
-          } else if (u.email) {
-            // Check if user was pre-assigned by email
-            const preAssignedRef = doc(db, 'users', emailId);
-            const preAssignedSnap = await getDoc(preAssignedRef);
-            
-            if (preAssignedSnap.exists()) {
-              const preAssignedData = preAssignedSnap.data();
-              const role = preAssignedData.role || 'viewer';
-              const newProfile: UserProfile = {
-                uid: u.uid,
-                name: u.displayName || preAssignedData.name || 'Usuário',
-                email: emailId,
-                role: role,
-                photoURL: u.photoURL || undefined,
-                permissions: preAssignedData.permissions || getDefaultPermissions(role),
-                status: 'approved',
-                createdAt: serverTimestamp()
-              };
-              
-              const batch = writeBatch(db);
-              batch.delete(preAssignedRef);
-              batch.set(userRef, newProfile);
-              await batch.commit();
-              
-              setProfile(newProfile);
-            } else if (emailId === 'murillo.silva@locgrupo.com.br' || emailId === 'servidorarquivos@locgrupo.com.br') {
-              // Only auto-create for the main admins
-              const role = 'admin';
-              const newProfile: UserProfile = {
-                uid: u.uid,
-                name: u.displayName || 'Administrador',
-                email: emailId,
-                role: role,
-                photoURL: u.photoURL || undefined,
-                permissions: getDefaultPermissions(role),
-                status: 'approved',
-                createdAt: serverTimestamp()
-              };
-              await setDoc(userRef, newProfile);
-              setProfile(newProfile);
-            } else {
-              // New user from Google: Status Pending
-              const role = 'viewer';
-              const newProfile: UserProfile = {
-                uid: u.uid,
-                name: u.displayName || 'Novo Usuário',
-                email: emailId,
-                role: role,
-                photoURL: u.photoURL || undefined,
-                permissions: getDefaultPermissions(role),
-                status: 'pending',
-                createdAt: serverTimestamp()
-              };
-              await setDoc(userRef, newProfile);
-              setProfile(newProfile);
-              toast.info('Sua solicitação de acesso foi enviada para análise.');
-            }
-          }
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, path);
-        }
-      } else {
+  const clearData = () => {
+    setProducts([]);
+    setTransactions([]);
+    setNotifications([]);
+    setCategories([]);
+    setServiceOrders([]);
+    setAllUsers([]);
+    unreadIdsRef.current = null;
+  };
+
+  /** Lê a sessão do Cognito e o perfil no servidor (/me cria o perfil no primeiro acesso). */
+  const loadSession = useCallback(async () => {
+    const token = await getIdToken();
+    if (!token) {
+      setUser(null);
+      setProfile(null);
+      return;
+    }
+    try {
+      const p = toProfile(await apiGet<ApiUser>('/me'));
+      setProfile(p);
+      setUser({ uid: p.uid, email: p.email, displayName: p.name, photoURL: p.photoURL ?? null });
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 401) {
+        await cognitoLogout().catch(() => {});
         setUser(null);
         setProfile(null);
+        return;
       }
-      setLoading(false);
-    });
-    return unsubscribe;
+      throw error;
+    }
   }, []);
 
   useEffect(() => {
-    if (!user || !profile || user.uid !== profile.uid) return;
-    
-    const isMainAdmin = user.email?.toLowerCase().includes('murillo') || user.email?.toLowerCase().includes('servidorarquivos');
-    if (profile.status !== 'approved' && !isMainAdmin) return;
+    loadSession()
+      .catch((e) => handleApiError(e, 'Não foi possível carregar sua sessão.'))
+      .finally(() => setLoading(false));
+  }, [loadSession]);
 
-    const qProducts = query(collection(db, 'products'), orderBy('name'));
-    const unsubProducts = onSnapshot(qProducts, (snap) => {
-      setProducts(snap.docs.map(d => ({ ...d.data(), id: d.id } as Product)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
+  const isAdmin = profile?.role === 'admin';
+  const permissions = profile?.permissions && Object.keys(profile.permissions).length > 0
+    ? profile.permissions
+    : getDefaultPermissions(profile?.role ?? 'viewer');
 
-    const qTransactions = query(collection(db, 'transactions'), orderBy('timestamp', 'desc'));
-    const unsubTransactions = onSnapshot(qTransactions, (snap) => {
-      setTransactions(snap.docs.map(d => ({ ...d.data(), id: d.id } as Transaction)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'transactions'));
-
-    const qCategories = query(collection(db, 'categories'), orderBy('name'));
-    const unsubCategories = onSnapshot(qCategories, (snap) => {
-      setCategories(snap.docs.map(d => ({ ...d.data(), id: d.id } as Category)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'categories'));
-
-    const qOS = query(collection(db, 'serviceOrders'), orderBy('createdAt', 'desc'));
-    const unsubOS = onSnapshot(qOS, (snap) => {
-      setServiceOrders(snap.docs.map(d => ({ ...d.data(), id: d.id } as ServiceOrder)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'serviceOrders'));
-
-    // Admin-only listeners
-    let unsubNotifications = () => {};
-    let unsubUsers = () => {};
-
-    if (profile?.role === 'admin') {
-      const qNotifications = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'));
-      unsubNotifications = onSnapshot(qNotifications, (snap) => {
-        setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-      }, (error) => handleFirestoreError(error, OperationType.LIST, 'notifications'));
-
-      const qUsers = query(collection(db, 'users'), orderBy('name'));
-      unsubUsers = onSnapshot(qUsers, (snap) => {
-        setAllUsers(snap.docs.map(d => ({ ...d.data(), uid: d.id } as UserProfile)));
-      }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
-
-      // Global Settings Listener
-      const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          const isLegacyName = !data.storeName || data.storeName.toLowerCase().includes('loc');
-          const storeName = isLegacyName ? 'Munago Estoque' : data.storeName;
-
-          setSettings(prev => {
-            const resolvedAccentColor = data.accentColor || prev.accentColor || getStoredAccentColor();
-            if (resolvedAccentColor) {
-              applyAccentColorToDOM(resolvedAccentColor);
-            }
-            return { 
-              ...prev, 
-              ...data, 
-              accentColor: resolvedAccentColor,
-              storeName 
-            } as SystemSettings;
-          });
-
-          // Auto-migrate legacy name in Firestore to persist Munago Estoque
-          if (isLegacyName) {
-            setDoc(doc(db, 'settings', 'global'), { storeName: 'Munago Estoque' }, { merge: true }).catch(() => {});
-          }
-        } else {
-          // Initialize in Firestore with Munago Estoque
-          setDoc(doc(db, 'settings', 'global'), { 
-            storeName: 'Munago Estoque',
-            accentColor: getStoredAccentColor()
-          }, { merge: true }).catch(() => {});
-        }
-      }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/global'));
-
-      return () => {
-        unsubNotifications();
-        unsubUsers();
-        unsubSettings();
-      };
-    }
-
-    return () => {
-      unsubProducts();
-      unsubTransactions();
-      unsubCategories();
-      unsubOS();
-      unsubNotifications();
-      unsubUsers();
-    };
-  }, [user, profile]);
-
-  const isAdmin = profile?.role === 'admin' || 
-    user?.email?.toLowerCase().includes('murillo');
-  
-  const permissions = (profile?.permissions && Object.keys(profile.permissions).length > 0) 
-    ? profile.permissions 
-    : (profile?.role ? getDefaultPermissions(profile.role) : getDefaultPermissions('viewer'));
-  
-  const isEditor = isAdmin || profile?.role === 'editor' || 
-    user?.email?.toLowerCase().includes('murillo');
-
+  const isEditor = isAdmin || profile?.role === 'editor';
   const isViewer = !isAdmin && !isEditor;
 
   const canManageInventory = isAdmin || permissions.canManageInventory || false;
@@ -591,97 +464,62 @@ export const AppProvider = ({ children }: { children: any }) => {
   const canManageUsers = isAdmin || permissions.canManageUsers || false;
   const canViewReports = isAdmin || permissions.canViewReports || false;
   const canPerformTransactions = isAdmin || permissions.canPerformTransactions || false;
-  
+
   // Helper for viewing: all approved users can view inventory and OS (viewers read-only, operators and admins can manage)
   const canViewInventory = true;
   const canViewOS = true;
 
-  // Automated Firestore Backups
+  const isApproved = !!profile && (profile.status === 'approved' || profile.role === 'admin');
+  const canSeeNotifications = canManageInventory || canManageOS;
+
+  // Carrega tudo após aprovação e recarrega cada recurso quando o servidor avisa (SSE).
   useEffect(() => {
-    const handleAutoBackup = async () => {
-      if (!isAdmin || !settings.autoBackupEnabled || loading) return;
-      
-      const now = Date.now();
-      const lastBackup = settings.lastFirestoreBackup ? new Date(settings.lastFirestoreBackup).getTime() : 0;
-      const hoursSinceLastBackup = (now - lastBackup) / (1000 * 60 * 60);
+    if (!isApproved) return;
 
-      // Auto backup every 24 hours if enabled
-      if (hoursSinceLastBackup > 24 && products.length > 0) {
-        try {
-          const backupData = {
-            timestamp: serverTimestamp(),
-            productCount: products.length,
-            transactionCount: transactions.length,
-            categoryCount: categories.length,
-            serviceOrderCount: serviceOrders.length,
-            data: {
-              products,
-              categories,
-              transactions: transactions.slice(0, 100),
-              serviceOrders: serviceOrders.slice(0, 50)
-            }
-          };
-
-          await addDoc(collection(db, 'backups'), backupData);
-          await setDoc(doc(db, 'settings', 'global'), { 
-            ...settings, 
-            lastFirestoreBackup: new Date().toISOString() 
-          }, { merge: true });
-
-          console.log('Automated Firestore backup created successfully.');
-        } catch (error) {
-          console.error('Failed to create automated Firestore backup:', error);
+    const loaders: Record<string, () => Promise<void>> = {
+      products: async () => setProducts((await apiGet<Product[]>('/products')).map(hydrateDates)),
+      transactions: async () => setTransactions((await apiGet<Transaction[]>('/transactions')).map(hydrateDates)),
+      categories: async () => setCategories((await apiGet<Category[]>('/categories')).map(hydrateDates)),
+      serviceOrders: async () => setServiceOrders((await apiGet<ServiceOrder[]>('/service-orders')).map(hydrateDates)),
+      settings: async () => {
+        const s = await apiGet<SystemSettings & { lastBackup?: string }>('/settings');
+        setSettings(prev => ({ ...prev, ...s, lastFirestoreBackup: s.lastBackup ?? '' }));
+      },
+      notifications: async () => {
+        if (!canSeeNotifications) return;
+        const list = (await apiGet<Notification[]>('/notifications')).map(hydrateDates);
+        const unread = new Set(list.filter(n => !n.read).map(n => n.id));
+        const previous = unreadIdsRef.current;
+        if (previous && [...unread].some(id => !previous.has(id))) {
+          playLowStockAlertIfEnabled(soundEnabledRef.current);
         }
-      }
+        unreadIdsRef.current = unread;
+        setNotifications(list);
+      },
+      users: async () => {
+        if (canManageUsers) setAllUsers((await apiGet<ApiUser[]>('/users')).map(toProfile));
+        // Admin pode ter mudado meu cargo/permissões.
+        await loadSession();
+      },
     };
 
-    handleAutoBackup();
-  }, [isAdmin, settings.autoBackupEnabled, settings.lastFirestoreBackup, loading, products.length]);
-
-  const login = async () => {
-    try {
-      const result = await loginWithGoogle();
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential?.accessToken) {
-        setDriveToken(credential.accessToken);
-        toast.success('Conectado ao Google Drive!');
-      }
-    } catch (error: any) {
-      console.error('Login error:', error);
-      let message = 'Erro ao fazer login com Google.';
-      if (error.code === 'auth/popup-blocked') {
-        message = 'O popup de login foi bloqueado pelo seu navegador.';
-        toast.error(message);
-      } else if (error.code === 'auth/unauthorized-domain') {
-        message = 'Este domínio não está autorizado no Firebase.';
-        toast.error(message);
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        // Just a info/warning toast instead of error for user-initiated closure
-        toast.info('Login cancelado.');
-        return; 
-      } else {
-        toast.error(message);
-      }
-      throw error;
+    for (const [name, load] of Object.entries(loaders)) {
+      if (name !== 'users' || canManageUsers) load().catch((e) => handleApiError(e));
     }
+    return subscribeChanges((resource) => {
+      loaders[resource]?.().catch((e) => handleApiError(e));
+    });
+  }, [isApproved, canManageUsers, canSeeNotifications, loadSession]);
+
+  const loginEmail = async (email: string, pass: string): Promise<LoginResult> => {
+    const result = await cognitoLogin(email, pass);
+    if (result === 'DONE') await loadSession();
+    return result;
   };
 
-  const loginEmail = async (email: string, pass: string) => {
-    try {
-      await loginWithEmail(email, pass);
-    } catch (error) {
-      console.error('Email login error:', error);
-      throw error;
-    }
-  };
-
-  const registerEmail = async (email: string, pass: string) => {
-    try {
-      await registerWithEmail(email, pass);
-    } catch (error) {
-      console.error('Email registration error:', error);
-      throw error;
-    }
+  const completeNewPassword = async (newPassword: string) => {
+    await cognitoCompleteNewPassword(newPassword);
+    await loadSession();
   };
 
   const handleLogout = async () => {
@@ -690,18 +528,14 @@ export const AppProvider = ({ children }: { children: any }) => {
       // Clear session tokens and cache hints (preserve user theme preferences in localStorage)
       localStorage.removeItem('google_tokens');
       sessionStorage.clear();
+      setDriveToken(null);
 
-      await logout();
-      
+      await cognitoLogout();
+
       setUser(null);
       setProfile(null);
-      setProducts([]);
-      setTransactions([]);
-      setNotifications([]);
-      setCategories([]);
-      setServiceOrders([]);
-      setAllUsers([]);
-      
+      clearData();
+
       toast.success('Você saiu do sistema.', { id: toastId });
     } catch (error) {
       console.error('Logout error:', error);
@@ -709,20 +543,11 @@ export const AppProvider = ({ children }: { children: any }) => {
     }
   };
 
-  console.log('User permissions debug:', {
-    email: user?.email,
-    uid: user?.uid,
-    role: profile?.role,
-    hasPermissionsField: !!profile?.permissions,
-    permissionsObject: profile?.permissions,
-    finalPermissions: permissions
-  });
-
   const markNotificationAsRead = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'notifications', id), { read: true });
+      await apiPatch(`/notifications/${id}/read`, {});
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `notifications/${id}`);
+      handleApiError(error);
     }
   };
 
@@ -733,34 +558,22 @@ export const AppProvider = ({ children }: { children: any }) => {
     }
     const toastId = toast.loading('Salvando produto...');
     try {
-      await addDoc(collection(db, 'products'), {
-        ...product,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+      await apiPost('/products', compact(product));
       toast.success('Produto salvo com sucesso!', { id: toastId });
     } catch (error) {
-      toast.error('Erro ao salvar produto.', { id: toastId });
-      handleFirestoreError(error, OperationType.CREATE, 'products');
+      toast.error(error instanceof Error ? error.message : 'Erro ao salvar produto.', { id: toastId });
     }
   };
 
   const updateProductAction = async (id: string, updates: Partial<Product>) => {
-    if (!canManageInventory && updates.quantity === undefined) {
+    if (!canManageInventory) {
       toast.error('Acesso restrito: Você não tem permissão para alterar produtos.');
       return;
     }
     const toastId = toast.loading('Atualizando produto...');
     try {
-      // Check for negative stock restriction
-      if (!settings.allowNegativeStock && updates.quantity !== undefined && updates.quantity < 0) {
-        throw new Error('Estoque não pode ser negativo de acordo com as configurações do sistema.');
-      }
-
-      await updateDoc(doc(db, 'products', id), {
-        ...updates,
-        updatedAt: serverTimestamp()
-      });
+      const { id: _id, createdAt: _c, updatedAt: _u, ...data } = updates;
+      await apiPatch(`/products/${id}`, compact(data));
 
       // Check if updated quantity triggers low stock alert
       if (updates.quantity !== undefined) {
@@ -772,8 +585,7 @@ export const AppProvider = ({ children }: { children: any }) => {
       }
       toast.success('Produto atualizado com sucesso!', { id: toastId });
     } catch (error) {
-      toast.error('Erro ao atualizar produto.', { id: toastId });
-      handleFirestoreError(error, OperationType.UPDATE, `products/${id}`);
+      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar produto.', { id: toastId });
     }
   };
 
@@ -784,157 +596,54 @@ export const AppProvider = ({ children }: { children: any }) => {
     }
     const toastId = toast.loading('Excluindo produto...');
     try {
-      await deleteDoc(doc(db, 'products', id));
+      await apiDelete(`/products/${id}`);
       toast.success('Produto excluído com sucesso!', { id: toastId });
     } catch (error) {
-      toast.error('Erro ao excluir produto.', { id: toastId });
-      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
+      toast.error(error instanceof Error ? error.message : 'Erro ao excluir produto.', { id: toastId });
     }
   };
 
   const addCategoryAction = async (category: Omit<Category, 'id' | 'createdAt'>) => {
     const toastId = toast.loading('Salvando categoria...');
     try {
-      await addDoc(collection(db, 'categories'), {
-        ...category,
-        aiSuggestion: category.aiSuggestion || '',
-        createdAt: serverTimestamp()
-      });
+      await apiPost('/categories', compact(category));
       toast.success('Categoria salva com sucesso!', { id: toastId });
     } catch (error) {
-      toast.error('Erro ao salvar categoria.', { id: toastId });
-      handleFirestoreError(error, OperationType.CREATE, 'categories');
+      toast.error(error instanceof Error ? error.message : 'Erro ao salvar categoria.', { id: toastId });
     }
   };
 
+  // O servidor propaga o novo nome para os produtos na mesma transação.
   const updateCategoryAction = async (id: string, updates: Partial<Category>) => {
     const toastId = toast.loading('Atualizando categoria...');
     try {
-      const oldCategory = categories.find(c => c.id === id);
-      const oldName = oldCategory?.name;
-      const newName = updates.name;
-
-      await updateDoc(doc(db, 'categories', id), updates);
-
-      // If name changed, update all products using this category
-      if (oldName && newName && oldName !== newName) {
-        const batch = writeBatch(db);
-        const productsToUpdate = products.filter(p => p.category === oldName);
-        
-        productsToUpdate.forEach(p => {
-          batch.update(doc(db, 'products', p.id), { category: newName });
-        });
-        
-        await batch.commit();
-      }
-
+      const { id: _id, createdAt: _c, ...data } = updates;
+      await apiPatch(`/categories/${id}`, compact(data));
       toast.success('Categoria atualizada com sucesso!', { id: toastId });
     } catch (error) {
-      toast.error('Erro ao atualizar categoria.', { id: toastId });
-      handleFirestoreError(error, OperationType.UPDATE, `categories/${id}`);
+      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar categoria.', { id: toastId });
     }
   };
 
   const deleteCategoryAction = async (id: string) => {
     const toastId = toast.loading('Excluindo categoria...');
     try {
-      // Check if any product is using this category
-      const categoryName = categories.find(c => c.id === id)?.name;
-      if (categoryName && products.some(p => p.category === categoryName)) {
-        throw new Error('Não é possível excluir uma categoria que possui produtos vinculados.');
-      }
-      await deleteDoc(doc(db, 'categories', id));
+      await apiDelete(`/categories/${id}`);
       toast.success('Categoria excluída com sucesso!', { id: toastId });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erro ao excluir categoria.', { id: toastId });
-      handleFirestoreError(error, OperationType.DELETE, `categories/${id}`);
     }
   };
 
+  // O servidor baixa o estoque e registra as movimentações na mesma transação.
   const addServiceOrderAction = async (os: Omit<ServiceOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
     if (!user || !profile) return;
     if (!canManageOS) {
       toast.error('Acesso restrito: Você não possui permissão para gerar Ordens de Serviço.');
       return;
     }
-    try {
-      // Check for negative stock restriction
-      if (!settings.allowNegativeStock) {
-        for (const item of os.items) {
-          const product = products.find(p => p.id === item.productId);
-          if (product && product.quantity < item.quantity) {
-            throw new Error(`Estoque insuficiente para o item: ${item.name}`);
-          }
-        }
-      }
-
-      const batch = writeBatch(db);
-      const osRef = doc(collection(db, 'serviceOrders'));
-      
-      batch.set(osRef, {
-        ...os,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-
-      // Register transactions and update stock for each item
-      for (const item of os.items) {
-        const transactionRef = doc(collection(db, 'transactions'));
-        batch.set(transactionRef, {
-          productId: item.productId,
-          productName: item.name,
-          type: 'out',
-          quantity: item.quantity,
-          reason: `Ordem de Serviço #${osRef.id.slice(-6).toUpperCase()}`,
-          userId: user.uid,
-          userName: profile.name,
-          timestamp: serverTimestamp()
-        });
-
-        const productRef = doc(db, 'products', item.productId);
-        batch.update(productRef, {
-          quantity: increment(-item.quantity),
-          updatedAt: serverTimestamp()
-        });
-      }
-
-      await batch.commit();
-
-      // Check for low stock alerts after batch commit
-      for (const item of os.items) {
-        const productSnap = await getDoc(doc(db, 'products', item.productId));
-        if (productSnap.exists()) {
-          const p = productSnap.data() as Product;
-          if (p.quantity <= p.minQuantity) {
-            // Play gentle low stock sound if enabled
-            playLowStockAlertIfEnabled(settings.enableSoundAlerts);
-
-            // Check if there's already an unread notification for this product
-            const q = query(
-              collection(db, 'notifications'), 
-              where('productId', '==', p.id),
-              where('read', '==', false),
-              where('type', '==', 'low_stock')
-            );
-            const existingNotifications = await getDocs(q);
-            
-            if (existingNotifications.empty) {
-              await addDoc(collection(db, 'notifications'), {
-                title: 'Alerta de Estoque Baixo',
-                message: `O produto "${p.name}" atingiu o nível crítico (${p.quantity} unidades).`,
-                productId: p.id,
-                type: 'low_stock',
-                timestamp: serverTimestamp(),
-                read: false
-              });
-            }
-          }
-        }
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'serviceOrders');
-    }
+    // Erro sobe para a tela, que mostra o toast.
+    await apiPost('/service-orders', compact(os));
   };
 
   const updateServiceOrderAction = async (id: string, updates: Partial<ServiceOrder>) => {
@@ -942,14 +651,13 @@ export const AppProvider = ({ children }: { children: any }) => {
       toast.error('Acesso restrito: Você não possui permissão para editar Ordens de Serviço.');
       return;
     }
-    try {
-      await updateDoc(doc(db, 'serviceOrders', id), {
-        ...updates,
-        updatedAt: serverTimestamp()
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `serviceOrders/${id}`);
+    // Itens e autor não mudam após criar (estoque já foi baixado).
+    const { id: _id, createdAt: _c, updatedAt: _u, createdBy: _b, items, ...data } = updates;
+    const current = serviceOrders.find(o => o.id === id);
+    if (items && current && JSON.stringify(items) !== JSON.stringify(current.items)) {
+      toast.warning('Os itens de uma OS não podem ser alterados após a criação. Os demais campos foram salvos.');
     }
+    await apiPatch(`/service-orders/${id}`, compact(data));
   };
 
   const deleteServiceOrderAction = async (id: string) => {
@@ -958,326 +666,136 @@ export const AppProvider = ({ children }: { children: any }) => {
       return;
     }
     try {
-      await deleteDoc(doc(db, 'serviceOrders', id));
+      await apiDelete(`/service-orders/${id}`);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `serviceOrders/${id}`);
+      handleApiError(error);
     }
   };
 
   const bulkAddProductsAction = async (newProducts: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]) => {
     try {
-      const batch = writeBatch(db);
-      newProducts.forEach((product) => {
-        const newDocRef = doc(collection(db, 'products'));
-        batch.set(newDocRef, {
-          ...product,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-      });
-      await batch.commit();
+      await apiPost('/products/bulk', newProducts.map(p => compact(p)));
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'products/bulk');
+      handleApiError(error);
     }
   };
 
   const bulkUpdateProductsAction = async (ids: string[], updates: Partial<Product>) => {
     try {
-      // Check for negative stock restriction
-      if (!settings.allowNegativeStock && updates.quantity !== undefined && updates.quantity < 0) {
-        throw new Error('Estoque não pode ser negativo de acordo com as configurações do sistema.');
-      }
-      const batch = writeBatch(db);
-      ids.forEach(id => {
-        const productRef = doc(db, 'products', id);
-        batch.update(productRef, {
-          ...updates,
-          updatedAt: serverTimestamp()
-        });
-      });
-      await batch.commit();
+      const { id: _id, createdAt: _c, updatedAt: _u, ...data } = updates;
+      await apiPatch('/products/bulk', { ids, updates: compact(data) });
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'products/bulk-update');
+      handleApiError(error);
     }
   };
 
-  const updateUserRoleAction = async (uid: string, role: 'admin' | 'editor' | 'viewer') => {
-    const toastId = toast.loading('Atualizando cargo...');
+  const patchUser = async (uid: string, body: object, loadingMsg: string, okMsg: string, errMsg: string) => {
+    const toastId = toast.loading(loadingMsg);
     try {
-      await updateDoc(doc(db, 'users', uid), { 
-        role,
-        permissions: getDefaultPermissions(role)
-      });
-      toast.success('Cargo atualizado com sucesso!', { id: toastId });
+      await apiPatch(`/users/${uid}`, body);
+      toast.success(okMsg, { id: toastId });
     } catch (error) {
-      toast.error('Erro ao atualizar cargo.', { id: toastId });
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+      toast.error(error instanceof Error && error.message ? error.message : errMsg, { id: toastId });
     }
   };
 
-  const updateUserPermissionsAction = async (uid: string, permissions: UserPermissions) => {
-    const toastId = toast.loading('Atualizando permissões...');
-    try {
-      await updateDoc(doc(db, 'users', uid), { permissions });
-      toast.success('Permissões atualizadas com sucesso!', { id: toastId });
-    } catch (error) {
-      toast.error('Erro ao atualizar permissões.', { id: toastId });
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
-    }
-  };
+  const updateUserRoleAction = (uid: string, role: 'admin' | 'editor' | 'viewer') =>
+    patchUser(uid, { role }, 'Atualizando cargo...', 'Cargo atualizado com sucesso!', 'Erro ao atualizar cargo.');
 
-  const updateUserRoleAndPermissionsAction = async (
-    uid: string, 
-    role: 'admin' | 'editor' | 'viewer', 
-    permissions: UserPermissions
-  ) => {
-    const toastId = toast.loading('Atualizando perfil e permissões...');
-    try {
-      await updateDoc(doc(db, 'users', uid), { 
-        role,
-        permissions
-      });
-      toast.success('Perfil e permissões atualizados com sucesso!', { id: toastId });
-    } catch (error) {
-      toast.error('Erro ao atualizar usuário.', { id: toastId });
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
-    }
-  };
+  const updateUserPermissionsAction = (uid: string, permissions: UserPermissions) =>
+    patchUser(uid, { permissions }, 'Atualizando permissões...', 'Permissões atualizadas com sucesso!', 'Erro ao atualizar permissões.');
 
-  const approveUserAction = async (uid: string) => {
-    const toastId = toast.loading('Aprovando usuário...');
-    try {
-      await updateDoc(doc(db, 'users', uid), { status: 'approved' });
-      toast.success('Usuário aprovado com sucesso!', { id: toastId });
-    } catch (error) {
-      toast.error('Erro ao aprovar usuário.', { id: toastId });
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
-    }
-  };
+  const updateUserRoleAndPermissionsAction = (uid: string, role: 'admin' | 'editor' | 'viewer', permissions: UserPermissions) =>
+    patchUser(uid, { role, permissions }, 'Atualizando perfil e permissões...', 'Perfil e permissões atualizados com sucesso!', 'Erro ao atualizar usuário.');
 
-  const denyUserAction = async (uid: string) => {
-    const toastId = toast.loading('Negando acesso...');
-    try {
-      await updateDoc(doc(db, 'users', uid), { status: 'denied' });
-      toast.success('Acesso negado!', { id: toastId });
-    } catch (error) {
-      toast.error('Erro ao negar acesso.', { id: toastId });
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
-    }
-  };
+  const approveUserAction = (uid: string) =>
+    patchUser(uid, { status: 'approved' }, 'Aprovando usuário...', 'Usuário aprovado com sucesso!', 'Erro ao aprovar usuário.');
+
+  const denyUserAction = (uid: string) =>
+    patchUser(uid, { status: 'denied' }, 'Negando acesso...', 'Acesso negado!', 'Erro ao negar acesso.');
 
   const deleteUserAction = async (uid: string) => {
     const toastId = toast.loading('Excluindo usuário...');
     try {
-      await deleteDoc(doc(db, 'users', uid));
+      await apiDelete(`/users/${uid}`);
       toast.success('Usuário excluído com sucesso!', { id: toastId });
     } catch (error) {
-      toast.error('Erro ao excluir usuário.', { id: toastId });
-      handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
+      toast.error(error instanceof Error && error.message ? error.message : 'Erro ao excluir usuário.', { id: toastId });
     }
   };
 
+  // O Cognito envia o e-mail de convite com senha temporária.
   const addUserByEmailAction = async (email: string, name: string, role: 'admin' | 'editor' | 'viewer', permissions?: UserPermissions) => {
     const toastId = toast.loading('Processando novo usuário...');
     try {
-      const emailId = email.toLowerCase().trim();
-      const userPermissions = permissions || getDefaultPermissions(role);
-      
-      // Generate a random temporary password
-      const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-      let password = "";
-      for (let i = 0; i < 12; i++) {
-        password += charset.charAt(Math.floor(Math.random() * charset.length));
-      }
-
-      try {
-        // Try the backend API first (Automatic Email)
-        const response = await fetch('/api/users/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: emailId,
-            password,
-            name,
-            role,
-            permissions: userPermissions
-          }),
-        });
-
-        if (response.ok) {
-          toast.success('Usuário criado e e-mail enviado com sucesso!', { id: toastId });
-          return;
-        }
-        
-        // If API fails (e.g. missing secrets), we fall back to manual mode
-        console.warn('Backend API failed, falling back to manual mode.');
-      } catch (e) {
-        console.warn('Backend API unreachable, falling back to manual mode.');
-      }
-
-      // FALLBACK: Manual Mode (Create doc in Firestore and show password)
-      const userRef = doc(db, 'users', emailId);
-      await setDoc(userRef, {
-        email: emailId,
-        name,
-        role,
-        uid: '', // Will be filled on first login
-        tempPassword: password, // Store temporarily so admin can see it
-        permissions: userPermissions
-      });
-
-      // Show a success message with the password
-      toast.dismiss(toastId);
-      
-      // We'll use a custom event or state to show a modal in the UI
-      // For now, let's use a more descriptive toast or an alert (since we can't use window.alert, we'll use a persistent toast)
-      toast.success(
-        (t) => (
-          <div className="flex flex-col gap-2">
-            <p className="font-bold">Usuário criado (Modo Manual)</p>
-            <p className="text-xs">O e-mail automático não pôde ser enviado, mas o acesso foi liberado.</p>
-            <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded text-xs font-mono">
-              Senha: {password}
-            </div>
-            <button 
-              onClick={() => {
-                const msg = `Olá ${name}! Sua conta no Munago Estoque foi criada.\n\nUsuário: ${emailId}\nSenha: ${password}\nAcesse em: ${window.location.origin}`;
-                navigator.clipboard.writeText(msg);
-                toast.success('Mensagem copiada!', { id: 'copy-success' });
-                toast.dismiss(t.id);
-              }}
-              className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded font-bold uppercase"
-            >
-              Copiar Mensagem de Boas-Vindas
-            </button>
-          </div>
-        ),
-        { duration: 10000 }
-      );
-
+      await apiPost('/users', { email, name, role, permissions: permissions || getDefaultPermissions(role) });
+      toast.success('Usuário criado! O convite com a senha temporária foi enviado por e-mail.', { id: toastId });
     } catch (error) {
-      console.error('Error adding user:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao adicionar usuário.', { id: toastId });
+      toast.error(error instanceof Error && error.message ? error.message : 'Erro ao adicionar usuário.', { id: toastId });
     }
   };
 
+  // userId/userName ficam na assinatura por compatibilidade: o servidor usa o usuário do token.
   const registerTransactionAction = async (
-    productId: string, 
-    productName: string, 
-    type: 'in' | 'out', 
-    quantity: number, 
+    productId: string,
+    _productName: string,
+    type: 'in' | 'out',
+    quantity: number,
     reason: string,
-    userId: string,
-    userName: string
+    _userId: string,
+    _userName: string
   ) => {
     if (!canPerformTransactions) {
       toast.error('Acesso restrito: Você não tem permissão para realizar movimentações no estoque.');
       return;
     }
     try {
-      // Check for negative stock restriction
-      if (type === 'out' && !settings.allowNegativeStock) {
-        const product = products.find(p => p.id === productId);
-        if (product && product.quantity < quantity) {
-          throw new Error('Estoque insuficiente para realizar esta saída.');
-        }
-      }
-
-      const transactionData = {
-        productId,
-        productName,
-        type,
-        quantity,
-        reason,
-        timestamp: serverTimestamp(),
-        userId,
-        userName
-      };
-
-      await addDoc(collection(db, 'transactions'), transactionData);
-      
-      // Update product quantity
-      const productRef = doc(db, 'products', productId);
-      await updateDoc(productRef, {
-        quantity: increment(type === 'in' ? quantity : -quantity),
-        updatedAt: serverTimestamp()
-      });
-
-      // Check for low stock alert
-      const productSnap = await getDoc(productRef);
-      if (productSnap.exists()) {
-        const p = productSnap.data() as Product;
-        if (p.quantity <= p.minQuantity) {
-          // Play gentle low stock sound if enabled
-          playLowStockAlertIfEnabled(settings.enableSoundAlerts);
-
-          // Check if there's already an unread notification for this product
-          const q = query(
-            collection(db, 'notifications'), 
-            where('productId', '==', p.id),
-            where('read', '==', false),
-            where('type', '==', 'low_stock')
-          );
-          const existingNotifications = await getDocs(q);
-          
-          if (existingNotifications.empty) {
-            await addDoc(collection(db, 'notifications'), {
-              title: 'Alerta de Estoque Baixo',
-              message: `O produto "${p.name}" atingiu o nível crítico (${p.quantity} unidades).`,
-              productId: p.id,
-              type: 'low_stock',
-              timestamp: serverTimestamp(),
-              read: false
-            });
-          }
-        }
-      }
+      await apiPost('/transactions', { productId, type, quantity, reason: reason || undefined });
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'transactions/products');
+      handleApiError(error);
     }
   };
 
   const updateSettingsAction = async (updates: Partial<SystemSettings>) => {
-    // 1. Sanitize updates to prevent any undefined values from causing Firestore setDoc fatal errors
-    const cleanUpdates: Record<string, any> = {};
-    for (const [key, value] of Object.entries(updates)) {
-      if (value !== undefined) {
-        cleanUpdates[key] = value;
-      }
+    const cleanUpdates: Record<string, unknown> = {};
+    for (const key of SETTINGS_KEYS) {
+      if (updates[key] !== undefined && updates[key] !== null) cleanUpdates[key] = updates[key];
     }
 
-    // 2. If accentColor is updated, apply immediately to DOM & localStorage
-    if (cleanUpdates.accentColor) {
+    if (typeof cleanUpdates.accentColor === 'string') {
       applyAccentColorToDOM(cleanUpdates.accentColor);
     }
-
-    // Handle sound alert toggle local storage persistence
     if (typeof cleanUpdates.enableSoundAlerts === 'boolean') {
       setStoredSoundAlertsEnabled(cleanUpdates.enableSoundAlerts);
     }
 
-    // 3. Immediately update local state so the UI responds without lag
+    // Atualiza a tela na hora; só admin grava as configurações globais.
     setSettings(prev => ({ ...prev, ...cleanUpdates }));
+    if (!isAdmin) return;
 
     const toastId = toast.loading('Salvando configurações...');
     try {
-      await setDoc(doc(db, 'settings', 'global'), cleanUpdates, { merge: true });
+      await apiPatch('/settings', cleanUpdates);
       toast.success('Configurações salvas com sucesso!', { id: toastId });
     } catch (error: any) {
-      console.error('Error saving settings to Firestore:', error);
-      // If Firestore reports permission or network issue, user's local appearance is preserved
-      toast.error('Erro ao sincronizar na nuvem: ' + (error?.message || 'Verifique permissões'), { id: toastId });
-      handleFirestoreError(error, OperationType.UPDATE, 'settings/global');
+      console.error('Error saving settings:', error);
+      toast.error('Erro ao salvar: ' + (error?.message || 'Verifique permissões'), { id: toastId });
     }
   };
 
-  const handleBackupToDrive = async () => {
-    if (!driveToken) {
-      toast.error('Você precisa estar conectado ao Google Drive para fazer o backup.');
-      return;
+  const ensureDriveToken = (): string | null => {
+    const token = driveToken || getStoredGoogleAccessToken();
+    if (!token) {
+      toast.info('Conecte sua conta Google para usar o Drive. Após autorizar, a página será recarregada.');
+      openGoogleAuth();
+      return null;
     }
+    return token;
+  };
+
+  const handleBackupToDrive = async () => {
+    const token = ensureDriveToken();
+    if (!token) return;
 
     const toastId = toast.loading('Gerando backup no Google Drive...');
     try {
@@ -1290,24 +808,22 @@ export const AppProvider = ({ children }: { children: any }) => {
       };
 
       const fileName = `backup_estoque_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`;
-      await createBackupFile(driveToken, fileName, JSON.stringify(backupData, null, 2));
-      
+      await createBackupFile(token, fileName, JSON.stringify(backupData, null, 2));
+
       toast.success('Backup realizado com sucesso no Google Drive!', { id: toastId });
     } catch (error) {
       console.error('Drive Backup Error:', error);
-      toast.error('Erro ao realizar backup no Google Drive.', { id: toastId });
+      toast.error('Erro ao realizar backup no Google Drive. Se persistir, reconecte sua conta Google.', { id: toastId });
     }
   };
 
   const handleRestoreFromDrive = async () => {
-    if (!driveToken) {
-      toast.error('Você precisa estar conectado ao Google Drive para restaurar o backup.');
-      return;
-    }
+    const token = ensureDriveToken();
+    if (!token) return;
 
     const toastId = toast.loading('Buscando backups...');
     try {
-      const files = await listBackups(driveToken);
+      const files = await listBackups(token);
       if (files.length === 0) {
         toast.error('Nenhum backup encontrado no Google Drive.', { id: toastId });
         return;
@@ -1315,61 +831,35 @@ export const AppProvider = ({ children }: { children: any }) => {
 
       // Sort by name descending (assuming timestamp in name)
       const latestFile = files.sort((a, b) => b.name.localeCompare(a.name))[0];
-      
       toast.loading(`Restaurando: ${latestFile.name}...`, { id: toastId });
-      
-      const content = await getFileContent(driveToken, latestFile.id);
-      const backupData = JSON.parse(content);
-      
-      const batch = writeBatch(db);
-      
-      // We will only do a basic restore adding missing data or overwriting depending on logic.
-      // But for total restoration, this could be destructive. Let's just restore products for now
-      // or at least insert whatever is in the backup that isn't here.
-      // Easiest is to push to db. But writing everything could cause quota issues.
-      // Let's do a simple update loop for products and categories:
 
-      if (backupData.products && Array.isArray(backupData.products)) {
-        for (const product of backupData.products) {
-          const productRef = doc(db, 'products', product.id);
-          batch.set(productRef, {
-            ...product,
-            updatedAt: serverTimestamp()
-          }, { merge: true }); // Merge to not overwrite new fields if they exist
-        }
-      }
-
-      if (backupData.categories && Array.isArray(backupData.categories)) {
-        for (const category of backupData.categories) {
-          const categoryRef = doc(db, 'categories', category.id);
-          batch.set(categoryRef, {
-            ...category,
-          }, { merge: true });
-        }
-      }
-
-      await batch.commit();
+      const backupData = JSON.parse(await getFileContent(token, latestFile.id));
+      // Restaura produtos e categorias (upsert por id), igual ao comportamento anterior.
+      await apiPost('/backups/restore', {
+        products: Array.isArray(backupData.products) ? backupData.products : [],
+        categories: Array.isArray(backupData.categories) ? backupData.categories : [],
+      });
 
       toast.success('Backup restaurado com sucesso!', { id: toastId });
     } catch (error) {
       console.error('Drive Restore Error:', error);
-      toast.error('Erro ao restaurar backup.', { id: toastId });
+      toast.error(error instanceof Error && error.message ? error.message : 'Erro ao restaurar backup.', { id: toastId });
     }
   };
 
   return (
-    <AppContext.Provider value={{ 
-      user, 
-      profile, 
-      products, 
-      transactions, 
+    <AppContext.Provider value={{
+      user,
+      profile,
+      products,
+      transactions,
       notifications,
       categories,
       serviceOrders,
       allUsers,
       users: allUsers,
-      loading, 
-      isAdmin, 
+      loading,
+      isAdmin,
       isEditor,
       isViewer,
       canManageInventory,
@@ -1379,9 +869,8 @@ export const AppProvider = ({ children }: { children: any }) => {
       canPerformTransactions,
       canViewInventory,
       canViewOS,
-      login, 
       loginEmail,
-      registerEmail,
+      completeNewPassword,
       handleLogout,
       markNotificationAsRead,
       addProduct: addProductAction,

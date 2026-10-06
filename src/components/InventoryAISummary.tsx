@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Product } from '../context/AppContext';
 import { toast } from 'sonner';
+import { authFetch } from '../lib/api';
 
 interface InventoryAISummaryProps {
   products: Product[];
@@ -93,7 +94,7 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
         Responda em Português do Brasil com linguagem clara e formatação bonita.
       `;
 
-      const response = await fetch('/api/gemini/generate', {
+      const response = await authFetch('/api/gemini/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +157,7 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
         Responda com precisão, apontando nomes de produtos específicos, SKUs e quantidades se necessário.
       `;
 
-      const response = await fetch('/api/gemini/generate', {
+      const response = await authFetch('/api/gemini/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

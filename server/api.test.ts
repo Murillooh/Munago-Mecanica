@@ -285,5 +285,13 @@ describe('API v1', () => {
       expect(mine).toHaveLength(1);
       expect(mine[0]).toMatchObject({ query: 'q1', userId: 'editor' });
     });
+
+    it('só exclui o próprio histórico', async () => {
+      const mine = (await h.as('editor').post('/ai-searches', { query: 'q', response: 'r' })).body;
+      await h.as('viewer').del(`/ai-searches/${mine.id}`).expect(204);
+      expect((await h.as('editor').get('/ai-searches')).body).toHaveLength(1);
+      await h.as('editor').del(`/ai-searches/${mine.id}`).expect(204);
+      expect((await h.as('editor').get('/ai-searches')).body).toHaveLength(0);
+    });
   });
 });

@@ -3,6 +3,7 @@ import { Tag, X, Sparkles, Trash2, Edit2, Plus, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp, Category } from '../context/AppContext';
 import { toast } from 'sonner';
+import { authFetch } from '../lib/api';
 
 interface CategoryManagerProps {
   isOpen: boolean;
@@ -55,7 +56,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
     
     try {
       // 1. Generate Image (Icon)
-      const imageRes = await fetch('/api/gemini/generate-image', {
+      const imageRes = await authFetch('/api/gemini/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,7 +71,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
       }
 
       // 2. Generate Suggestion
-      const suggestionRes = await fetch('/api/gemini/generate', {
+      const suggestionRes = await authFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

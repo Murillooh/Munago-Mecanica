@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { aiSearches } from '../db/schema';
 import { requirePermission } from '../auth/middleware';
 import { asyncHandler } from '../middleware/errorHandler';
@@ -26,6 +26,11 @@ export function createAiSearchesRouter({ db }: ApiDeps) {
     const data = aiSearchInput.parse(req.body);
     const [row] = await db.insert(aiSearches).values({ id: newId(), userId: req.user!.id, ...data }).returning();
     res.status(201).json(row);
+  }));
+
+  r.delete('/ai-searches/:id', requirePermission(), asyncHandler(async (req, res) => {
+    await db.delete(aiSearches).where(and(eq(aiSearches.id, req.params.id), eq(aiSearches.userId, req.user!.id)));
+    res.status(204).end();
   }));
 
   return r;

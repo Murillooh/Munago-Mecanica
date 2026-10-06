@@ -30,8 +30,7 @@ import {
   Check
 } from 'lucide-react';
 import { useApp, ROLE_PRESETS, UserPermissions, UserProfile } from '../context/AppContext';
-import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { apiGet, apiPost } from '../lib/api';
 import { toast } from 'sonner';
 
 export const Users = () => {
@@ -93,30 +92,20 @@ export const Users = () => {
     setIsSubmitting(true);
     
     try {
-      const response = await fetch('/api/users/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...newUser,
-          permissions: {
-            canManageInventory: newUser.canManageInventory,
-            canManageOS: newUser.canManageOS,
-            canManageUsers: newUser.canManageUsers,
-            canViewReports: newUser.canViewReports,
-            canPerformTransactions: newUser.canPerformTransactions
-          }
-        })
+      await apiPost('/users', {
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role,
+        permissions: {
+          canManageInventory: newUser.canManageInventory,
+          canManageOS: newUser.canManageOS,
+          canManageUsers: newUser.canManageUsers,
+          canViewReports: newUser.canViewReports,
+          canPerformTransactions: newUser.canPerformTransactions
+        }
       });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao criar usuário');
-      }
-
-      toast.success(data.message || 'Usuário criado com sucesso!');
+      toast.success('Usuário criado! O convite com a senha temporária foi enviado por e-mail.');
       setIsAddModalOpen(false);
       setNewUser({
         name: '',
@@ -183,9 +172,7 @@ export const Users = () => {
   const fetchAccessRequests = async () => {
     setIsLoadingRequests(true);
     try {
-      const q = query(collection(db, 'access_requests'), where('status', '==', 'pending'));
-      const snapshot = await getDocs(q);
-      setAccessRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setAccessRequests(await apiGet<any[]>('/access-requests?status=pending'));
     } catch (error) {
        console.error('Error fetching requests:', error);
     } finally {
@@ -378,23 +365,7 @@ export const Users = () => {
                       onClick={async () => {
                         const toastId = toast.loading('Processando aprovação...');
                         try {
-                          if (request.userId) {
-                            await approveUser(request.userId);
-                            await updateUserRole(request.userId, 'editor');
-                          } else if (request.email) {
-                            const emailId = request.email.toLowerCase().trim();
-                            await setDoc(doc(db, 'users', emailId), {
-                              email: emailId,
-                              name: request.name || 'Usuário Aprovado',
-                              role: 'editor',
-                              uid: '',
-                              permissions: ROLE_PRESETS.editor.permissions,
-                              status: 'approved'
-                            });
-                          }
-                          await updateDoc(doc(db, 'access_requests', request.id), {
-                            status: 'approved'
-                          });
+                          await apiPost(`/access-requests/${request.id}/approve`, { role: 'editor' });
                           await fetchAccessRequests();
                           toast.success('Acesso aprovado como Operador!', { id: toastId });
                         } catch (err: any) {
@@ -409,9 +380,7 @@ export const Users = () => {
                       onClick={async () => {
                         const toastId = toast.loading('Negando acesso...');
                         try {
-                          await updateDoc(doc(db, 'access_requests', request.id), {
-                            status: 'rejected'
-                          });
+                          await apiPost(`/access-requests/${request.id}/reject`);
                           await fetchAccessRequests();
                           toast.success('Pedido rejeitado', { id: toastId });
                         } catch (err: any) {

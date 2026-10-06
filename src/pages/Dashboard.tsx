@@ -44,6 +44,7 @@ import { useApp } from '../context/AppContext';
 import { exportInventoryToPDF } from '../lib/pdfExport';
 import { toast } from 'sonner';
 import { ProductMovementTrendChart } from '../components/dashboard/ProductMovementTrendChart';
+import { authFetch } from '../lib/api';
 
 interface DashboardProps {
   onSeeAllLowStock: () => void;
@@ -350,7 +351,7 @@ export const Dashboard = ({
           v: p.price
         }));
 
-      const res = await fetch('/api/gemini/generate', {
+      const res = await authFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

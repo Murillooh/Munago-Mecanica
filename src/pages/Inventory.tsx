@@ -46,6 +46,7 @@ import { exportInventoryToPDF } from '../lib/pdfExport';
 
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { InventoryAISummary } from '../components/InventoryAISummary';
+import { authFetch } from '../lib/api';
 
 export const Inventory = () => {
   const { 
@@ -79,7 +80,7 @@ export const Inventory = () => {
       throw new Error('Não autenticado com o Google.');
     }
 
-    const response = await fetch(`/api/sheets/data?spreadsheetId=${encodeURIComponent(spreadsheetId)}&range=${encodeURIComponent(range)}`, {
+    const response = await authFetch(`/api/sheets/data?spreadsheetId=${encodeURIComponent(spreadsheetId)}&range=${encodeURIComponent(range)}`, {
       headers: {
         'x-google-tokens': tokens
       }

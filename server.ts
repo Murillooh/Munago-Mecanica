@@ -19,6 +19,7 @@ import { ChangeBus } from "./server/realtime/events";
 import { createApiRouter } from "./server/api";
 import { authMiddleware, requireAdmin, requirePermission } from "./server/auth/middleware";
 import { createCognitoAdmin, createCognitoVerifier } from "./server/auth/cognito";
+import { runAutoBackupIfDue } from "./server/services/backup";
 
 dotenv.config();
 
@@ -289,6 +290,8 @@ async function startServer() {
 
     const scopes = [
       "https://www.googleapis.com/auth/spreadsheets.readonly",
+      // Backup/restauração no Google Drive (só arquivos criados pelo app)
+      "https://www.googleapis.com/auth/drive.file",
       "https://www.googleapis.com/auth/userinfo.profile",
       "https://www.googleapis.com/auth/userinfo.email",
     ];
@@ -493,6 +496,13 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on http://localhost:${PORT}`);
   });
+
+  // Backup automático diário (quando ligado em Configurações). Verifica de hora em hora.
+  const backupTick = () => runAutoBackupIfDue(db)
+    .then((done) => done && logger.info('Automatic backup created'))
+    .catch((err) => logger.error(err, 'Automatic backup failed'));
+  backupTick();
+  setInterval(backupTick, 60 * 60 * 1000).unref();
 }
 
 startServer();

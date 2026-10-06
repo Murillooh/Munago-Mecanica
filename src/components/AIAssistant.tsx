@@ -1,18 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from "../context/AppContext";
-import { db, auth, handleFirestoreError, OperationType } from "../firebase";
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  serverTimestamp,
-  Timestamp,
-  deleteDoc,
-  doc
-} from 'firebase/firestore';
+import { apiDelete, apiGet, apiPost, authFetch, hydrateDates, type AppTimestamp } from "../lib/api";
 import { 
   Send, 
   Bot, 
@@ -45,7 +33,7 @@ interface SavedSearch {
   id: string;
   query: string;
   response: string;
-  timestamp: Timestamp;
+  timestamp: AppTimestamp;
   metadata?: any;
 }
 
@@ -70,28 +58,19 @@ const AIAssistant = () => {
     }
   }, [messages, activeTab]);
 
-  // Load history from Firestore
+  // Histórico de pesquisas do usuário (API)
+  const loadHistory = async () => {
+    try {
+      setHistory((await apiGet<SavedSearch[]>('/ai-searches')).map(hydrateDates));
+    } catch (error) {
+      console.error('Error loading AI history:', error);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
-
-    const q = query(
-      collection(db, 'ai_searches'),
-      where('userId', '==', user.uid),
-      orderBy('timestamp', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const savedSearches: SavedSearch[] = [];
-      snapshot.forEach((doc) => {
-        savedSearches.push({ id: doc.id, ...doc.data() } as SavedSearch);
-      });
-      setHistory(savedSearches);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'ai_searches');
-    });
-
-    return () => unsubscribe();
-  }, []);
+    loadHistory();
+  }, [user?.uid]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -136,7 +115,7 @@ const AIAssistant = () => {
         Sempre responda em Português do Brasil. Seja técnico mas acessível.
       `;
 
-      const response = await fetch('/api/gemini/chat-stream', {
+      const response = await authFetch('/api/gemini/chat-stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -209,15 +188,10 @@ const AIAssistant = () => {
         }
       }
 
-      // Save to Firestore after stream completes
-      if (auth.currentUser) {
-        await addDoc(collection(db, 'ai_searches'), {
-          userId: auth.currentUser.uid,
-          query: userQuery,
-          response: fullResponse,
-          timestamp: serverTimestamp(),
-          metadata: null 
-        });
+      // Salva no histórico após o stream terminar
+      if (user && fullResponse) {
+        await apiPost('/ai-searches', { query: userQuery, response: fullResponse });
+        loadHistory();
       }
 
     } catch (error: any) {
@@ -469,7 +443,8 @@ const AIAssistant = () => {
                           <button 
                             onClick={async () => {
                               try {
-                                await deleteDoc(doc(db, 'ai_searches', item.id));
+                                await apiDelete(`/ai-searches/${item.id}`);
+                                setHistory(prev => prev.filter(h => h.id !== item.id));
                                 toast.success('Pesquisa excluída com sucesso!');
                               } catch (err) {
                                 toast.error('Erro ao excluir pesquisa.');

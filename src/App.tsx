@@ -11,6 +11,25 @@ import {
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { toast } from 'sonner';
+import { authFetch } from './lib/api';
+
+// Download exige token: window.open não envia o header Authorization.
+const downloadProject = async () => {
+  const toastId = toast.loading('Gerando arquivo do projeto...');
+  try {
+    const res = await authFetch('/api/download-project');
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Erro ${res.status}`);
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'projeto-munago-estoque.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Download iniciado.', { id: toastId });
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Erro ao baixar o projeto.', { id: toastId });
+  }
+};
 
 // Components
 import { Sidebar } from './components/layout/Sidebar';
@@ -25,7 +44,6 @@ import { Transactions } from './pages/Transactions';
 import { Notifications } from './pages/Notifications';
 import { SettingsView } from './pages/Settings';
 import { Users } from './pages/Users';
-import SetPassword from './pages/SetPassword';
 import Login from './pages/Login';
 
 const AppContent = () => {
@@ -81,7 +99,7 @@ const AppContent = () => {
       case 'alerts':
         return <Notifications />;
       case 'settings':
-        return <SettingsView handleDownloadProject={() => window.open('/api/download-project')} />;
+        return <SettingsView handleDownloadProject={downloadProject} />;
       case 'users':
         return <Users />;
       case 'ai':
@@ -203,15 +221,11 @@ const RootApp = () => {
 
           <div className="flex items-center gap-2 text-[11px] text-zinc-400 dark:text-zinc-500 mt-5 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Sincronizando com Firestore</span>
+            <span>Sincronizando dados</span>
           </div>
         </motion.div>
       </div>
     );
-  }
-
-  if (location.pathname === '/auth/set-password') {
-    return <SetPassword />;
   }
 
   if (!user) return <Login />;
@@ -228,7 +242,7 @@ const RootApp = () => {
             Sua solicitação de acesso foi enviada com sucesso. Um administrador da <span className="font-semibold text-zinc-900 dark:text-white">{settings?.storeName || 'Munago Estoque'}</span> revisará seu perfil em breve.
           </p>
           <div className="mt-5 p-3.5 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200/60 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-medium leading-relaxed">
-            Verifique seu e-mail para configurar sua senha se sua conta foi criada recentemente.
+            Assim que um administrador aprovar, saia e entre novamente para acessar o sistema.
           </div>
           <button 
             type="button"
