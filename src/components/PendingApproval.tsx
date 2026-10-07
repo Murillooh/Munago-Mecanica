@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Check, Hourglass, LogOut, RefreshCw, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Check, Hourglass, LogOut, RefreshCw } from 'lucide-react';
 import { AUTH_BG, AUTH_CHARACTER_URL, AUTH_PANEL_GRID } from './auth/authStyles';
+import { AuthFeatures } from './auth/AuthFeatures';
 
 const POLL_MS = 15_000;
 
@@ -76,20 +77,7 @@ export const PendingApproval: React.FC<{
             </p>
           </div>
 
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-center gap-4 text-white/90">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/10">
-                <ShieldCheck size={20} />
-              </div>
-              <span className="font-bold">Segurança de nível empresarial</span>
-            </div>
-            <div className="flex items-center gap-4 text-white/90">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/10">
-                <TrendingUp size={20} />
-              </div>
-              <span className="font-bold">Relatórios e insights em tempo real</span>
-            </div>
-          </div>
+          <AuthFeatures />
 
           <motion.img
             src={AUTH_CHARACTER_URL}

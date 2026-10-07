@@ -10,7 +10,6 @@ import {
   Loader2, 
   AlertCircle,
   ShieldCheck,
-  TrendingUp,
   ArrowLeft,
   Eye,
   EyeOff
@@ -18,6 +17,7 @@ import {
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import { AUTH_BG, AUTH_PANEL_GRID } from '../components/auth/authStyles';
+import { AuthFeatures } from '../components/auth/AuthFeatures';
 import { useApp } from '../context/AppContext';
 import {
   authErrorMessage,
@@ -379,20 +379,7 @@ const Login: React.FC = () => {
             </AnimatePresence>
           </div>
 
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-center gap-4 text-white/90">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/10">
-                <ShieldCheck size={20} />
-              </div>
-              <span className="font-bold">Segurança de nível empresarial</span>
-            </div>
-            <div className="flex items-center gap-4 text-white/90">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/10">
-                <TrendingUp size={20} />
-              </div>
-              <span className="font-bold">Relatórios e insights em tempo real</span>
-            </div>
-          </div>
+          <AuthFeatures />
 
           {/* Floating Character */}
           <motion.img 
