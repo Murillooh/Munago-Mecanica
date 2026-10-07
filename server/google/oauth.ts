@@ -48,6 +48,21 @@ export function decryptJson<T>(key: Buffer, payload: string): T {
   return JSON.parse(Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8'));
 }
 
+/**
+ * E-mail do id_token que o próprio Google devolveu na troca do code (canal TLS direto com o Google),
+ * por isso basta ler o payload. Só para exibição; nunca usar para autorizar nada.
+ */
+export function emailFromIdToken(idToken?: string | null): string | null {
+  const payload = idToken?.split('.')[1];
+  if (!payload) return null;
+  try {
+    const { email } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { email?: unknown };
+    return typeof email === 'string' ? email : null;
+  } catch {
+    return null;
+  }
+}
+
 interface StatePayload { u: string; exp: number; n: string }
 
 export function signState(key: Buffer, userId: string, now = Date.now()): string {
@@ -155,7 +170,9 @@ export function createGoogleOAuth(cfg: GoogleOAuthConfig) {
     async status(userId: string) {
       const [row] = await cfg.db.select({ scope: googleConnections.scope }).from(googleConnections)
         .where(eq(googleConnections.userId, userId));
-      return { connected: Boolean(row), sheets: Boolean(row?.scope?.includes(SHEETS_SCOPE)) };
+      // E-mail da conta Google conectada, para a tela mostrar qual conta está ligada.
+      const email = row ? emailFromIdToken((await load(userId))?.id_token) : null;
+      return { connected: Boolean(row), sheets: Boolean(row?.scope?.includes(SHEETS_SCOPE)), email };
     },
 
     async accessToken(userId: string) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Cloud,
   Save,
@@ -13,10 +13,16 @@ import {
   Store,
   Percent,
   Bell,
-  Database
+  Database,
+  Link2,
+  Unlink
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
+import { apiDelete, apiGet } from '../lib/api';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
+
+interface DriveStatus { configured: boolean; connected: boolean; email: string | null }
 
 const ACCENT_COLORS = [
   { name: 'Azul Munago (padrão)', hex: '#3b82f6' },
@@ -103,6 +109,36 @@ export const SettingsView = () => {
   const [isApplyingColor, setIsApplyingColor] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [form, setForm] = useState(settings);
+
+  // Conexão com o Google Drive (tokens ficam no servidor; aqui só o status).
+  const { openGoogleAuth, isLoading: isConnectingDrive } = useGoogleAuth();
+  const [drive, setDrive] = useState<DriveStatus | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const loadDrive = useCallback(() => {
+    apiGet<DriveStatus>('/google/status')
+      .then(setDrive)
+      .catch(() => setDrive({ configured: false, connected: false, email: null }));
+  }, []);
+  useEffect(() => {
+    loadDrive();
+    // Ao voltar do popup do Google (ou de outra aba), atualiza o status.
+    window.addEventListener('focus', loadDrive);
+    return () => window.removeEventListener('focus', loadDrive);
+  }, [loadDrive]);
+
+  const disconnectDrive = async () => {
+    if (!window.confirm('Desconectar a conta Google? Os backups já enviados continuam no seu Drive.')) return;
+    setDisconnecting(true);
+    try {
+      await apiDelete('/google/connection');
+      toast.success('Conta Google desconectada.');
+      loadDrive();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível desconectar.');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   // Sincroniza quando as configurações chegam do servidor ou mudam
   React.useEffect(() => {
@@ -303,13 +339,54 @@ export const SettingsView = () => {
               onChange={() => saveNow('autobackup', { autoBackupEnabled: !form.autoBackupEnabled }, !form.autoBackupEnabled ? 'Backup automático ativado.' : 'Backup automático desativado.')}
             />
           </Row>
-          <Row title="Google Drive" description="Envie uma cópia manual para o seu Drive ou restaure a partir dela.">
-            <button type="button" onClick={handleBackupToDrive} className={secondaryBtn}>
-              <Cloud size={14} className="text-blue-600" aria-hidden="true" /> Fazer backup
-            </button>
-            <button type="button" onClick={handleRestoreFromDrive} className={secondaryBtn}>
-              <History size={14} className="text-emerald-600" aria-hidden="true" /> Restaurar
-            </button>
+          <Row
+            title="Google Drive"
+            description={
+              <span className="flex flex-col gap-1">
+                <span>Envie uma cópia manual para o seu Drive ou restaure a partir dela.</span>
+                <span className="flex items-center gap-1.5" aria-live="polite">
+                  {!drive ? (
+                    <><Loader2 size={12} className="animate-spin" aria-hidden="true" /> Verificando conexão…</>
+                  ) : !drive.configured ? (
+                    <><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" /> Google não configurado no servidor.</>
+                  ) : drive.connected ? (
+                    <>
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">Conectado</span>
+                      {drive.email && <span className="truncate">· {drive.email}</span>}
+                    </>
+                  ) : (
+                    <><span className="h-2 w-2 rounded-full bg-zinc-400" aria-hidden="true" /> Não conectado</>
+                  )}
+                </span>
+              </span>
+            }
+          >
+            {drive?.connected ? (
+              <>
+                <button type="button" onClick={handleBackupToDrive} className={secondaryBtn}>
+                  <Cloud size={14} className="text-blue-600" aria-hidden="true" /> Fazer backup
+                </button>
+                <button type="button" onClick={handleRestoreFromDrive} className={secondaryBtn}>
+                  <History size={14} className="text-emerald-600" aria-hidden="true" /> Restaurar
+                </button>
+                <button
+                  type="button"
+                  onClick={disconnectDrive}
+                  disabled={disconnecting}
+                  aria-label="Desconectar conta Google"
+                  title="Desconectar conta Google"
+                  className="inline-flex items-center justify-center rounded-lg p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:hover:bg-red-950/40 cursor-pointer"
+                >
+                  {disconnecting ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Unlink size={14} aria-hidden="true" />}
+                </button>
+              </>
+            ) : drive?.configured ? (
+              <button type="button" onClick={() => openGoogleAuth('drive')} disabled={isConnectingDrive} className={secondaryBtn}>
+                {isConnectingDrive ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Link2 size={14} className="text-blue-600" aria-hidden="true" />}
+                Conectar Google Drive
+              </button>
+            ) : null}
           </Row>
         </Section>
         </div>

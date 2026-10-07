@@ -80,6 +80,16 @@ describe('Google OAuth', () => {
     await h.as('viewer').get('/google/access-token').expect(404);
   });
 
+  it('status mostra a conta Google conectada (e-mail do id_token)', async () => {
+    const payload = Buffer.from(JSON.stringify({ email: 'oficina@exemplo.com', email_verified: true })).toString('base64url');
+    client.getToken.mockResolvedValueOnce({ tokens: { access_token: 'at', refresh_token: 'rt', expiry_date: Date.now() + 3600_000, scope: 'drive.file', id_token: `h.${payload}.sig` } } as never);
+    expect((await h.as('editor').get('/google/status').expect(200)).body).toMatchObject({ connected: false, email: null });
+
+    const { url } = (await h.as('editor').get('/google/auth-url').expect(200)).body;
+    await g.handleCallback('abc', stateFrom(url));
+    expect((await h.as('editor').get('/google/status').expect(200)).body).toMatchObject({ connected: true, email: 'oficina@exemplo.com' });
+  });
+
   it('callback com state inválido não grava nada', async () => {
     await expect(g.handleCallback('abc', 'lixo.lixo')).rejects.toMatchObject({ code: 'INVALID_STATE' });
     expect(client.getToken).not.toHaveBeenCalled();
