@@ -917,7 +917,7 @@ export const Inventory = () => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] z-10"
+              className="relative bg-white dark:bg-zinc-900 w-full max-w-2xl lg:max-w-5xl rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] z-10"
             >
               {/* Modal Header */}
               <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/90 flex items-center justify-between shrink-0">
@@ -948,8 +948,9 @@ export const Inventory = () => {
               </div>
               
               {/* Modal Body / Form */}
-              <form id="product-form" onSubmit={handleSaveProduct} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs sm:text-sm">
-                
+              <form id="product-form" onSubmit={handleSaveProduct} className="p-5 sm:p-6 overflow-y-auto flex-1 text-xs sm:text-sm grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+                {/* Coluna esquerda: cadastro, estoque e valores */}
+                <div className="space-y-6 min-w-0">
                 {/* Grupo 1: Identificação & Dados Básicos */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
@@ -1182,6 +1183,10 @@ export const Inventory = () => {
                   </div>
                 </div>
 
+                </div>
+
+                {/* Coluna direita: mídia e dossiê técnico */}
+                <div className="space-y-6 min-w-0 lg:border-l lg:border-zinc-100 lg:dark:border-zinc-800 lg:pl-8">
                 {/* Grupo 4: Imagem & Mídia */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
@@ -1190,7 +1195,7 @@ export const Inventory = () => {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 lg:flex-col-reverse lg:items-stretch">
                     <div className="flex-1 space-y-1.5">
                       <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                         <ImageIcon size={13} className="text-zinc-400" />
@@ -1206,10 +1211,10 @@ export const Inventory = () => {
                     </div>
 
                     {/* Preview Thumbnail */}
-                    <div className="w-14 h-14 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0 shadow-xs relative group">
+                    <div className="w-14 h-14 lg:w-full lg:h-44 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0 shadow-xs relative group">
                       {formImageUrl ? (
                         <>
-                          <img src={formImageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={formImageUrl} alt="Preview" className="w-full h-full object-cover lg:object-contain" referrerPolicy="no-referrer" />
                           <button
                             type="button"
                             onClick={() => setFormImageUrl('')}
@@ -1242,11 +1247,11 @@ export const Inventory = () => {
                       name="description" 
                       defaultValue={selectedProduct?.description} 
                       placeholder="Ex: Amortecedor pressurizado a gás. Compatível com modelos 2018 a 2023..."
-                      className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-xs sm:text-sm font-normal text-zinc-900 dark:text-white outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors h-24 resize-none" 
+                      className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-xs sm:text-sm font-normal text-zinc-900 dark:text-white outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors h-24 lg:h-40 resize-none" 
                     />
                   </div>
                 </div>
-
+                </div>
               </form>
 
               {/* Modal Footer */}

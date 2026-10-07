@@ -15,6 +15,7 @@ import { toast, Toaster } from 'sonner';
 // Components
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
+import { PendingApproval } from './components/PendingApproval';
 
 // Pages: cada uma vira um chunk próprio, baixado só quando a aba é aberta.
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
@@ -172,7 +173,7 @@ const AppContent = () => {
 };
 
 const RootApp = () => {
-  const { user, profile, loading, handleLogout, settings } = useApp();
+  const { user, profile, loading, handleLogout, settings, refreshProfile } = useApp();
   const location = useLocation();
 
   if (loading) {
@@ -224,27 +225,12 @@ const RootApp = () => {
   
   if (profile?.status === 'pending') {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 text-center shadow-lg">
-          <div className="w-14 h-14 bg-amber-50 dark:bg-amber-950/40 text-amber-500 rounded-xl flex items-center justify-center mx-auto mb-5 border border-amber-200/60 dark:border-amber-800/50">
-            <Loader2 size={26} className="animate-spin" />
-          </div>
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight mb-2">Acesso em Análise</h2>
-          <p className="text-xs sm:text-sm text-zinc-500 font-medium leading-relaxed dark:text-zinc-400">
-            Sua solicitação de acesso foi enviada com sucesso. Um administrador da <span className="font-semibold text-zinc-900 dark:text-white">{settings?.storeName || 'Munago Mecânica'}</span> revisará seu perfil em breve.
-          </p>
-          <div className="mt-5 p-3.5 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200/60 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-medium leading-relaxed">
-            Assim que um administrador aprovar, saia e entre novamente para acessar o sistema.
-          </div>
-          <button 
-            type="button"
-            onClick={handleLogout}
-            className="mt-6 w-full py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg font-semibold text-xs transition-colors"
-          >
-            Voltar para Tela de Login (Sair)
-          </button>
-        </div>
-      </div>
+      <PendingApproval
+        storeName={settings?.storeName || 'Munago Mecânica'}
+        email={profile?.email}
+        onRefresh={refreshProfile}
+        onLogout={handleLogout}
+      />
     );
   }
 

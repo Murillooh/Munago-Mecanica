@@ -226,6 +226,8 @@ interface AppContextType {
   loginEmail: (email: string, pass: string) => Promise<LoginResult>;
   completeNewPassword: (newPassword: string) => Promise<void>;
   handleLogout: () => Promise<void>;
+  /** Relê o perfil no servidor (ex.: tela de acesso pendente verificando se já foi aprovado). */
+  refreshProfile: () => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
@@ -884,6 +886,7 @@ export const AppProvider = ({ children }: { children: any }) => {
       loginEmail,
       completeNewPassword,
       handleLogout,
+      refreshProfile: loadSession,
       markNotificationAsRead,
       addProduct: addProductAction,
       updateProduct: updateProductAction,
