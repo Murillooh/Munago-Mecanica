@@ -88,7 +88,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
     },
   ].filter(g => g.items.length > 0);
 
-  const storeName = (!settings?.storeName || settings.storeName.toLowerCase().includes('loc')) ? 'Munago Estoque' : settings.storeName;
+  const storeName = (!settings?.storeName || settings.storeName.toLowerCase().includes('loc')) ? 'Munago Mecânica' : settings.storeName;
   const roleLabel = isAdmin ? 'Administrador' : profile?.role === 'editor' ? 'Operador' : profile?.role === 'viewer' ? 'Visualizador' : 'Colaborador';
   const initials = (profile?.name || 'US').substring(0, 2).toUpperCase();
 
@@ -113,7 +113,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       <div className={`flex h-14 shrink-0 items-center border-b border-zinc-200 dark:border-zinc-800 ${isCollapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-2'}`}>
         {!isCollapsed && (
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blue-600 font-mono text-[11px] font-bold text-white" aria-hidden="true">ME</span>
+            <img src="/brand/munago-mecanica-icon.svg" alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-md" />
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{storeName}</p>
               <p className="truncate text-[11px] text-zinc-500">Gestão da oficina</p>

@@ -366,8 +366,8 @@ const Login: React.FC = () => {
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-12">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 font-black text-xl shadow-xl">ME</div>
-              <span className="font-black text-3xl tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">Munago <span className="text-blue-200">Estoque</span></span>
+              <img src="/brand/munago-mecanica-icon.svg" alt="" width={48} height={48} className="h-12 w-12 rounded-xl shadow-xl ring-1 ring-white/20" />
+              <span className="font-black text-3xl tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">Munago <span className="text-amber-300">Mecânica</span></span>
             </div>
             
             <AnimatePresence mode="wait" initial={false}>

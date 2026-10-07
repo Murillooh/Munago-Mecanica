@@ -327,7 +327,7 @@ export const AppProvider = ({ children }: { children: any }) => {
   const [loading, setLoading] = useState(true);
 
   const [settings, setSettings] = useState<SystemSettings>(() => ({
-    storeName: 'Munago Estoque',
+    storeName: 'Munago Mecânica',
     allowNegativeStock: false,
     accentColor: getStoredAccentColor(),
     autoBackupEnabled: false,

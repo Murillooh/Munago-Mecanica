@@ -3,87 +3,150 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Termos de Serviço · Munago Estoque</title>
-  <link rel="icon" type="image/png" href="/favicon.png" />
-<meta name="description" content="Condições de uso do Munago Estoque, sistema de estoque e ordens de serviço para oficinas.">
-<style>
-  :root { --bg:#fafafa; --fg:#18181b; --muted:#52525b; --line:#e4e4e7; --accent:#2563eb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#09090b; --fg:#f4f4f5; --muted:#a1a1aa; --line:#27272a; --accent:#60a5fa; } }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
-  header { border-bottom:1px solid var(--line); padding-bottom:24px; margin-bottom:32px; }
-  .brand { font-weight:700; letter-spacing:-.01em; color:var(--accent); text-decoration:none; }
-  h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); line-height:1.15; margin:12px 0 8px; letter-spacing:-.02em; }
-  h2 { font-size:1.15rem; margin:36px 0 8px; }
-  .muted { color:var(--muted); font-size:.95rem; }
-  ul { padding-left: 1.2rem; } li { margin: 4px 0; }
-  a { color: var(--accent); }
-  footer { margin-top:56px; padding-top:20px; border-top:1px solid var(--line); }
-</style>
+<title>Termos de Serviço · Munago Mecânica</title>
+<meta name="description" content="Condições de uso da Munago Mecânica, sistema de estoque e ordens de serviço para oficinas.">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/legal.css">
 </head>
 <body>
-<main>
-  <header>
-    <a class="brand" href="/">Munago Estoque</a>
-    <h1>Termos de Serviço</h1>
-    <p class="muted">Última atualização: 6 de outubro de 2026</p>
-  </header>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">ME</span>Munago Mecânica</a>
+    <nav class="topnav" aria-label="Documentos">
+      <a class="doc" href="/termos.html" aria-current="page">Termos de Serviço</a>
+      <a class="doc" href="/privacidade.html">Privacidade</a>
+      <a class="back" href="/">Voltar ao sistema</a>
+    </nav>
+  </div>
+</header>
 
-  <p>Estes termos regem o uso do <strong>Munago Estoque</strong> (o "sistema"), oferecido pela Munago Desenvolvedora de Software ("nós"). Ao acessar ou usar o sistema, você concorda com estes termos. Se não concordar, não use o sistema.</p>
+<div class="hero">
+  <p class="eyebrow">Documento legal</p>
+  <h1>Termos de Serviço</h1>
+  <p class="meta"><span>Última atualização: 7 de outubro de 2026</span><span>Leitura de cerca de 4 minutos</span></p>
 
-  <h2>1. O serviço</h2>
-  <p>O sistema permite controlar estoque de peças, registrar movimentações, abrir e acompanhar ordens de serviço, calcular repasses de pagamento e gerar relatórios. Funções opcionais incluem backup no Google Drive, importação de planilhas e recursos de inteligência artificial.</p>
+  <aside class="summary" aria-labelledby="resumo">
+    <h2 id="resumo">Em resumo</h2>
+    <ul>
+      <li>Os dados que a sua oficina cadastra (estoque, clientes, ordens de serviço) são da sua oficina.</li>
+      <li>Cada pessoa tem acesso próprio, liberado pelo administrador da empresa.</li>
+      <li>Valores calculados e sugestões da IA devem ser conferidos antes de cobrar ou pagar.</li>
+    </ul>
+  </aside>
+</div>
 
-  <h2>2. Contas e acesso</h2>
-  <ul>
-    <li>O acesso é individual e depende de aprovação de um administrador da empresa.</li>
-    <li>Você é responsável por manter sua senha em sigilo e por toda atividade feita com sua conta.</li>
-    <li>O administrador da empresa define os perfis de acesso (administrador, editor ou visualizador) e pode remover usuários a qualquer momento.</li>
-  </ul>
+<div class="layout">
+  <nav class="toc" aria-label="Sumário">
+    <details open>
+      <summary>Nesta página</summary>
+      <ol>
+        <li><a href="#servico">O serviço</a></li>
+        <li><a href="#contas">Contas e acesso</a></li>
+        <li><a href="#uso">Uso aceitável</a></li>
+        <li><a href="#dados">Seus dados</a></li>
+        <li><a href="#valores">Valores e inteligência artificial</a></li>
+        <li><a href="#google">Integrações com o Google</a></li>
+        <li><a href="#disponibilidade">Disponibilidade e backups</a></li>
+        <li><a href="#responsabilidade">Limitação de responsabilidade</a></li>
+        <li><a href="#encerramento">Suspensão e encerramento</a></li>
+        <li><a href="#alteracoes">Alterações</a></li>
+        <li><a href="#lei">Lei aplicável</a></li>
+        <li><a href="#contato">Contato</a></li>
+      </ol>
+    </details>
+  </nav>
 
-  <h2>3. Uso aceitável</h2>
-  <p>Você concorda em não:</p>
-  <ul>
-    <li>usar o sistema para fins ilegais ou para inserir dados de terceiros sem base legal;</li>
-    <li>tentar acessar contas, dados ou áreas para os quais não tem permissão;</li>
-    <li>sobrecarregar, testar vulnerabilidades ou interferir no funcionamento do sistema sem autorização;</li>
-    <li>copiar, revender ou fazer engenharia reversa do sistema.</li>
-  </ul>
+  <main class="doc">
+    <p>Estes termos regem o uso da <strong>Munago Mecânica</strong> (o "sistema"), oferecida pela Munago Desenvolvedora de Software ("nós"). Ao acessar ou usar o sistema, você concorda com estes termos. Se não concordar, não use o sistema.</p>
 
-  <h2>4. Seus dados</h2>
-  <p>Os dados inseridos pela sua empresa (estoque, clientes, ordens de serviço) pertencem à sua empresa. Nós os tratamos apenas para prestar o serviço, conforme a <a href="/privacidade">Política de Privacidade</a>. A empresa é responsável pela exatidão dos dados e por ter base legal para registrar dados de seus clientes.</p>
+    <section id="servico">
+      <h2>O serviço</h2>
+      <p>O sistema permite controlar o estoque de peças, registrar movimentações, abrir e acompanhar ordens de serviço, calcular repasses de pagamento e gerar relatórios. Funções opcionais incluem backup no Google Drive, importação de planilhas e recursos de inteligência artificial.</p>
+    </section>
 
-  <h2>5. Valores, cálculos e inteligência artificial</h2>
-  <ul>
-    <li>Preços, totais e repasses são calculados a partir dos valores informados pelos usuários. Confira os valores antes de cobrar clientes ou fazer pagamentos.</li>
-    <li>Sugestões e relatórios gerados por inteligência artificial podem conter erros e não substituem a avaliação de um profissional.</li>
-  </ul>
+    <section id="contas">
+      <h2>Contas e acesso</h2>
+      <ul>
+        <li>O acesso é individual e depende de aprovação de um administrador da empresa.</li>
+        <li>Você é responsável por manter sua senha em sigilo e por toda atividade feita com sua conta.</li>
+        <li>O administrador define os perfis de acesso (administrador, editor ou visualizador) e pode remover usuários a qualquer momento.</li>
+      </ul>
+    </section>
 
-  <h2>6. Integrações com o Google</h2>
-  <p>As integrações com Google Drive e Google Planilhas são opcionais e também estão sujeitas aos termos do Google. Você pode desconectá-las a qualquer momento em <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a>.</p>
+    <section id="uso">
+      <h2>Uso aceitável</h2>
+      <p>Você concorda em não:</p>
+      <ul>
+        <li>usar o sistema para fins ilegais ou para inserir dados de terceiros sem base legal;</li>
+        <li>tentar acessar contas, dados ou áreas para os quais não tem permissão;</li>
+        <li>sobrecarregar, testar vulnerabilidades ou interferir no funcionamento do sistema sem autorização;</li>
+        <li>copiar, revender ou fazer engenharia reversa do sistema.</li>
+      </ul>
+    </section>
 
-  <h2>7. Disponibilidade e backups</h2>
-  <p>Trabalhamos para manter o sistema disponível e seguro, mas ele é fornecido "no estado em que se encontra", podendo passar por manutenções e interrupções. Recomendamos manter os backups em dia usando a função de backup do próprio sistema.</p>
+    <section id="dados">
+      <h2>Seus dados</h2>
+      <p>Os dados inseridos pela sua empresa (estoque, clientes, ordens de serviço) pertencem à sua empresa. Nós os tratamos apenas para prestar o serviço, conforme a <a href="/privacidade.html">Política de Privacidade</a>. A empresa é responsável pela exatidão dos dados e por ter base legal para registrar dados de seus clientes.</p>
+    </section>
 
-  <h2>8. Limitação de responsabilidade</h2>
-  <p>Na extensão permitida pela lei, não nos responsabilizamos por lucros cessantes, perda de dados causada por uso indevido ou por danos indiretos decorrentes do uso do sistema. Nada nestes termos limita direitos garantidos pelo Código de Defesa do Consumidor quando aplicável.</p>
+    <section id="valores">
+      <h2>Valores e inteligência artificial</h2>
+      <ul>
+        <li>Preços, totais e repasses são calculados a partir dos valores informados pelos usuários. Confira os valores antes de cobrar clientes ou fazer pagamentos.</li>
+        <li>Sugestões e relatórios gerados por inteligência artificial podem conter erros e não substituem a avaliação de um profissional.</li>
+      </ul>
+    </section>
 
-  <h2>9. Suspensão e encerramento</h2>
-  <p>Podemos suspender o acesso em caso de violação destes termos ou risco à segurança. A empresa pode encerrar o uso a qualquer momento e solicitar a exclusão dos dados.</p>
+    <section id="google">
+      <h2>Integrações com o Google</h2>
+      <p>As integrações com Google Drive e Google Planilhas são opcionais e também estão sujeitas aos termos do Google. Você pode desconectá-las a qualquer momento em <strong>Configurações → Backup e dados</strong> ou em <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a>.</p>
+    </section>
 
-  <h2>10. Alterações</h2>
-  <p>Podemos atualizar estes termos. A data no topo indica a versão vigente; continuar usando o sistema após a atualização significa concordar com a nova versão.</p>
+    <section id="disponibilidade">
+      <h2>Disponibilidade e backups</h2>
+      <p>Trabalhamos para manter o sistema disponível e seguro, mas ele é fornecido "no estado em que se encontra", podendo passar por manutenções e interrupções. Recomendamos manter os backups em dia usando a função de backup do próprio sistema.</p>
+    </section>
 
-  <h2>11. Lei aplicável</h2>
-  <p>Estes termos são regidos pelas leis do Brasil.</p>
+    <section id="responsabilidade">
+      <h2>Limitação de responsabilidade</h2>
+      <p>Na extensão permitida pela lei, não nos responsabilizamos por lucros cessantes, perda de dados causada por uso indevido ou danos indiretos decorrentes do uso do sistema. Nada nestes termos limita direitos garantidos pelo Código de Defesa do Consumidor quando aplicável.</p>
+    </section>
 
-  <h2>12. Contato</h2>
-  <p>Dúvidas sobre estes termos: <a href="mailto:muurisattos@gmail.com">muurisattos@gmail.com</a>.</p>
+    <section id="encerramento">
+      <h2>Suspensão e encerramento</h2>
+      <p>Podemos suspender o acesso em caso de violação destes termos ou de risco à segurança. A empresa pode encerrar o uso a qualquer momento e solicitar a exclusão dos dados.</p>
+    </section>
 
-  <footer class="muted">
-    Munago Desenvolvedora de Software · <a href="/privacidade">Política de Privacidade</a>
-  </footer>
-</main>
+    <section id="alteracoes">
+      <h2>Alterações</h2>
+      <p>Podemos atualizar estes termos. A data no topo indica a versão vigente; continuar usando o sistema após a atualização significa concordar com a nova versão.</p>
+    </section>
+
+    <section id="lei">
+      <h2>Lei aplicável</h2>
+      <p>Estes termos são regidos pelas leis do Brasil.</p>
+    </section>
+
+    <section id="contato">
+      <h2>Contato</h2>
+      <p>Dúvidas sobre estes termos: <a href="mailto:munagosoftware@gmail.com">munagosoftware@gmail.com</a>.</p>
+    </section>
+
+    <div class="contact">
+      <p><strong>Ficou alguma dúvida?</strong> Respondemos pelo e-mail em até 15 dias.</p>
+      <a class="button" href="mailto:munagosoftware@gmail.com">Falar com a Munago</a>
+    </div>
+  </main>
+</div>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span>© 2026 Munago Desenvolvedora de Software</span>
+    <span><a href="/privacidade.html">Política de Privacidade</a></span>
+  </div>
+</footer>
 </body>
 </html>

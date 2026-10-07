@@ -454,7 +454,7 @@ export const Dashboard = ({
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 pb-6 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div>
           <div className="flex items-center gap-2.5 text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">{settings.storeName || 'Munago Estoque'}</span>
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">{settings.storeName || 'Munago Mecânica'}</span>
             <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">/</span>
             <span className="text-zinc-900 dark:text-zinc-200 font-medium">Monitoramento Operacional</span>
             <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">·</span>
@@ -1202,7 +1202,7 @@ export const Dashboard = ({
 
               <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <span className="text-xs text-zinc-400">
-                  Munago Estoque · Análise Executiva
+                  Munago Mecânica · Análise Executiva
                 </span>
                 <div className="flex items-center gap-2">
                   {summary && (

@@ -8,7 +8,7 @@ import { asyncHandler } from '../middleware/errorHandler';
 import type { ApiDeps } from './deps';
 
 export const DEFAULT_SETTINGS = {
-  storeName: 'Munago Estoque',
+  storeName: 'Munago Mecânica',
   allowNegativeStock: false,
   accentColor: '#2563eb',
   autoBackupEnabled: false,

@@ -598,7 +598,7 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
           {/* Footer */}
           <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 px-8 py-5 bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] uppercase tracking-widest font-black text-zinc-400">
             <span>Powered by **Gemini 3.5 Flash** Model</span>
-            <span>Munago Estoque Analytics</span>
+            <span>Munago Mecânica Analytics</span>
           </div>
         </motion.div>
       </div>

@@ -8,7 +8,7 @@ export const createBackupFile = async (accessToken: string, fileName: string, co
   const metadata = {
     name: fileName,
     mimeType: 'application/json',
-    description: 'Backup do Sistema Munago Estoque',
+    description: 'Backup do Sistema Munago Mecânica',
   };
 
   const form = new FormData();

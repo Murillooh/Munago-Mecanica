@@ -1,0 +1,123 @@
+/* Páginas legais (Termos de Uso e Política de Privacidade) da Munago Mecânica. */
+:root {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --fg: #18181b;
+  --muted: #5b5b66;
+  --subtle: #8a8a96;
+  --line: #e6e6ea;
+  --accent: #2563eb;
+  --accent-soft: #eef3ff;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #09090b;
+    --surface: #121215;
+    --fg: #f1f1f3;
+    --muted: #a6a6b0;
+    --subtle: #73737e;
+    --line: #232328;
+    --accent: #60a5fa;
+    --accent-soft: rgba(37, 99, 235, 0.12);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.7 "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+code { font-family: var(--mono); font-size: .86em; background: var(--accent-soft); padding: .1em .35em; border-radius: 4px; }
+
+/* Barra superior */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: saturate(140%) blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-inner { max-width: none; margin: 0; padding: 12px 48px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; font-weight: 700; letter-spacing: -.01em; }
+.brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: #fff; font: 700 11px/1 var(--mono); }
+.topnav { display: flex; align-items: center; gap: 4px; font-size: 14px; }
+.topnav a { color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 8px; }
+.topnav a:hover { color: var(--fg); background: var(--accent-soft); }
+.topnav a[aria-current="page"] { color: var(--fg); font-weight: 600; background: var(--accent-soft); }
+.topnav .back { margin-left: 8px; border: 1px solid var(--line); color: var(--fg); }
+@media (max-width: 640px) { .topnav .doc { display: none; } }
+
+/* Cabeçalho do documento */
+.hero { max-width: none; margin: 0; padding: 48px 48px 8px; }
+.eyebrow { font: 600 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+h1 { font-size: clamp(2rem, 4.5vw, 2.75rem); line-height: 1.1; letter-spacing: -.03em; margin: 12px 0 10px; }
+.meta { color: var(--subtle); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+
+.summary {
+  margin-top: 28px; padding: 18px 22px;
+  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 12px;
+}
+.summary h2 { margin: 0 0 8px; font-size: 15px; }
+.summary ul { margin: 0; padding-left: 1.1rem; color: var(--muted); }
+.summary li { margin: 4px 0; }
+
+/* Corpo: sumário + conteúdo */
+.layout { max-width: none; margin: 0; padding: 32px 48px 80px; display: grid; gap: 56px; }
+@media (min-width: 1024px) { .layout { grid-template-columns: 280px minmax(0, 1fr); } }
+
+.toc { font-size: 14px; }
+.toc details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.toc summary { cursor: pointer; font-weight: 600; list-style: none; }
+.toc summary::-webkit-details-marker { display: none; }
+.toc ol { list-style: none; margin: 10px 0 0; padding: 0; counter-reset: toc; }
+.toc li { counter-increment: toc; }
+.toc a { display: flex; gap: 10px; padding: 5px 6px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+.toc a::before { content: counter(toc, decimal-leading-zero); font: 500 12px/1.9 var(--mono); color: var(--subtle); }
+.toc a:hover { color: var(--fg); background: var(--accent-soft); }
+@media (min-width: 1024px) {
+  .toc { position: sticky; top: 88px; align-self: start; max-height: calc(100vh - 110px); overflow: auto; }
+  .toc details { background: transparent; border: 0; padding: 0; }
+  .toc summary { pointer-events: none; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--subtle); }
+}
+
+.doc { max-width: none; counter-reset: sec; }
+.doc > p:first-child { font-size: 17px; color: var(--muted); margin-top: 0; }
+.doc section { counter-increment: sec; padding-top: 8px; margin-top: 28px; border-top: 1px solid var(--line); }
+.doc h2 { display: flex; align-items: baseline; gap: 12px; font-size: 1.2rem; letter-spacing: -.01em; margin: 20px 0 8px; }
+.doc h2::before { content: counter(sec, decimal-leading-zero); font: 600 13px/1 var(--mono); color: var(--accent); }
+.doc ul { padding-left: 1.2rem; }
+.doc li { margin: 6px 0; }
+.doc li::marker { color: var(--subtle); }
+.callout { margin: 16px 0; padding: 14px 16px; background: var(--accent-soft); border-radius: 10px; font-size: 15px; }
+
+/* Rodapé */
+.contact { margin-top: 48px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.contact p { margin: 0; color: var(--muted); }
+.contact strong { color: var(--fg); }
+.button { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; }
+.button:hover { filter: brightness(1.08); }
+.footer { border-top: 1px solid var(--line); color: var(--subtle); font-size: 13px; }
+.footer-inner { max-width: none; margin: 0; padding: 20px 48px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.footer a { color: var(--muted); }
+
+@media print {
+  .topbar, .toc, .contact .button { display: none; }
+  body { background: #fff; color: #000; font-size: 12pt; }
+  .layout { display: block; padding: 0; }
+  .doc section { break-inside: avoid; }
+  a { color: #000; }
+}
+
+/* Telas pequenas: margens menores */
+@media (max-width: 640px) {
+  .topbar-inner, .hero, .layout, .footer-inner { padding-left: 16px; padding-right: 16px; }
+}

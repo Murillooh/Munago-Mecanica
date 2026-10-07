@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from './context/AppContext';
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
 
 // Components
 import { Sidebar } from './components/layout/Sidebar';
@@ -186,14 +186,12 @@ const RootApp = () => {
         >
           {/* Brand Mark */}
           <div className="relative mb-5">
-            <div className="w-14 h-14 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 rounded-2xl flex items-center justify-center font-black text-lg shadow-sm border border-zinc-700/30 dark:border-zinc-300">
-              ME
-            </div>
+            <img src="/brand/munago-mecanica-icon.svg" alt="" width={56} height={56} className="h-14 w-14 rounded-2xl shadow-sm" />
             <div className="absolute -inset-1.5 rounded-2xl bg-blue-500/10 blur-md -z-10" />
           </div>
 
           <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">
-            {settings?.storeName || 'Munago Estoque'}
+            {settings?.storeName || 'Munago Mecânica'}
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Carregando ambiente operacional...
@@ -233,7 +231,7 @@ const RootApp = () => {
           </div>
           <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight mb-2">Acesso em Análise</h2>
           <p className="text-xs sm:text-sm text-zinc-500 font-medium leading-relaxed dark:text-zinc-400">
-            Sua solicitação de acesso foi enviada com sucesso. Um administrador da <span className="font-semibold text-zinc-900 dark:text-white">{settings?.storeName || 'Munago Estoque'}</span> revisará seu perfil em breve.
+            Sua solicitação de acesso foi enviada com sucesso. Um administrador da <span className="font-semibold text-zinc-900 dark:text-white">{settings?.storeName || 'Munago Mecânica'}</span> revisará seu perfil em breve.
           </p>
           <div className="mt-5 p-3.5 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200/60 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-medium leading-relaxed">
             Assim que um administrador aprovar, saia e entre novamente para acessar o sistema.
@@ -285,10 +283,17 @@ const RootApp = () => {
   return <AppContent />;
 };
 
+// Sem este Toaster nenhum toast() do app aparece na tela.
+const AppToaster = () => {
+  const { darkMode } = useApp();
+  return <Toaster position="top-right" richColors closeButton theme={darkMode ? 'dark' : 'light'} />;
+};
+
 const App = () => {
   return (
     <BrowserRouter>
       <RootApp />
+      <AppToaster />
     </BrowserRouter>
   );
 };

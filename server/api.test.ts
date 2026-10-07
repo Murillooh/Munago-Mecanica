@@ -223,7 +223,7 @@ describe('API v1', () => {
   describe('settings', () => {
     it('defaults, merge e só admin altera', async () => {
       const def = await h.as('viewer').get('/settings').expect(200);
-      expect(def.body).toMatchObject({ storeName: 'Munago Estoque', allowNegativeStock: false });
+      expect(def.body).toMatchObject({ storeName: 'Munago Mecânica', allowNegativeStock: false });
       await h.as('editor').patch('/settings', { storeName: 'X' }).expect(403);
       await h.as('admin').patch('/settings', { storeName: 'Oficina' }).expect(200);
       await h.as('admin').patch('/settings', { accentColor: '#ff0000' }).expect(200);

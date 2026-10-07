@@ -76,7 +76,7 @@ const pageH = (doc: jsPDF) => doc.internal.pageSize.getHeight();
 /** Cabeçalho completo da primeira página. Devolve o Y onde o conteúdo começa. */
 const drawHeader = (doc: jsPDF, store: StoreInfo, title: string, filterLabel?: string) => {
   const W = pageW(doc);
-  const name = store.storeName || 'Munago Estoque';
+  const name = store.storeName || 'Munago Mecânica';
 
   setText(doc, 15, 'bold', C.text);
   doc.text(name, M, 14);
@@ -105,7 +105,7 @@ const drawHeader = (doc: jsPDF, store: StoreInfo, title: string, filterLabel?: s
 const drawCompactHeader = (doc: jsPDF, store: StoreInfo, title: string) => {
   const W = pageW(doc);
   setText(doc, 8.5, 'bold', C.text);
-  doc.text(store.storeName || 'Munago Estoque', M, 10);
+  doc.text(store.storeName || 'Munago Mecânica', M, 10);
   setText(doc, 8, 'normal', C.muted);
   doc.text(title, W - M, 10, { align: 'right' });
   doc.setDrawColor(...C.border);
@@ -124,7 +124,7 @@ const finalize = (doc: jsPDF, store: StoreInfo, label: string, filePrefix: strin
     doc.setLineWidth(0.2);
     doc.line(M, H - 10, W - M, H - 10);
     setText(doc, 7, 'normal', C.faint);
-    doc.text(`${store.storeName || 'Munago Estoque'} · ${label}`, M, H - 6);
+    doc.text(`${store.storeName || 'Munago Mecânica'} · ${label}`, M, H - 6);
     doc.text(`Página ${i} de ${total}`, W - M, H - 6, { align: 'right' });
   }
   const slug = (store.storeName || 'munago').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_');
@@ -404,7 +404,7 @@ export interface ExportInventoryPdfOptions {
 }
 
 export const exportInventoryToPDF = ({ storeName, store: storeInfo, products, filterLabel }: ExportInventoryPdfOptions) => {
-  const store: StoreInfo = { ...storeInfo, storeName: storeInfo?.storeName || storeName || 'Munago Estoque' };
+  const store: StoreInfo = { ...storeInfo, storeName: storeInfo?.storeName || storeName || 'Munago Mecânica' };
   const title = 'Relatório de estoque';
   const doc = newDoc();
   const W = pageW(doc);
@@ -437,7 +437,7 @@ export interface ExportTransactionsPdfOptions {
 }
 
 export const exportTransactionsToPDF = ({ storeName, store: storeInfo, transactions, filterLabel }: ExportTransactionsPdfOptions) => {
-  const store: StoreInfo = { ...storeInfo, storeName: storeInfo?.storeName || storeName || 'Munago Estoque' };
+  const store: StoreInfo = { ...storeInfo, storeName: storeInfo?.storeName || storeName || 'Munago Mecânica' };
   const title = 'Relatório de movimentações';
   const doc = newDoc();
   const W = pageW(doc);
