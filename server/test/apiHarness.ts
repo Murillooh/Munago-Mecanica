@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Router } from 'express';
 import request from 'supertest';
 import { vi } from 'vitest';
 import { createTestDb } from './testDb';
@@ -25,7 +25,8 @@ export const TOKENS = {
   pending: 'pending|pending@x.com',
 };
 
-export async function createHarness() {
+/** `extra` monta rotas autenticadas adicionais (ex.: Google), recebendo o banco de teste. */
+export async function createHarness(extra?: (db: DB) => (r: Router) => void) {
   const db: DB = await createTestDb();
   const bus = new ChangeBus();
   const changes: string[] = [];
@@ -47,7 +48,7 @@ export async function createHarness() {
 
   const app = express();
   app.use(express.json());
-  app.use('/api/v1', createApiRouter({ db, bus, cognito, verifier: fakeVerifier, bootstrapAdmins: [] }));
+  app.use('/api/v1', createApiRouter({ db, bus, cognito, verifier: fakeVerifier, bootstrapAdmins: [], extra: extra?.(db) }));
   app.use(errorHandler);
 
   const as = (who: keyof typeof TOKENS) => {

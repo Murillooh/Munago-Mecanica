@@ -26,7 +26,6 @@ export function startPgChangeListener(url: string, bus: ChangeBus, log: Log): ()
   let retry: ReturnType<typeof setTimeout> | undefined;
 
   const scheduleReconnect = (err: unknown) => {
-    client?.removeAllListeners();
     client = undefined;
     if (stopped) return;
     log.warn({ err: err instanceof Error ? err.message : err, retryInMs: delay }, 'Realtime: conexão LISTEN caiu');
@@ -36,7 +35,8 @@ export function startPgChangeListener(url: string, bus: ChangeBus, log: Log): ()
 
   async function connect() {
     const c = new pg.Client(poolConfig(url));
-    // Uma queda dispara 'error' e depois 'end': reconecta uma vez só.
+    // O handler de 'error' nunca é removido: uma conexão morta ainda pode emitir outro 'error',
+    // e sem listener o Node derruba o processo. `down` garante uma reconexão por queda.
     let down = false;
     const onDown = (err: unknown) => {
       if (down) return;
@@ -46,21 +46,22 @@ export function startPgChangeListener(url: string, bus: ChangeBus, log: Log): ()
     c.on('error', onDown);
     c.on('end', () => onDown('conexão encerrada'));
     c.on('notification', (msg) => {
-      if (msg.channel === CHANGES_CHANNEL && RESOURCES.has(msg.payload as Resource)) {
+      if (!down && msg.channel === CHANGES_CHANNEL && RESOURCES.has(msg.payload as Resource)) {
         bus.emitChange(msg.payload as Resource);
       }
     });
     try {
       await c.connect();
       await c.query(`LISTEN ${CHANGES_CHANNEL}`);
+      if (stopped) { down = true; await c.end().catch(() => {}); return; }
       client = c;
       delay = 1000;
       log.info({ channel: CHANGES_CHANNEL }, 'Realtime: ouvindo mudanças do banco');
     } catch (err) {
+      const first = !down;
       down = true;
-      c.removeAllListeners();
       await c.end().catch(() => {});
-      scheduleReconnect(err);
+      if (first) scheduleReconnect(err);
     }
   }
 
@@ -71,7 +72,6 @@ export function startPgChangeListener(url: string, bus: ChangeBus, log: Log): ()
     clearTimeout(retry);
     const c = client;
     client = undefined;
-    c?.removeAllListeners();
     await c?.end().catch(() => {});
   };
 }

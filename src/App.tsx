@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Mail, 
@@ -11,40 +11,28 @@ import {
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { toast } from 'sonner';
-import { authFetch } from './lib/api';
-
-// Download exige token: window.open não envia o header Authorization.
-const downloadProject = async () => {
-  const toastId = toast.loading('Gerando arquivo do projeto...');
-  try {
-    const res = await authFetch('/api/download-project');
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Erro ${res.status}`);
-    const url = URL.createObjectURL(await res.blob());
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'projeto-munago-estoque.zip';
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Download iniciado.', { id: toastId });
-  } catch (e) {
-    toast.error(e instanceof Error ? e.message : 'Erro ao baixar o projeto.', { id: toastId });
-  }
-};
 
 // Components
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
-import AIAssistant from './components/AIAssistant';
 
-// Pages
-import { Dashboard } from './pages/Dashboard';
-import { Inventory } from './pages/Inventory';
-import { ServiceOrders } from './pages/ServiceOrders';
-import { Transactions } from './pages/Transactions';
-import { Notifications } from './pages/Notifications';
-import { SettingsView } from './pages/Settings';
-import { Users } from './pages/Users';
-import Login from './pages/Login';
+// Pages: cada uma vira um chunk próprio, baixado só quando a aba é aberta.
+const AIAssistant = lazy(() => import('./components/AIAssistant'));
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Inventory = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
+const ServiceOrders = lazy(() => import('./pages/ServiceOrders').then(m => ({ default: m.ServiceOrders })));
+const Transactions = lazy(() => import('./pages/Transactions').then(m => ({ default: m.Transactions })));
+const Notifications = lazy(() => import('./pages/Notifications').then(m => ({ default: m.Notifications })));
+const SettingsView = lazy(() => import('./pages/Settings').then(m => ({ default: m.SettingsView })));
+const Users = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
+const Login = lazy(() => import('./pages/Login'));
+
+const PageFallback = () => (
+  <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite">
+    <Loader2 size={24} className="animate-spin text-zinc-400" />
+    <span className="sr-only">Carregando...</span>
+  </div>
+);
 
 const AppContent = () => {
   const { 
@@ -99,7 +87,7 @@ const AppContent = () => {
       case 'alerts':
         return <Notifications />;
       case 'settings':
-        return <SettingsView handleDownloadProject={downloadProject} />;
+        return <SettingsView />;
       case 'users':
         return <Users />;
       case 'ai':
@@ -168,7 +156,9 @@ const AppContent = () => {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
             >
-              {renderContent()}
+              <Suspense fallback={<PageFallback />}>
+                {renderContent()}
+              </Suspense>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -228,7 +218,11 @@ const RootApp = () => {
     );
   }
 
-  if (!user) return <Login />;
+  if (!user) return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-50 dark:bg-zinc-950"><PageFallback /></div>}>
+      <Login />
+    </Suspense>
+  );
   
   if (profile?.status === 'pending') {
     return (

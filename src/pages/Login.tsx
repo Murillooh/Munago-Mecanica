@@ -4,8 +4,6 @@ import {
   Mail, 
   Sparkles, 
   Palette, 
-  Moon, 
-  Sun, 
   X, 
   User,
   ChevronRight, 
@@ -85,12 +83,48 @@ const GoogleButton: React.FC<{ id: string; label: string; onClick: () => void; d
   </button>
 );
 
+/** Camadas do fundo do login (ver comentário no JSX). */
+const GRID_MASK = 'radial-gradient(ellipse 95% 90% at 50% 50%, #000 45%, transparent 100%)';
+const LOGIN_BG: Record<'glow' | 'grid' | 'vignette', React.CSSProperties> = {
+  glow: {
+    background:
+      'radial-gradient(ellipse 70% 60% at 50% 48%, rgba(37,99,235,0.22), transparent 72%),' +
+      'radial-gradient(ellipse 35% 35% at 12% 88%, rgba(79,70,229,0.12), transparent 70%),' +
+      'radial-gradient(ellipse 35% 35% at 88% 10%, rgba(37,99,235,0.10), transparent 70%)',
+  },
+  grid: {
+    backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.16) 1px, transparent 1.5px)',
+    backgroundSize: '22px 22px',
+    backgroundPosition: 'center center',
+    maskImage: GRID_MASK,
+    WebkitMaskImage: GRID_MASK,
+  },
+  vignette: {
+    background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.5) 100%)',
+  },
+};
+
+/** Pontilhado do painel azul: mesma linguagem do fundo, em branco translúcido. */
+const PANEL_GRID: React.CSSProperties = {
+  backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.22) 1px, transparent 1.5px)',
+  backgroundSize: '18px 18px',
+  maskImage: 'linear-gradient(135deg, #000 0%, transparent 70%)',
+  WebkitMaskImage: 'linear-gradient(135deg, #000 0%, transparent 70%)',
+};
+
+const LegalNotice = () => (
+  <p className="mt-4 text-center text-[11px] leading-relaxed text-zinc-400 dark:text-zinc-500">
+    Ao continuar, você concorda com os{' '}
+    <a href="/termos.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-blue-600 dark:hover:text-blue-400">Termos de Serviço</a>
+    {' '}e a{' '}
+    <a href="/privacidade.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-blue-600 dark:hover:text-blue-400">Política de Privacidade</a>.
+  </p>
+);
+
 const Login: React.FC = () => {
   const {
     loginEmail,
-    completeNewPassword,
-    darkMode,
-    toggleDarkMode
+    completeNewPassword
   } = useApp();
 
   const [email, setEmail] = useState('');
@@ -307,25 +341,12 @@ const Login: React.FC = () => {
 
   return (
     <div id="login-root-container" className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 md:p-6 relative overflow-hidden font-sans">
-      {/* Animated Background Elements */}
-      <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/20 blur-[120px] rounded-full animate-pulse" />
-      <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[100px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none" />
-
-      {/* Theme Toggle Button */}
-      <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
-        <button
-          id="btn-toggle-theme-login"
-          type="button"
-          onClick={toggleDarkMode}
-          aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
-          className="p-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl hover:scale-110 transition-all text-white hover:bg-white/10 flex items-center gap-2 cursor-pointer"
-        >
-          {darkMode ? <Sun size={24} className="text-zinc-300" aria-hidden="true" /> : <Moon size={24} aria-hidden="true" />}
-          <span className="text-[10px] font-black uppercase tracking-widest hidden md:block">
-            {darkMode ? 'Escuro' : 'Claro'}
-          </span>
-        </button>
+      {/* Fundo: pontilhado sutil que some nas bordas, luz azul parada atrás do card,
+          granulação e vinheta. Só CSS: sem imagem externa e sem animação. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0" style={LOGIN_BG.glow} />
+        <div className="absolute inset-0" style={LOGIN_BG.grid} />
+                <div className="absolute inset-0" style={LOGIN_BG.vignette} />
       </div>
 
       <motion.div 
@@ -341,7 +362,7 @@ const Login: React.FC = () => {
           transition={sideSwapTransition}
           className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 to-indigo-700 p-16 flex-col justify-between relative overflow-hidden z-10"
         >
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20" />
+          <div aria-hidden="true" className="absolute inset-0" style={PANEL_GRID} />
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-12">
@@ -607,6 +628,7 @@ const Login: React.FC = () => {
                       onClick={() => handleGoogleLogin(setLoginError)}
                       disabled={isLoggingIn}
                     />
+                    <LegalNotice />
                   </>
                 )}
               </motion.div>
@@ -778,6 +800,7 @@ const Login: React.FC = () => {
                       onClick={() => handleGoogleLogin(setSignupError)}
                       disabled={isLoggingIn || registrationLoading}
                     />
+                    <LegalNotice />
                     <p className="mt-6 text-center text-xs text-zinc-400">
                       Já tem uma conta?{' '}
                       <button

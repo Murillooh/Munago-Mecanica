@@ -40,7 +40,6 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { exportInventoryToPDF } from '../lib/pdfExport';
 import { toast } from 'sonner';
 import { ProductMovementTrendChart } from '../components/dashboard/ProductMovementTrendChart';
 import { OSRevenueChart } from '../components/dashboard/OSRevenueChart';
@@ -434,12 +433,14 @@ export const Dashboard = ({
     setTimeout(() => setCopiedSummary(false), 2000);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     try {
-      exportInventoryToPDF({
-        storeName: settings.storeName || 'Munago Estoque',
+      const { exportExecutiveReportToPDF } = await import('../lib/pdfExport');
+      exportExecutiveReportToPDF({
+        store: settings,
         products: products || [],
-        filterLabel: 'Relatório Executivo Geral de Monitoramento'
+        transactions: transactions || [],
+        serviceOrders: serviceOrders || []
       });
       toast.success("Relatório executivo em PDF exportado!");
     } catch {

@@ -26,7 +26,7 @@ import {
 } from '../lib/auth';
 import { Hub } from 'aws-amplify/utils';
 import { apiGet, apiPost, apiPatch, apiDelete, hydrateDates, subscribeChanges, ApiRequestError } from '../lib/api';
-import { useGoogleAuth } from '../hooks/useGoogleAuth';
+import { useGoogleAuth, fetchGoogleAccessToken } from '../hooks/useGoogleAuth';
 
 // Types
 export interface Product {
@@ -269,7 +269,6 @@ interface AppContextType {
   settings: SystemSettings;
   updateSettings: (updates: Partial<SystemSettings>) => Promise<void>;
   playLowStockAlertSound: () => void;
-  driveToken: string | null;
   handleBackupToDrive: () => Promise<void>;
   handleRestoreFromDrive: () => Promise<void>;
 }
@@ -316,16 +315,6 @@ export const getDefaultPermissions = (role: 'admin' | 'editor' | 'viewer'): User
   return ROLE_PRESETS[role]?.permissions || ROLE_PRESETS.viewer.permissions;
 };
 
-/** Token OAuth do Google (popup do servidor) salvo por useGoogleAuth; usado no backup do Drive. */
-function getStoredGoogleAccessToken(): string | null {
-  try {
-    const raw = localStorage.getItem('google_tokens');
-    return raw ? JSON.parse(raw).access_token ?? null : null;
-  } catch {
-    return null;
-  }
-}
-
 export const AppProvider = ({ children }: { children: any }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -348,7 +337,6 @@ export const AppProvider = ({ children }: { children: any }) => {
     lastFirestoreBackup: '',
   }));
 
-  const [driveToken, setDriveToken] = useState<string | null>(() => getStoredGoogleAccessToken());
   const { openGoogleAuth } = useGoogleAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [inventoryLowStockFilter, setInventoryLowStockFilter] = useState(false);
@@ -547,10 +535,10 @@ export const AppProvider = ({ children }: { children: any }) => {
   const handleLogout = async () => {
     const toastId = toast.loading('Saindo...');
     try {
-      // Clear session tokens and cache hints (preserve user theme preferences in localStorage)
+      // Clear session tokens and cache hints (preserve user theme preferences in localStorage).
+      // 'google_tokens' é da versão antiga (tokens no navegador); hoje ficam no servidor, por usuário.
       localStorage.removeItem('google_tokens');
       sessionStorage.clear();
-      setDriveToken(null);
 
       await cognitoLogout();
 
@@ -803,8 +791,12 @@ export const AppProvider = ({ children }: { children: any }) => {
     }
   };
 
-  const ensureDriveToken = (): string | null => {
-    const token = driveToken || getStoredGoogleAccessToken();
+  const ensureDriveToken = async (): Promise<string | null> => {
+    const token = await fetchGoogleAccessToken().catch((e) => {
+      toast.error(e instanceof Error ? e.message : 'Erro ao acessar a conta Google.');
+      return undefined;
+    });
+    if (token === undefined) return null;
     if (!token) {
       toast.info('Conecte sua conta Google para usar o Drive. Após autorizar, a página será recarregada.');
       openGoogleAuth();
@@ -814,7 +806,7 @@ export const AppProvider = ({ children }: { children: any }) => {
   };
 
   const handleBackupToDrive = async () => {
-    const token = ensureDriveToken();
+    const token = await ensureDriveToken();
     if (!token) return;
 
     const toastId = toast.loading('Gerando backup no Google Drive...');
@@ -838,7 +830,7 @@ export const AppProvider = ({ children }: { children: any }) => {
   };
 
   const handleRestoreFromDrive = async () => {
-    const token = ensureDriveToken();
+    const token = await ensureDriveToken();
     if (!token) return;
 
     const toastId = toast.loading('Buscando backups...');
@@ -927,7 +919,6 @@ export const AppProvider = ({ children }: { children: any }) => {
       settings,
       updateSettings: updateSettingsAction,
       playLowStockAlertSound: () => soundManager.playLowStockChime(),
-      driveToken,
       handleBackupToDrive,
       handleRestoreFromDrive
     }}>

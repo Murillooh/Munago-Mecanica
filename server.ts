@@ -2,11 +2,9 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
-import fs from "fs";
-import { google } from "googleapis";
-import cookieParser from "cookie-parser";
 import { GoogleGenAI } from "@google/genai";
 import cors from "cors";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import crypto from 'crypto';
@@ -21,12 +19,15 @@ import { createApiRouter } from "./server/api";
 import { authMiddleware, requireAdmin, requirePermission } from "./server/auth/middleware";
 import { createCognitoAdmin, createCognitoVerifier } from "./server/auth/cognito";
 import { runAutoBackupIfDue } from "./server/services/backup";
+import { createGoogleOAuth } from "./server/google/oauth";
+import { createGoogleRouter } from "./server/routes/google";
 
 dotenv.config();
 
 // Environment variable validation
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production']).default('development'),
+  // O bundle de produção (dist/server.cjs) já define 'production' se faltar (banner no build).
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
   // Proxies na frente do Express (produção: Vercel → CloudFront → nginx = 3), para req.ip ser o do cliente.
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
@@ -57,7 +58,7 @@ const bus = new ChangeBus();
 startPgChangeListener(env.DATABASE_URL, bus, logger);
 const verifier = createCognitoVerifier(cognitoConfig);
 const bootstrapAdmins = env.BOOTSTRAP_ADMIN_EMAILS.split(',');
-// Rotas legadas fora do /api/v1 (Gemini, Sheets, download) também exigem login.
+// Rotas legadas fora do /api/v1 (Gemini) também exigem login.
 const requireLogin = [authMiddleware({ db, verifier, bootstrapAdmins }), requirePermission()];
 
 const ai = new GoogleGenAI({
@@ -69,21 +70,62 @@ const ai = new GoogleGenAI({
   }
 });
 
+// Modelos e parâmetros fixos no servidor: o cliente não escolhe modelo caro nem ferramentas.
+const GEMINI_TEXT_MODELS = ['gemini-flash-latest', 'gemini-3.5-flash'] as const;
+const geminiTextInput = z.object({
+  model: z.enum(GEMINI_TEXT_MODELS).default('gemini-flash-latest'),
+  contents: z.union([
+    z.string().min(1).max(500_000), // resumo do estoque manda todos os produtos
+    z.array(z.object({
+      role: z.enum(['user', 'model']).optional(),
+      parts: z.array(z.object({ text: z.string().max(500_000) })).min(1).max(20),
+    })).min(1).max(50),
+  ]),
+  systemInstruction: z.string().max(20_000).optional(),
+  // Só estes campos passam; o resto (tools, safetySettings...) é descartado.
+  config: z.object({
+    temperature: z.number().min(0).max(2).optional(),
+    maxOutputTokens: z.number().int().min(1).max(4096).optional(),
+  }).default({}),
+});
+const geminiImageInput = z.object({
+  prompt: z.string().min(1).max(2000),
+  config: z.object({
+    imageConfig: z.object({ aspectRatio: z.enum(['1:1', '4:3', '3:4', '16:9', '9:16']).default('1:1') }).default({ aspectRatio: '1:1' }),
+  }).optional(),
+}).transform(({ prompt, config }) => ({ prompt, aspectRatio: config?.imageConfig.aspectRatio ?? '1:1' }));
+
 async function startServer() {
   const app = express();
   app.set('trust proxy', env.TRUST_PROXY);
   const PORT = env.PORT;
 
-  // CORS Configuration
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    env.APP_URL
-  ].filter(Boolean) as string[];
+  // CORS: comparação exata de origem (startsWith aceitaria "https://app.com.evil.com").
+  const allowedOrigins = new Set([
+    ...(env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:5173']),
+    new URL(env.APP_URL).origin,
+    new URL(env.FRONTEND_URL).origin,
+  ]);
+
+  // CSP completa fica de fora: o SPA (Vite/Vercel) tem script inline de tema. Aqui só o que não quebra nada.
+  app.use(helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        // Sem useDefaults o helmet exige default-src; aqui ela fica desligada de propósito (ver comentário acima).
+        "default-src": helmet.contentSecurityPolicy.dangerouslyDisableDefaultSrc,
+        "frame-ancestors": ["'none'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+      },
+    },
+    // O popup do Google precisa de window.opener para avisar o app.
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  }));
 
   app.use(cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+      if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -91,7 +133,7 @@ async function startServer() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Google-Tokens']
+    allowedHeaders: ['Content-Type', 'Authorization']
   }));
 
   // Rate Limiting
@@ -103,9 +145,11 @@ async function startServer() {
     legacyHeaders: false
   });
 
+  // Por usuário (roda depois do login): vários usuários atrás do mesmo IP da oficina não se bloqueiam.
   const geminiLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 30, // Increased for better interactivity
+    max: 30,
+    keyGenerator: (req) => req.user!.id,
     message: { error: 'Limite de requisições ao Gemini excedido. Tente novamente em 1 minuto.' },
     standardHeaders: true,
     legacyHeaders: false
@@ -121,60 +165,38 @@ async function startServer() {
   });
 
   app.use("/api", globalLimiter);
-  app.use(express.json());
-  app.use(cookieParser());
+  // Imagens em data URL (produtos, categorias, logo) passam do limite padrão de 100kb.
+  app.use(express.json({ limit: '2mb' }));
 
-  // Google OAuth Client
-  const GOOGLE_CLIENT_ID = env.GOOGLE_CLIENT_ID;
-  const GOOGLE_CLIENT_SECRET = env.GOOGLE_CLIENT_SECRET;
-  
-  // Normalize APP_URL
-  let APP_URL = env.APP_URL;
-  if (APP_URL.endsWith('/')) {
-    APP_URL = APP_URL.slice(0, -1);
-  }
-  
+  const APP_URL = env.APP_URL.replace(/\/$/, '');
   const GOOGLE_REDIRECT_URI = env.GOOGLE_REDIRECT_URI || `${APP_URL}/auth/google/callback`;
+  logger.info({ appUrl: APP_URL, redirectUri: GOOGLE_REDIRECT_URI, hasClientId: !!env.GOOGLE_CLIENT_ID }, 'Initializing Google OAuth');
 
-  logger.info({
-    appUrl: APP_URL,
+  const googleOAuth = createGoogleOAuth({
+    db,
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
     redirectUri: GOOGLE_REDIRECT_URI,
-    hasClientId: !!GOOGLE_CLIENT_ID
-  }, 'Initializing Google OAuth');
-
-  const oauth2Client = new google.auth.OAuth2(
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI
-  );
+  });
 
   // API v1: Postgres (RDS) + Cognito. Substitui Firestore, firestore.rules e Firebase Auth.
   app.use("/api/v1", createApiRouter({
     db, bus, verifier, bootstrapAdmins,
     cognito: createCognitoAdmin(cognitoConfig),
     publicLimiter: accessRequestLimiter,
+    extra: (r) => r.use(createGoogleRouter(googleOAuth)),
   }));
-
-  // Google Auth Routes
-  app.get("/api/auth/google/config", (req, res) => {
-    res.json({ 
-      redirectUri: GOOGLE_REDIRECT_URI,
-      hasClientId: !!GOOGLE_CLIENT_ID,
-      hasClientSecret: !!GOOGLE_CLIENT_SECRET
-    });
-  });
 
   // Gemini API Routes
   app.post("/api/gemini/generate", ...requireLogin, geminiLimiter, async (req, res, next) => {
-    const { model, contents, config, systemInstruction } = req.body;
+    const parsed = geminiTextInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Requisição de IA inválida.', code: 'VALIDATION' });
+    const { model, contents, config, systemInstruction } = parsed.data;
     try {
       const response = await ai.models.generateContent({
-        model: model || "gemini-flash-latest",
+        model,
         contents,
-        config: {
-          ...config,
-          systemInstruction
-        }
+        config: { ...config, systemInstruction }
       });
       res.json({ text: response.text });
     } catch (error: any) {
@@ -189,8 +211,10 @@ async function startServer() {
     }
   });
 
-  app.post("/api/gemini/chat-stream", ...requireLogin, geminiLimiter, async (req, res, next) => {
-    const { model, contents, config, systemInstruction } = req.body;
+  app.post("/api/gemini/chat-stream", ...requireLogin, geminiLimiter, async (req, res) => {
+    const parsed = geminiTextInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Requisição de IA inválida.', code: 'VALIDATION' });
+    const { model, contents, config, systemInstruction } = parsed.data;
 
     // Sem chave a chamada falharia no meio do stream; responde antes com erro claro.
     if (!process.env.GEMINI_API_KEY) {
@@ -208,7 +232,7 @@ async function startServer() {
 
     try {
       const stream = await ai.models.generateContentStream({
-        model: model || "gemini-flash-latest",
+        model,
         contents: typeof contents === 'string' ? [{ role: 'user', parts: [{ text: contents }] }] : contents,
         config: {
           ...config,
@@ -231,8 +255,9 @@ async function startServer() {
     } catch (error: any) {
       logger.error(error, "Gemini stream error");
       const isQuotaError = error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED");
-      let errorMessage = error.message;
-      if (isQuotaError) errorMessage = "Limite de cota atingido. Tente novamente mais tarde.";
+      const errorMessage = isQuotaError
+        ? "Limite de cota atingido. Tente novamente mais tarde."
+        : "Erro ao consultar a IA. Tente novamente.";
       
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
@@ -244,17 +269,17 @@ async function startServer() {
   });
 
   app.post("/api/gemini/generate-image", ...requireLogin, geminiLimiter, async (req, res) => {
-    const { model, prompt, config } = req.body;
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
     }
+    const parsed = geminiImageInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Requisição de IA inválida.', code: 'VALIDATION' });
+    const { prompt, aspectRatio } = parsed.data;
     try {
       const response = await ai.models.generateContent({
-        model: model || "gemini-2.5-flash-image",
+        model: "gemini-2.5-flash-image",
         contents: [{ text: prompt }],
-        config: config || {
-          imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
-        }
+        config: { imageConfig: { aspectRatio, imageSize: "1K" } }
       });
       
       let imagePart = null;
@@ -274,11 +299,11 @@ async function startServer() {
       
       res.json({ image: imagePart, text: textPart });
     } catch (error: any) {
-      console.error("Gemini image error:", error);
+      logger.error(error, "Gemini image error");
       const isQuotaError = error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED");
       const isKeyError = error.message?.includes("403") || error.message?.includes("400") || error.message?.includes("API_KEY_INVALID") || error.message?.includes("PERMISSION_DENIED");
       
-      let message = error.message;
+      let message = "Erro ao gerar a imagem. Tente novamente.";
       if (isQuotaError) message = "Limite de cota atingido para geração de imagens.";
       if (isKeyError) message = "Chave de API sem permissão para geração de imagens.";
 
@@ -286,213 +311,51 @@ async function startServer() {
     }
   });
 
-  app.get("/api/auth/google/check", (req, res) => {
-    const tokensCookie = req.cookies.google_tokens;
-    res.json({ authenticated: !!tokensCookie });
-  });
-
-  app.get("/api/auth/google/url", (req, res) => {
-    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return res.status(500).json({ 
-        error: "Configuração incompleta: GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET não foram encontrados nas variáveis de ambiente (Secrets)." 
-      });
+  // Callback do Google (popup). O state assinado diz de qual usuário são os tokens;
+  // eles ficam no banco e a página só avisa a janela do app que a conexão terminou.
+  app.get("/auth/google/callback", async (req, res) => {
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    let ok = false;
+    if (code && state) {
+      try {
+        await googleOAuth.handleCallback(code, state);
+        ok = true;
+      } catch (error) {
+        logger.warn({ err: error instanceof Error ? error.message : error }, 'Google OAuth callback failed');
+      }
     }
+    // Cookie da versão antiga (tokens no navegador).
+    res.clearCookie("google_tokens", { httpOnly: true, secure: true, sameSite: "none" });
 
-    // Só escopos não sensíveis por padrão: com o app publicado, o Google não mostra
-    // "app não verificado" nem exige verificação. Planilhas (sensível) só para quem usa a sincronização.
-    const scopes = [
-      // Backup/restauração no Google Drive (só arquivos criados pelo app)
-      "https://www.googleapis.com/auth/drive.file",
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "https://www.googleapis.com/auth/userinfo.email",
-    ];
-    if (req.query.purpose === "sheets") {
-      scopes.push("https://www.googleapis.com/auth/spreadsheets.readonly");
-    }
+    const nonce = crypto.randomBytes(16).toString('base64');
+    // Serializa para dentro de <script> sem permitir fechar a tag (XSS).
+    const inlineJson = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
+    const message = ok
+      ? { type: 'OAUTH_AUTH_SUCCESS', provider: 'google' }
+      : { type: 'OAUTH_AUTH_FAILED', error: 'Não foi possível conectar a conta Google.' };
 
-    const state = (req.query.nonce as string) || "";
-
-    const url = oauth2Client.generateAuthUrl({
-      access_type: "offline",
-      scope: scopes,
-      // Mantém o que o usuário já autorizou (ex.: Drive) ao pedir planilhas depois.
-      include_granted_scopes: true,
-      prompt: "consent",
-      state: state,
-      redirect_uri: GOOGLE_REDIRECT_URI,
+    res.set({
+      'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'`,
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
     });
-
-    res.json({ url });
+    res.status(ok ? 200 : 400).send(`<!DOCTYPE html>
+<html lang="pt-BR">
+  <head><meta charset="UTF-8"><title>Autenticação Munago Estoque</title></head>
+  <body>
+    <p style="font-family: sans-serif; text-align: center; margin-top: 50px;">${ok ? 'Conta Google conectada! Fechando janela...' : 'Não foi possível conectar a conta Google. Feche esta janela e tente novamente.'}</p>
+    <script nonce="${nonce}">
+      if (window.opener) window.opener.postMessage(${inlineJson(message)}, ${inlineJson(new URL(env.FRONTEND_URL).origin)});
+      setTimeout(function () { window.opener ? window.close() : (window.location.href = '/'); }, ${ok ? 1000 : 4000});
+    </script>
+  </body>
+</html>`);
   });
 
-  app.get("/auth/google/callback", async (req, res, next) => {
-    const { code, state } = req.query;
-
-    if (!code) {
-      return res.status(400).send("No code provided");
-    }
-
-    try {
-      logger.info('Exchanging code for tokens...');
-      const { tokens } = await oauth2Client.getToken(code as string);
-      
-      // Secondary cookie storage
-      res.cookie("google_tokens", JSON.stringify(tokens), {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
-
-      const nonce = (state as string) || crypto.createHash('sha256').update(Math.random().toString()).digest('hex');
-      const tokensJson = JSON.stringify(tokens);
-      // Serializa para dentro de <script> sem permitir fechar a tag (XSS).
-      const LT_ESCAPED = String.fromCharCode(92) + "u003c"; // "\u003c": JSON.parse devolve <, mas o HTML não vê </script>
-      const inlineJson = (v: unknown) => JSON.stringify(v).replace(/</g, LT_ESCAPED);
-      const escapedJson = inlineJson(tokensJson);
-
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>Autenticação Munago Estoque</title>
-          </head>
-          <body>
-            <p style="font-family: sans-serif; text-align: center; margin-top: 50px;">Autenticação bem-sucedida! Fechando janela...</p>
-            <script>
-              try {
-                if (!window.opener) {
-                  window.location.href = '/';
-                }
-
-                const tokensJson = JSON.parse(${escapedJson});
-                const tokens = JSON.parse(tokensJson);
-
-                window.opener.postMessage({ 
-                  type: 'OAUTH_AUTH_SUCCESS', 
-                  provider: 'google',
-                  tokens: tokens,
-                  nonce: ${inlineJson(nonce)},
-                  timestamp: Date.now()
-                }, ${inlineJson(env.FRONTEND_URL)});
-                
-                setTimeout(() => window.close(), 1000);
-              } catch(e) {
-                console.error('Auth error:', e);
-                if (window.opener) {
-                  window.opener.postMessage({ 
-                    type: 'OAUTH_AUTH_FAILED', 
-                    error: 'Falha no processamento de segurança'
-                  }, window.location.origin);
-                }
-                setTimeout(() => window.close(), 2000);
-              }
-            </script>
-          </body>
-        </html>
-      `);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.get("/api/sheets/data", ...requireLogin, async (req, res) => {
-    const spreadsheetId = req.query.spreadsheetId as string;
-    const range = (req.query.range as string) || "A1:Z100";
-    
-    // Try to get tokens from header first, then cookie
-    let tokensCookie = req.headers['x-google-tokens'] as string || req.cookies.google_tokens;
-
-    if (!spreadsheetId) {
-      return res.status(400).json({ error: "Spreadsheet ID is required" });
-    }
-
-    if (!tokensCookie) {
-      return res.status(401).json({ error: "Not authenticated with Google. Please connect your account." });
-    }
-
-    try {
-      const tokens = JSON.parse(tokensCookie);
-      
-      // Create a fresh client for this request to avoid state pollution
-      const requestAuth = new google.auth.OAuth2(
-        GOOGLE_CLIENT_ID,
-        GOOGLE_CLIENT_SECRET,
-        GOOGLE_REDIRECT_URI
-      );
-      requestAuth.setCredentials(tokens);
-
-      const sheets = google.sheets({ version: "v4", auth: requestAuth });
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range,
-      });
-
-      res.json({ values: response.data.values });
-    } catch (error: any) {
-      console.error("Error fetching sheet data:", error);
-      
-      if (error.message.includes('invalid_grant') || error.message.includes('invalid_token')) {
-        return res.status(401).json({ error: "Sessão expirada ou inválida. Por favor, conecte-se novamente." });
-      }
-      // Conta conectada só para o Drive: falta autorizar a leitura de planilhas.
-      if (error.code === 403 && /insufficient.*scope/i.test(error.message)) {
-        return res.status(403).json({ code: "SHEETS_SCOPE_REQUIRED", error: "Sua conta Google está conectada só para o backup. Clique em Conectar Google para autorizar a leitura de planilhas." });
-      }
-
-      res.status(500).json({ error: `Erro na API do Google: ${error.message}` });
-    }
-  });
-
-  app.get("/api/download-project", ...requireLogin, requireAdmin, async (req, res) => {
-    const { exec } = await import("child_process");
-    const { promisify } = await import("util");
-    const execPromise = promisify(exec);
-
-    try {
-      const zipPath = path.join(process.cwd(), "project-export.zip");
-      
-      // List of files and folders to include in the zip
-      // This is safer than excluding, as it avoids errors when excluded folders don't exist
-      const itemsToInclude = [
-        "src",
-        "package.json",
-        "package-lock.json",
-        "server.ts",
-        "tsconfig.json",
-        "vite.config.ts",
-        "index.html",
-        "metadata.json",
-        ".env.example",
-        ".gitignore"
-      ].join(" ");
-
-      console.log("Creating project zip with items:", itemsToInclude);
-      
-      // Use npx bestzip to create the zip file
-      await execPromise(`npx -y bestzip project-export.zip ${itemsToInclude}`);
-      
-      if (!fs.existsSync(zipPath)) {
-        throw new Error("Zip file was not created successfully.");
-      }
-
-      res.download(zipPath, "projeto-loc-estoque.zip", (err) => {
-        if (err) {
-          console.error("Error sending file:", err);
-        }
-        // Clean up after sending
-        fs.unlink(zipPath, (unlinkErr) => {
-          if (unlinkErr) console.error("Error deleting temp zip:", unlinkErr);
-        });
-      });
-    } catch (error: any) {
-      console.error("Error creating project zip:", error);
-      res.status(500).json({ 
-        error: "Erro ao gerar o arquivo ZIP do projeto.",
-        details: error.message 
-      });
-    }
+  // Rota de API inexistente: 404 em JSON, não o index.html do SPA.
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ error: 'Rota não encontrada.', code: 'NOT_FOUND' });
   });
 
   // Vite middleware for development
@@ -505,8 +368,17 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     // extensions: /privacidade e /termos servem os .html públicos (link exigido pelo Google OAuth).
-    app.use(express.static(distPath, { extensions: ['html'] }));
+    // Arquivos em /assets têm hash no nome: cache de 1 ano é seguro. HTML sempre revalida
+    // para que um deploy novo apareça na hora.
+    app.use('/assets', express.static(path.join(distPath, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }));
+    app.use(express.static(distPath, {
+      extensions: ['html'],
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+      },
+    }));
     app.get("*", (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

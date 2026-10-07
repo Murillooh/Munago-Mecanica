@@ -27,5 +27,9 @@ export function poolConfig(url: string): pg.PoolConfig {
 
 export function createDb(url = process.env.DATABASE_URL): DB & { $client: pg.Pool } {
   if (!url) throw new Error('DATABASE_URL não definida');
-  return drizzle(new pg.Pool(poolConfig(url)), { schema });
+  const pool = new pg.Pool(poolConfig(url));
+  // Conexão ociosa que cai (ex.: ECONNRESET) emite 'error' no pool; sem listener o Node derruba o processo.
+  // O pool descarta a conexão e abre outra na próxima query.
+  pool.on('error', (err) => console.warn('[db] conexão ociosa caiu:', err.message));
+  return drizzle(pool, { schema });
 }

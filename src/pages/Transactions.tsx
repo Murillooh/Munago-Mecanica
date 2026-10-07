@@ -7,10 +7,8 @@ import {
   Search,
   History
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { useApp, type Transaction } from '../context/AppContext';
-import { exportTransactionsToPDF } from '../lib/pdfExport';
 import { parseDate } from '../components/dashboard/utils';
 
 const timeOf = (t: Transaction) => parseDate(t.timestamp)?.getTime() ?? 0;
@@ -80,7 +78,7 @@ export const Transactions = () => {
     out: (transactions || []).filter(t => t.type === 'out').length,
   }), [transactions]);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!filteredTransactions || filteredTransactions.length === 0) {
       toast.error('Nenhuma movimentação para exportar.');
       return;
@@ -92,8 +90,9 @@ export const Transactions = () => {
         searchTerm ? `Busca: "${searchTerm}"` : null
       ].filter(Boolean).join(' | ');
 
+      const { exportTransactionsToPDF } = await import('../lib/pdfExport');
       exportTransactionsToPDF({
-        storeName: settings?.storeName || 'Munago Estoque',
+        store: settings,
         transactions: filteredTransactions,
         filterLabel
       });
@@ -104,7 +103,7 @@ export const Transactions = () => {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!filteredTransactions || filteredTransactions.length === 0) {
       toast.error('Nenhuma movimentação para exportar.');
       return;
@@ -120,6 +119,7 @@ export const Transactions = () => {
         'Justificativa': t.reason || ''
       }));
 
+      const XLSX = await import('xlsx');
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Movimentações');

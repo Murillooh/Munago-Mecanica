@@ -38,16 +38,14 @@ import {
   Save,
   Image as ImageIcon
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 import { MovementModal } from '../components/inventory/MovementModal';
 import CategoryManager from '../components/CategoryManager';
-import { exportInventoryToPDF } from '../lib/pdfExport';
 
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { InventoryAISummary } from '../components/InventoryAISummary';
-import { authFetch } from '../lib/api';
+import { apiGet } from '../lib/api';
 
 export const Inventory = () => {
   const { 
@@ -75,27 +73,13 @@ export const Inventory = () => {
     toast.error('Gerar imagens requer chave de API Gemini no backend.');
     return '';
   };
+  // Tokens do Google ficam no servidor (por usuário); a planilha é lida por lá.
   const fetchGoogleSheetsData = async (spreadsheetId: string, range: string) => {
-    const tokens = localStorage.getItem('google_tokens');
-    if (!tokens) {
-      throw new Error('Não autenticado com o Google.');
-    }
-
-    const response = await authFetch(`/api/sheets/data?spreadsheetId=${encodeURIComponent(spreadsheetId)}&range=${encodeURIComponent(range)}`, {
-      headers: {
-        'x-google-tokens': tokens
-      }
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Falha ao buscar dados do Google Sheets');
-    }
-
-    const data = await response.json();
+    const q = new URLSearchParams({ spreadsheetId, range });
+    const data = await apiGet<{ values: any[][] }>(`/google/sheets?${q}`);
     return data.values || [];
   };
-  const googleConfig = { hasClientId: true, hasClientSecret: true };
+  const [googleConfig, setGoogleConfig] = useState({ hasClientId: true, hasClientSecret: true });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -127,11 +111,12 @@ export const Inventory = () => {
   }, [selectedProduct, isModalOpen]);
 
   useEffect(() => {
-    // Check if we have google tokens in local storage
-    const tokens = localStorage.getItem('google_tokens');
-    if (tokens) {
-      setIsGoogleAuthenticated(true);
-    }
+    apiGet<{ configured: boolean; sheets: boolean }>('/google/status')
+      .then(({ configured, sheets }) => {
+        setGoogleConfig({ hasClientId: configured, hasClientSecret: configured });
+        setIsGoogleAuthenticated(sheets);
+      })
+      .catch(() => {});
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -217,7 +202,8 @@ export const Inventory = () => {
     }
   };
 
-  const handleExportData = (format: 'csv' | 'xlsx') => {
+  const handleExportData = async (format: 'csv' | 'xlsx') => {
+    const XLSX = await import('xlsx');
     const data = filteredProducts.map(p => ({
       SKU: p.sku || '',
       Nome: p.name || '',
@@ -238,8 +224,9 @@ export const Inventory = () => {
     toast.success(`Exportação para ${format.toUpperCase()} concluída!`);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     try {
+      const { exportInventoryToPDF } = await import('../lib/pdfExport');
       const isFiltered = searchTerm || categoryFilter !== 'all' || inventoryLowStockFilter;
       const filterDesc = isFiltered 
         ? [
@@ -250,7 +237,7 @@ export const Inventory = () => {
         : 'Catálogo Geral';
 
       exportInventoryToPDF({
-        storeName: settings?.storeName || 'Munago Estoque',
+        store: settings,
         products: filteredProducts,
         filterLabel: filterDesc
       });

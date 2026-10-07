@@ -155,3 +155,11 @@ export const backups = pgTable('backups', {
   data: jsonb('data').notNull(),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Conta Google conectada (Drive/Planilhas) por usuário. `tokens` é JSON cifrado (AES-256-GCM), nunca vai ao navegador. */
+export const googleConnections = pgTable('google_connections', {
+  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  tokens: text('tokens').notNull(),
+  scope: text('scope'),
+  updatedAt: updatedAt(),
+});

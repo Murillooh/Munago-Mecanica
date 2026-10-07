@@ -22,6 +22,13 @@
       "when": 1791317121125,
       "tag": "0002_os_revenue_split",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791343549779,
+      "tag": "0003_google_connections",
+      "breakpoints": true
     }
   ]
 }

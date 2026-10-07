@@ -88,7 +88,7 @@ const Switch: React.FC<{ checked: boolean; onChange: () => void; label: string; 
   </button>
 );
 
-export const SettingsView = ({ handleDownloadProject }: { handleDownloadProject: () => void }) => {
+export const SettingsView = () => {
   const {
     settings,
     updateSettings,
