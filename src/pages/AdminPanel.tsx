@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, Users, FileText, Wallet, Search, RefreshCw, LogIn, ChevronDown, Loader2, AlertTriangle, ShieldCheck, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Building2, Users, FileText, Wallet, Search, RefreshCw, LogIn, ChevronDown, Loader2, AlertTriangle, ShieldCheck, Pencil, Trash2, Check, X, UserCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiDelete, apiGet, apiPatch, setActiveWorkspace } from '../lib/api';
 import { useApp } from '../context/AppContext';
+import { SignupQueue } from '../components/SignupQueue';
 
 interface WorkspaceUser {
   id: string;
@@ -58,7 +59,13 @@ const Kpi = ({ icon: Icon, label, value, hint }: { icon: React.ElementType; labe
 
 /** Painel exclusivo do admin geral: todas as oficinas, seus números e usuários. */
 export const AdminPanel = () => {
-  const { profile, switchWorkspace } = useApp();
+  const { profile, switchWorkspace, setActiveTab } = useApp();
+
+  /** Abre a tela Usuários da oficina (editar acessos, aprovar, remover). */
+  const manageTeam = (id: string) => {
+    if (id === activeId) setActiveTab('users');
+    else switchWorkspace(id, 'users');
+  };
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -159,6 +166,8 @@ export const AdminPanel = () => {
             <Kpi icon={FileText} label="Ordens de serviço" value={String(data.totals.serviceOrders)} hint={`${data.totals.products} produtos cadastrados`} />
             <Kpi icon={Wallet} label="Faturado (30 dias)" value={brl(data.totals.revenue30d)} hint={`Total: ${brl(data.totals.revenue)}`} />
           </div>
+
+          <SignupQueue mode="super" workspaces={data.workspaces.map(w => ({ id: w.id, name: w.name }))} onDone={load} />
 
           <div className="relative max-w-sm">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
@@ -282,6 +291,16 @@ export const AdminPanel = () => {
 
                   {isOpen && (
                     <div className="border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/50">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">Para editar acessos, aprovar ou remover alguém, abra a equipe desta oficina.</p>
+                        <button
+                          type="button"
+                          onClick={() => manageTeam(w.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:border-blue-500 hover:text-blue-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:text-blue-400 cursor-pointer"
+                        >
+                          <UserCog size={13} aria-hidden="true" /> Gerenciar equipe
+                        </button>
+                      </div>
                       {w.users.length === 0 ? (
                         <p className="text-xs text-zinc-500">Nenhum usuário.</p>
                       ) : (

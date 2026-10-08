@@ -4,7 +4,7 @@ import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createTestDb } from '../test/testDb';
 import { authMiddleware, requirePermission, requireAdmin, effectivePermissions, ROLE_PERMISSIONS } from './middleware';
-import { users, workspaces } from '../db/schema';
+import { UNASSIGNED_WORKSPACE, users, workspaces } from '../db/schema';
 import type { DB } from '../db/client';
 
 // Token fake: "sub|email|verified"
@@ -42,20 +42,26 @@ describe('authMiddleware', () => {
     expect(res.body.code).toBe('INVALID_TOKEN');
   });
 
-  it('primeiro acesso cria uma oficina própria com o usuário como admin', async () => {
+  it('primeiro acesso fica aguardando, sem oficina, até um admin colocar numa', async () => {
+    const before = await db.select().from(workspaces);
     const res = await request(buildApp(db)).get('/me').set(auth('s1|a@x.com')).expect(200);
-    expect(res.body).toMatchObject({ id: 's1', email: 'a@x.com', role: 'admin', status: 'approved', isSuperAdmin: false });
-    expect(res.body.workspaceId).not.toBe('default');
-    expect(res.body.activeWorkspace).toBe(res.body.workspaceId);
+    // viewer (e não admin): admin pendente passaria pelo requireLogin.
+    expect(res.body).toMatchObject({ id: 's1', email: 'a@x.com', role: 'viewer', status: 'pending', isSuperAdmin: false, workspaceId: UNASSIGNED_WORKSPACE });
+    expect(await db.select().from(workspaces)).toHaveLength(before.length);
+    await request(buildApp(db)).get('/read').set(auth('s1|a@x.com')).expect(403);
+  });
+
+  it('admin geral no primeiro acesso ganha a própria oficina', async () => {
+    const res = await request(buildApp(db)).get('/me').set(auth('s2|boss@x.com')).expect(200);
+    expect(res.body).toMatchObject({ role: 'admin', status: 'approved', isSuperAdmin: true });
+    expect(res.body.workspaceId).not.toBe(UNASSIGNED_WORKSPACE);
     const [w] = await db.select().from(workspaces).where(eq(workspaces.id, res.body.workspaceId));
     expect(w.name).toBe('Oficina de Fulano');
   });
 
-  it('cadastros diferentes caem em oficinas diferentes', async () => {
-    const app = buildApp(db);
-    const a = await request(app).get('/me').set(auth('s1|a@x.com')).expect(200);
-    const b = await request(app).get('/me').set(auth('s2|b@x.com')).expect(200);
-    expect(a.body.workspaceId).not.toBe(b.body.workspaceId);
+  it('admin geral não "entra" na área de cadastros sem oficina', async () => {
+    const res = await request(buildApp(db)).get('/me').set(auth('s2|boss@x.com')).set('X-Workspace-Id', UNASSIGNED_WORKSPACE).expect(404);
+    expect(res.body.code).toBe('WORKSPACE_NOT_FOUND');
   });
 
   it('segundo acesso reaproveita o mesmo usuário', async () => {

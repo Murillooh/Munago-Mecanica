@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import { eq, sql } from 'drizzle-orm';
-import { users, workspaces, type Permissions } from '../db/schema';
+import { UNASSIGNED_WORKSPACE, users, workspaces, type Permissions } from '../db/schema';
 import type { DB } from '../db/client';
 
 export type Role = 'admin' | 'editor' | 'viewer';
@@ -85,17 +85,27 @@ export function authMiddleware(opts: { db: DB; verifier: TokenVerifier; bootstra
           return { user: byEmail };
         }
 
-        // Cadastro novo: ganha a própria oficina e é admin dela.
-        const workspaceId = crypto.randomUUID();
-        await tx.insert(workspaces).values({ id: workspaceId, name: `Oficina de ${name}` });
+        // Admin geral (instalação nova): ganha a própria oficina e é admin dela.
+        if (emailVerified && admins.has(email)) {
+          const workspaceId = crypto.randomUUID();
+          await tx.insert(workspaces).values({ id: workspaceId, name: `Oficina de ${name}` });
+          const [created] = await tx.insert(users).values({
+            id: claims.sub, workspaceId, email, name,
+            role: 'admin', status: 'approved', permissions: ROLE_PERMISSIONS.admin,
+          }).returning();
+          return { user: created };
+        }
+
+        // Demais cadastros: aguardam um admin colocá-los numa oficina (rotas /signups).
+        // Viewer, não admin: admin pendente passaria pelo requireLogin.
         const [created] = await tx.insert(users).values({
           id: claims.sub,
-          workspaceId,
+          workspaceId: UNASSIGNED_WORKSPACE,
           email,
           name,
-          role: 'admin',
-          status: 'approved',
-          permissions: ROLE_PERMISSIONS.admin,
+          role: 'viewer',
+          status: 'pending',
+          permissions: ROLE_PERMISSIONS.viewer,
         }).returning();
         return { user: created };
       });
@@ -108,7 +118,9 @@ export function authMiddleware(opts: { db: DB; verifier: TokenVerifier; bootstra
       // Admin geral pode operar em outra oficina; o id precisa existir.
       const requested = req.headers[WORKSPACE_HEADER];
       if (isSuperAdmin && typeof requested === 'string' && requested && requested !== req.workspaceId) {
-        const [ws] = await opts.db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, requested));
+        const [ws] = requested === UNASSIGNED_WORKSPACE
+          ? []
+          : await opts.db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, requested));
         if (!ws) return res.status(404).json({ error: 'Oficina não encontrada.', code: 'WORKSPACE_NOT_FOUND' });
         req.workspaceId = ws.id;
       }

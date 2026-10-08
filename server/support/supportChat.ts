@@ -49,7 +49,8 @@ Sistema web de gestão para oficinas de motos: almoxarifado (estoque de peças),
 - Entrar: e-mail e senha, ou o botão "Conta Google" na tela de login.
 - Criar conta: "Não tem uma conta? Crie uma agora", preencher nome, e-mail e senha e confirmar o código que chega por e-mail.
 - Esqueceu a senha: link "Esqueceu a senha?" na tela de login; chega um código por e-mail para criar uma nova.
-- Conta nova fica "em análise" até um administrador aprovar. A tela de espera confere sozinha a cada 15 segundos e abre o sistema assim que for aprovada (não precisa sair e entrar).
+- Conta nova fica aguardando até um administrador colocá-la numa mecânica: o administrador geral (no "Painel geral", podendo criar uma mecânica nova) ou o dono de uma mecânica (em "Equipe e acessos" > "Cadastros novos aguardando mecânica" > "Adicionar à minha mecânica"). A tela de espera confere sozinha a cada 15 segundos e abre o sistema assim que for aprovada (não precisa sair e entrar).
+- Funcionário: o jeito mais rápido é o dono cadastrar em "Equipe e acessos" > "Novo usuário"; a pessoa recebe um convite por e-mail e já entra na mecânica certa.
 - Perfis: Administrador (tudo, inclusive equipe e configurações), Operador (estoque, movimentações, OS e relatórios) e Visualizador (só consulta o Monitoramento). O administrador pode ajustar permissões individuais.
 - Sair: no computador, ícone ao lado do nome no rodapé do menu; no celular, Menu > Sair.
 

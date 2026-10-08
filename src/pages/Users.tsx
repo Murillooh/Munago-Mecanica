@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useApp, ROLE_PRESETS, UserPermissions, UserProfile } from '../context/AppContext';
 import { apiGet, apiPost } from '../lib/api';
+import { SignupQueue } from '../components/SignupQueue';
 import { toast } from 'sonner';
 
 type Role = 'admin' | 'editor' | 'viewer';
@@ -352,6 +353,15 @@ export const Users = () => {
         )}
       </div>
 
+      {/* Quem criou conta e ainda não está em nenhuma mecânica */}
+      {isAdmin && (profile?.workspace?.id ?? profile?.workspaceId) && (
+        <SignupQueue
+          mode="owner"
+          workspaceId={(profile?.workspace?.id ?? profile?.workspaceId)!}
+          workspaceName={profile?.workspace?.name}
+        />
+      )}
+
       {/* Aguardando aprovação */}
       {canManageUsers && pendingTotal > 0 && (
         <section aria-labelledby="pending-heading" className="bg-white dark:bg-zinc-900/90 rounded-xl border border-amber-200/80 dark:border-amber-900/50 shadow-xs overflow-hidden">
@@ -592,7 +602,7 @@ export const Users = () => {
                               aria-label={`Editar acessos de ${user.name}`}
                             >
                               <SlidersHorizontal size={14} aria-hidden="true" />
-                              <span className="hidden xl:inline">Editar</span>
+                              <span>Editar</span>
                             </button>
                           )}
                           {isAdmin && !isMe && (

@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
-import { accessRequests, users, workspaces } from '../db/schema';
-import { ROLE_PERMISSIONS, effectivePermissions, requirePermission, requireSuperAdmin, ws, type AuthUser, type Role } from '../auth/middleware';
+import { and, asc, count, desc, eq, ne, sql } from 'drizzle-orm';
+import { UNASSIGNED_WORKSPACE, accessRequests, users, workspaces } from '../db/schema';
+import { ROLE_PERMISSIONS, effectivePermissions, requireAdmin, requirePermission, requireSuperAdmin, ws, type AuthUser, type Role } from '../auth/middleware';
 import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { newId, type ApiDeps } from './deps';
+import { mergeSettings } from './settings';
 
 const role = z.enum(['admin', 'editor', 'viewer']);
 const permissions = z.object({
@@ -28,6 +29,16 @@ const userPatch = z.object({
   permissions,
   status: z.enum(['pending', 'approved', 'denied']),
 }).partial().strict();
+
+/** Destino do cadastro: uma oficina existente OU uma mecânica nova (só o admin geral cria). */
+const assignInput = z.object({
+  workspaceId: z.string().trim().min(1).max(100).optional(),
+  newWorkspaceName: z.string().trim().min(1).max(100).optional(),
+  role,
+  permissions: permissions.optional(),
+}).strict().refine((v) => Boolean(v.workspaceId) !== Boolean(v.newWorkspaceName), {
+  message: 'Escolha uma oficina ou dê nome a uma mecânica nova.',
+});
 
 const accessRequestInput = z.object({
   name: z.string().trim().min(1).max(200),
@@ -78,7 +89,7 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
     const rows = await db.select({ id: workspaces.id, name: workspaces.name, createdAt: workspaces.createdAt, userCount: count(users.id) })
       .from(workspaces)
       .leftJoin(users, eq(users.workspaceId, workspaces.id))
-      .where(req.user!.isSuperAdmin ? undefined : eq(workspaces.id, req.user!.workspaceId))
+      .where(req.user!.isSuperAdmin ? ne(workspaces.id, UNASSIGNED_WORKSPACE) : eq(workspaces.id, req.user!.workspaceId))
       .groupBy(workspaces.id)
       .orderBy(asc(workspaces.name));
     res.json(rows);
@@ -134,6 +145,66 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
     await db.delete(users).where(eq(users.id, target.id));
     bus.emitChange('users');
     res.status(204).end();
+  }));
+
+  // ---- Cadastros aguardando oficina: admin geral e donos de oficina atendem ----
+
+  const pendingSignup = (id: string) =>
+    and(eq(users.id, id), eq(users.workspaceId, UNASSIGNED_WORKSPACE), eq(users.status, 'pending'));
+
+  r.get('/signups', requireAdmin, asyncHandler(async (_req, res) => {
+    const rows = await db.select({ id: users.id, name: users.name, email: users.email, createdAt: users.createdAt })
+      .from(users)
+      .where(and(eq(users.workspaceId, UNASSIGNED_WORKSPACE), eq(users.status, 'pending')))
+      .orderBy(asc(users.createdAt));
+    res.json(rows);
+  }));
+
+  /**
+   * Coloca o cadastro numa oficina e aprova. Dono: só na própria. Admin geral: em qualquer uma
+   * ou numa mecânica nova (`newWorkspaceName`), da qual a pessoa vira admin.
+   */
+  r.post('/signups/:id/assign', requireAdmin, asyncHandler(async (req, res) => {
+    const input = assignInput.parse(req.body);
+    const actor = req.user!;
+    if (!actor.isSuperAdmin && (input.newWorkspaceName || input.workspaceId !== actor.workspaceId)) {
+      throw new ApiError(403, 'OWN_WORKSPACE_ONLY', 'Você só pode adicionar pessoas à sua própria oficina.');
+    }
+    if (input.workspaceId) {
+      const [w] = input.workspaceId === UNASSIGNED_WORKSPACE
+        ? []
+        : await db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, input.workspaceId));
+      if (!w) throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Oficina não encontrada.');
+    }
+
+    const row = await db.transaction(async (tx) => {
+      let workspaceId = input.workspaceId!;
+      let targetRole: Role = input.role;
+      if (input.newWorkspaceName) {
+        workspaceId = newId();
+        targetRole = 'admin';
+        await tx.insert(workspaces).values({ id: workspaceId, name: input.newWorkspaceName });
+      }
+      const [updated] = await tx.update(users).set({
+        workspaceId,
+        role: targetRole,
+        status: 'approved',
+        permissions: targetRole === input.role && input.permissions ? input.permissions : ROLE_PERMISSIONS[targetRole],
+      }).where(pendingSignup(req.params.id)).returning();
+      // Outro admin atendeu antes (ou não é um cadastro na fila): desfaz a oficina criada.
+      if (!updated) throw new ApiError(409, 'ALREADY_ASSIGNED', 'Este cadastro já foi atendido.');
+      return updated;
+    });
+    if (input.newWorkspaceName) await mergeSettings(db, row.workspaceId, { storeName: input.newWorkspaceName });
+    bus.emitChange('users', 'workspaces');
+    res.json(withPermissions(row));
+  }));
+
+  r.post('/signups/:id/reject', requireSuperAdmin, asyncHandler(async (req, res) => {
+    const [row] = await db.update(users).set({ status: 'denied' }).where(pendingSignup(req.params.id)).returning();
+    if (!row) throw new ApiError(409, 'ALREADY_ASSIGNED', 'Este cadastro já foi atendido.');
+    bus.emitChange('users');
+    res.json(withPermissions(row));
   }));
 
   // ---- Solicitações de acesso (formulário público): só o admin geral analisa ----

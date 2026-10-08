@@ -201,6 +201,8 @@ const toProfile = (u: ApiUser): UserProfile => ({
 });
 
 // Campos aceitos por PATCH /settings (o resto do formulário é só exibição).
+const OPEN_TAB_KEY = 'munago_open_tab';
+
 const SETTINGS_KEYS = [
   'storeName', 'logoUrl', 'contactPhone', 'contactEmail', 'address', 'allowNegativeStock', 'accentColor',
   'autoBackupEnabled', 'enableSoundAlerts', 'monitorAutoScrollEnabled', 'monitorScrollIntervalSeconds',
@@ -250,7 +252,8 @@ interface AppContextType {
   /** Todas as oficinas (só preenchido para o admin geral). */
   workspaces: Workspace[];
   /** Admin geral: passa a operar na oficina escolhida (recarrega a página). */
-  switchWorkspace: (id: string) => void;
+  /** Troca a oficina administrada (recarrega a página); `openTab` abre essa tela depois. */
+  switchWorkspace: (id: string, openTab?: string) => void;
   markNotificationAsRead: (id: string) => Promise<void>;
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
@@ -364,7 +367,13 @@ export const AppProvider = ({ children }: { children: any }) => {
   }));
 
   const { openGoogleAuth } = useGoogleAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Tela pedida por switchWorkspace (sobrevive ao reload da troca de oficina).
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return sessionStorage.getItem(OPEN_TAB_KEY) || 'dashboard'; } catch { return 'dashboard'; }
+  });
+  useEffect(() => {
+    try { sessionStorage.removeItem(OPEN_TAB_KEY); } catch { /* armazenamento indisponível */ }
+  }, []);
   const [inventoryLowStockFilter, setInventoryLowStockFilter] = useState(false);
   const [isMonitorMode, setIsMonitorMode] = useState(false);
 
@@ -489,9 +498,10 @@ export const AppProvider = ({ children }: { children: any }) => {
 
   const isSuperAdmin = !!profile?.isSuperAdmin;
 
-  const switchWorkspace = (id: string) => {
+  const switchWorkspace = (id: string, openTab?: string) => {
     // A própria oficina não precisa de header.
     setActiveWorkspace(id === profile?.workspaceId ? null : id);
+    if (openTab) { try { sessionStorage.setItem(OPEN_TAB_KEY, openTab); } catch { /* armazenamento indisponível */ } }
     window.location.reload();
   };
 

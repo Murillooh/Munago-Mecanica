@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createHarness } from './test/apiHarness';
-import { notifications, products, serviceOrders, transactions, users, workspaces } from './db/schema';
+import { UNASSIGNED_WORKSPACE, notifications, products, serviceOrders, transactions, users, workspaces } from './db/schema';
 
 type H = Awaited<ReturnType<typeof createHarness>>;
 
@@ -314,6 +314,95 @@ describe('API v1', () => {
 
     it('valida e-mail', async () => {
       await request(h.app).post('/api/v1/access-requests').send({ ...req, email: 'x' }).expect(400);
+    });
+  });
+
+  describe('cadastros aguardando oficina', () => {
+    const signupIds = async (who: 'admin' | 'boss' | 'outsider') =>
+      (await h.as(who).get('/signups').expect(200)).body.map((s: { id: string }) => s.id);
+
+    it('quem se cadastra fica pendente e aparece para o admin geral e para os donos', async () => {
+      await h.as('newbie').get('/me').expect(200);
+      await h.as('newbie').get('/products').expect(403);
+      expect(await signupIds('boss')).toEqual(['newbie']);
+      expect(await signupIds('admin')).toEqual(['newbie']);
+      expect(await signupIds('outsider')).toEqual(['newbie']);
+      const [s] = (await h.as('boss').get('/signups')).body;
+      expect(s).toMatchObject({ id: 'newbie', name: 'newbie', email: 'newbie@z.com' });
+      expect(s.createdAt).toBeTruthy();
+    });
+
+    it('só admins veem a fila', async () => {
+      await h.as('editor').get('/signups').expect(403);
+      await h.as('viewer').get('/signups').expect(403);
+      await h.as('newbie').get('/signups').expect(403);
+    });
+
+    it('dono coloca na própria oficina com a função escolhida; a pessoa passa a operar lá', async () => {
+      await h.as('newbie').get('/me');
+      const res = await h.as('outsider').post('/signups/newbie/assign', { workspaceId: 'other', role: 'editor' }).expect(200);
+      expect(res.body).toMatchObject({ id: 'newbie', workspaceId: 'other', role: 'editor', status: 'approved', permissions: { canManageInventory: true } });
+      expect((await h.as('newbie').get('/me')).body.workspace).toMatchObject({ id: 'other' });
+      await h.as('newbie').get('/products').expect(200);
+      expect(await signupIds('boss')).toEqual([]);
+      expect(h.changes).toContain('users');
+    });
+
+    it('dono não coloca em oficina alheia nem cria oficina nova', async () => {
+      await h.as('newbie').get('/me');
+      await h.as('outsider').post('/signups/newbie/assign', { workspaceId: 'default', role: 'viewer' }).expect(403);
+      await h.as('outsider').post('/signups/newbie/assign', { newWorkspaceName: 'Minha', role: 'admin' }).expect(403);
+    });
+
+    it('admin geral coloca em qualquer oficina', async () => {
+      await h.as('newbie').get('/me');
+      await h.as('boss').post('/signups/newbie/assign', { workspaceId: 'other', role: 'viewer' }).expect(200);
+      const [u] = await h.db.select().from(users).where(eq(users.id, 'newbie'));
+      expect(u).toMatchObject({ workspaceId: 'other', role: 'viewer', status: 'approved' });
+    });
+
+    it('admin geral cria mecânica nova e a pessoa vira admin dela', async () => {
+      await h.as('newbie').get('/me');
+      const res = await h.as('boss').post('/signups/newbie/assign', { newWorkspaceName: 'Moto Peças Silva', role: 'viewer' }).expect(200);
+      expect(res.body).toMatchObject({ role: 'admin', status: 'approved' });
+      const [w] = await h.db.select().from(workspaces).where(eq(workspaces.id, res.body.workspaceId));
+      expect(w.name).toBe('Moto Peças Silva');
+      expect((await h.as('newbie').get('/settings')).body.storeName).toBe('Moto Peças Silva');
+    });
+
+    it('não dá para atender o mesmo cadastro duas vezes nem mexer em quem já tem oficina', async () => {
+      await h.as('newbie').get('/me');
+      await h.as('admin').post('/signups/newbie/assign', { workspaceId: 'default', role: 'viewer' }).expect(200);
+      const again = await h.as('outsider').post('/signups/newbie/assign', { workspaceId: 'other', role: 'admin' }).expect(409);
+      expect(again.body.code).toBe('ALREADY_ASSIGNED');
+      await h.as('boss').post('/signups/editor/assign', { workspaceId: 'other', role: 'viewer' }).expect(409);
+    });
+
+    it('valida destino: um dos dois, oficina existente e não a área reservada', async () => {
+      await h.as('newbie').get('/me');
+      await h.as('boss').post('/signups/newbie/assign', { role: 'viewer' }).expect(400);
+      await h.as('boss').post('/signups/newbie/assign', { workspaceId: 'other', newWorkspaceName: 'X', role: 'viewer' }).expect(400);
+      await h.as('boss').post('/signups/newbie/assign', { workspaceId: 'nao-existe', role: 'viewer' }).expect(404);
+      await h.as('boss').post('/signups/newbie/assign', { workspaceId: UNASSIGNED_WORKSPACE, role: 'viewer' }).expect(404);
+    });
+
+    it('recusar: só o admin geral; a pessoa fica negada e sai da fila', async () => {
+      await h.as('newbie').get('/me');
+      await h.as('newbie2').get('/me');
+      await h.as('admin').post('/signups/newbie/reject').expect(403);
+      await h.as('boss').post('/signups/newbie/reject').expect(200);
+      expect(await signupIds('boss')).toEqual(['newbie2']);
+      expect((await h.as('newbie').get('/me')).body.status).toBe('denied');
+    });
+
+    it('área reservada não aparece como oficina', async () => {
+      await h.as('newbie').get('/me');
+      const ids = (await h.as('boss').get('/workspaces')).body.map((w: { id: string }) => w.id);
+      expect(ids).not.toContain(UNASSIGNED_WORKSPACE);
+      const { body } = await h.as('boss').get('/admin/overview');
+      expect(body.workspaces.map((w: { id: string }) => w.id)).not.toContain(UNASSIGNED_WORKSPACE);
+      expect(body.totals.users).toBe(6);
+      await h.as('boss').patch(`/admin/workspaces/${UNASSIGNED_WORKSPACE}`, { name: 'X' }).expect(404);
     });
   });
 

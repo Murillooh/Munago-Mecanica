@@ -8,7 +8,7 @@ const POLL_MS = 15_000;
 
 const STEPS = [
   { label: 'Conta criada', state: 'done' },
-  { label: 'Em análise', state: 'current' },
+  { label: 'Aguardando entrar numa mecânica', state: 'current' },
   { label: 'Acesso liberado', state: 'todo' },
 ] as const;
 
@@ -105,7 +105,7 @@ export const PendingApproval: React.FC<{
 
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">Acesso em análise</h1>
           <p className="mt-3 text-sm text-zinc-400 leading-relaxed max-w-md">
-            Um administrador da <span className="font-semibold text-white">{storeName}</span> vai liberar seu acesso em breve.
+            Um administrador da <span className="font-semibold text-white">{storeName}</span> vai colocar você na sua mecânica e liberar o acesso em breve.
           </p>
           {email && (
             <p className="mt-4 inline-flex w-fit items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 font-mono text-xs text-zinc-300">

@@ -28,6 +28,12 @@ export const workspaces = pgTable('workspaces', {
   createdAt: createdAt(),
 });
 
+/**
+ * Área reservada (criada pela migração 0005) onde ficam os cadastros novos até um admin
+ * colocá-los numa oficina. Não é uma oficina: não aparece em listas nem recebe dados.
+ */
+export const UNASSIGNED_WORKSPACE = 'unassigned';
+
 const workspaceId = () => text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' });
 
 export const users = pgTable('users', {

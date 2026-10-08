@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { asc, count, eq, inArray, max, sql } from 'drizzle-orm';
-import { aiSearches, products, serviceOrders, settings, transactions, users, workspaces } from '../db/schema';
+import { asc, count, eq, inArray, max, ne, sql } from 'drizzle-orm';
+import { UNASSIGNED_WORKSPACE, aiSearches, products, serviceOrders, settings, transactions, users, workspaces } from '../db/schema';
 import { requireSuperAdmin } from '../auth/middleware';
 import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { mergeSettings } from './settings';
@@ -18,18 +18,19 @@ export function createAdminRouter({ db, bus, cognito }: ApiDeps) {
   const r = Router();
 
   async function findWorkspace(id: string) {
-    const [w] = await db.select().from(workspaces).where(eq(workspaces.id, id));
+    const [w] = id === UNASSIGNED_WORKSPACE ? [] : await db.select().from(workspaces).where(eq(workspaces.id, id));
     if (!w) throw new ApiError(404, 'NOT_FOUND', 'Oficina não encontrada.');
     return w;
   }
 
   r.get('/admin/overview', requireSuperAdmin, asyncHandler(async (_req, res) => {
     const [wsRows, userRows, prodAgg, osAgg, txAgg] = await Promise.all([
-      db.select().from(workspaces).orderBy(asc(workspaces.createdAt)),
+      // A área de cadastros sem oficina tem a própria fila (/signups); não entra aqui.
+      db.select().from(workspaces).where(ne(workspaces.id, UNASSIGNED_WORKSPACE)).orderBy(asc(workspaces.createdAt)),
       db.select({
         id: users.id, workspaceId: users.workspaceId, name: users.name, email: users.email,
         role: users.role, status: users.status, createdAt: users.createdAt,
-      }).from(users).orderBy(asc(users.name)),
+      }).from(users).where(ne(users.workspaceId, UNASSIGNED_WORKSPACE)).orderBy(asc(users.name)),
       db.select({
         workspaceId: products.workspaceId,
         count: count(),

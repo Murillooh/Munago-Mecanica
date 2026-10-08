@@ -27,6 +27,9 @@ export const TOKENS = {
   outsider: 'outsider|outsider@y.com',
   /** Admin geral (BOOTSTRAP_ADMIN_EMAILS), mora na 'default'. */
   boss: 'boss|boss@x.com',
+  /** Sem cadastro prévio: o primeiro acesso cai na fila de cadastros sem oficina. */
+  newbie: 'newbie|newbie@z.com',
+  newbie2: 'newbie2|newbie2@z.com',
 };
 
 /** `extra` monta rotas autenticadas adicionais (ex.: Google), recebendo o banco de teste. */
