@@ -1,0 +1,15 @@
+{
+  "name": "Munago Mecânica",
+  "short_name": "Munago",
+  "description": "Estoque, ordens de serviço e repasses da oficina.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    { "src": "/brand/munago-mecanica-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}

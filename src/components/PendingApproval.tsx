@@ -47,7 +47,7 @@ export const PendingApproval: React.FC<{
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 md:p-6 relative overflow-hidden font-sans">
+    <div className="min-h-[100dvh] bg-zinc-950 flex flex-col items-center justify-center gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 relative overflow-hidden font-sans">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0" style={AUTH_BG.glow} />
         <div className="absolute inset-0" style={AUTH_BG.grid} />
@@ -57,7 +57,7 @@ export const PendingApproval: React.FC<{
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-6xl lg:min-h-[620px] flex flex-col lg:flex-row items-stretch relative z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]"
+        className="w-full max-w-6xl lg:min-h-[620px] flex flex-col lg:flex-row items-stretch relative z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]"
       >
         {/* Painel azul, igual ao do login */}
         <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 to-indigo-700 p-16 flex-col justify-between relative overflow-hidden">
@@ -90,7 +90,7 @@ export const PendingApproval: React.FC<{
         </div>
 
         {/* Lado direito: status da aprovação */}
-        <div className="flex-1 flex flex-col justify-center p-8 sm:p-12 lg:p-16">
+        <div className="flex-1 flex flex-col justify-center p-6 sm:p-12 lg:p-16">
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <img src="/brand/munago-mecanica-icon.svg" alt="" width={36} height={36} className="h-9 w-9 rounded-lg" />
             <span className="font-black text-xl tracking-tight text-white">Munago <span className="text-amber-300">Mecânica</span></span>
@@ -165,8 +165,8 @@ export const PendingApproval: React.FC<{
         </div>
       </motion.div>
 
-      <div className="absolute bottom-6 inset-x-4 flex justify-center pointer-events-none">
-        <div className="pointer-events-auto flex flex-col items-center w-full max-w-3xl gap-1.5 px-6 py-3 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-center text-white/70 text-[11px] font-semibold tracking-[0.3em] uppercase">
+      <div className="relative z-10 flex w-full justify-center">
+        <div className="flex flex-col items-center w-full max-w-3xl gap-1.5 px-4 sm:px-6 py-3 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-center text-white/70 text-[10px] sm:text-[11px] font-semibold tracking-[0.15em] sm:tracking-[0.3em] uppercase">
           <span className="text-white">Munago Desenvolvedora de Software</span>
           <span>&copy; 2026 • Gestão Operacional • Versão 1.0.1</span>
         </div>

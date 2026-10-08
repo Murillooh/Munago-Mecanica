@@ -318,9 +318,10 @@ const AIAssistant = () => {
   const firstName = (profile?.name || '').split(' ')[0];
 
   return (
-    <div className="w-full flex flex-col gap-4 h-[calc(100dvh-9rem)] lg:h-[calc(100dvh-3rem)]">
-      {/* Cabeçalho */}
-      <div className="shrink-0 flex items-center justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
+    // Celular: desconta o menu inferior, as margens da página e as áreas seguras do iPhone.
+    <div className="w-full flex flex-col gap-4 h-[calc(100dvh-10rem-env(safe-area-inset-bottom)-env(safe-area-inset-top))] lg:h-[calc(100dvh-3rem)]">
+      {/* Cabeçalho: no celular quebra em duas linhas (título em cima, controles embaixo) */}
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div className="flex items-baseline gap-3 min-w-0">
           <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Assistente IA</h1>
           <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Analisa seu estoque e suas OS e pesquisa preços e fornecedores na web.</p>
@@ -342,9 +343,11 @@ const AIAssistant = () => {
           <button
             type="button"
             onClick={newConversation}
+            aria-label="Nova conversa"
+            title="Nova conversa"
             className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
           >
-            <Plus size={15} aria-hidden="true" /> Nova conversa
+            <Plus size={15} aria-hidden="true" /> <span className="hidden sm:inline">Nova conversa</span>
           </button>
         </div>
       </div>

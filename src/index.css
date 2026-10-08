@@ -29,7 +29,24 @@
   }
 }
 
+/* Celular (iOS/Android) */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* iOS dá zoom ao focar campos com fonte < 16px; em telas de toque o campo usa no mínimo 16px. */
+  @media (pointer: coarse) {
+    input, select, textarea { font-size: max(16px, 1em) !important; }
+  }
+}
+
 @layer utilities {
+  /* Margens das áreas seguras (notch, barra de gestos) quando viewport-fit=cover */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+
   .glass {
     @apply bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border border-white/20 dark:border-zinc-800/20;
   }

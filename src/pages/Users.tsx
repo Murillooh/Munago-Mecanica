@@ -333,7 +333,7 @@ export const Users = () => {
   return (
     <div className="w-full space-y-5 pb-24 lg:pb-6">
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between gap-4 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div className="flex items-baseline gap-3 min-w-0">
           <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Equipe & Acessos</h1>
           <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Quem acessa o sistema e o que cada pessoa pode fazer.</p>
@@ -438,7 +438,7 @@ export const Users = () => {
               className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-colors"
             />
           </div>
-          <div className="flex items-center gap-1 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200/70 dark:border-zinc-700 w-fit overflow-x-auto" role="group" aria-label="Filtrar por função">
+          <div className="flex items-center gap-1 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200/70 dark:border-zinc-700 max-w-full w-fit overflow-x-auto" role="group" aria-label="Filtrar por função">
             {([['all', 'Todos'], ['admin', 'Admin'], ['editor', 'Operador'], ['viewer', 'Visualizador']] as const).map(([value, label]) => (
               <button
                 key={value}
@@ -459,7 +459,72 @@ export const Users = () => {
         </div>
 
         {filteredUsers.length > 0 ? (
-          <div className="overflow-x-auto">
+          <>
+          {/* Celular: um cartão por pessoa (a tabela não cabe em 360–430 px) */}
+          <ul className="md:hidden divide-y divide-zinc-100 dark:divide-zinc-800/70">
+            {filteredUsers.map(user => {
+              const role = roleOf(user.role);
+              const meta = ROLE_META[role];
+              const RoleIcon = meta.icon;
+              const perms = user.permissions && Object.keys(user.permissions).length > 0 ? user.permissions : ROLE_PRESETS[role].permissions;
+              const isMe = profile?.uid === user.uid;
+              return (
+                <li key={user.uid} className="px-3 py-3 space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <Avatar name={user.name} photoURL={user.photoURL} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
+                        {user.name || 'Sem nome'}
+                        {isMe && <span className="ml-1.5 text-[10px] font-semibold text-zinc-400">(você)</span>}
+                      </p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{user.email}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {canManageUsers && (
+                        <button
+                          type="button"
+                          onClick={() => openEditPermissionsModal(user)}
+                          className="p-2 rounded-lg text-zinc-500 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-blue-600 transition-colors cursor-pointer"
+                          aria-label={`Editar acessos de ${user.name}`}
+                        >
+                          <SlidersHorizontal size={16} aria-hidden="true" />
+                        </button>
+                      )}
+                      {isAdmin && !isMe && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirmUser(user)}
+                          className="p-2 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                          aria-label={`Excluir ${user.name}`}
+                        >
+                          <Trash2 size={16} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 pl-[2.625rem]">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${meta.chip}`}>
+                      <RoleIcon size={12} aria-hidden="true" /> {meta.label}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+                      <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'approved' ? 'bg-emerald-500' : user.status === 'denied' ? 'bg-red-500' : 'bg-amber-500'}`} aria-hidden="true" />
+                      {user.status === 'approved' ? 'Ativo' : user.status === 'denied' ? 'Negado' : 'Pendente'}
+                    </span>
+                    {PERMISSIONS.filter(p => perms?.[p.id]).map(p => {
+                      const Icon = p.icon;
+                      return (
+                        <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700 text-[11px] text-zinc-600 dark:text-zinc-300" title={p.label}>
+                          <Icon size={11} aria-hidden="true" /> {p.short}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-[820px] text-xs">
               <thead className="bg-zinc-50 dark:bg-zinc-900">
                 <tr>
@@ -547,6 +612,7 @@ export const Users = () => {
               </tbody>
             </table>
           </div>
+          </>
         ) : (
           <div className="flex flex-col items-center text-center py-14 px-6">
             <UsersIcon size={22} className="text-zinc-300 dark:text-zinc-600" aria-hidden="true" />

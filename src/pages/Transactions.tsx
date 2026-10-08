@@ -142,7 +142,7 @@ export const Transactions = () => {
     // No desktop a página ocupa exatamente a altura da tela (descontando o py-6 do <main>) e só a planilha rola.
     <div className="w-full flex flex-col gap-5 lg:h-[calc(100dvh-3rem)]">
       {/* Cabeçalho */}
-      <div className="shrink-0 flex items-center justify-between gap-4 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div className="flex items-baseline gap-3 min-w-0">
           <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Movimentações</h1>
           <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Todas as entradas e saídas do estoque, por dia.</p>
@@ -205,7 +205,7 @@ export const Transactions = () => {
             ))}
           </div>
 
-          <dl className="flex items-center gap-4 lg:ml-auto text-xs tabular-nums">
+          <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 lg:ml-auto text-xs tabular-nums">
             <div className="flex items-center gap-1.5">
               <dt className="text-zinc-500">Registros</dt>
               <dd className="font-semibold text-zinc-900 dark:text-white">{fmtQty(stats.total)}</dd>
@@ -228,7 +228,49 @@ export const Transactions = () => {
         </div>
 
         {filteredTransactions.length > 0 ? (
-          <div className="flex-1 min-h-0 overflow-auto max-h-[70dvh] lg:max-h-none">
+          <>
+          {/* Celular: lista agrupada por dia (a tabela de 7 colunas não cabe) */}
+          <div className="md:hidden">
+            {groups.map(g => (
+              <section key={g.key} aria-label={g.label}>
+                <h3 className="sticky top-0 z-[5] flex items-center justify-between gap-3 px-3 py-1.5 bg-zinc-100/95 dark:bg-zinc-800/95 backdrop-blur-sm border-y border-zinc-200 dark:border-zinc-700 text-xs">
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-100 capitalize">{g.label}</span>
+                  <span className="flex items-center gap-2 text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                    {g.inQty > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{fmtQty(g.inQty)}</span>}
+                    {g.outQty > 0 && <span className="text-red-600 dark:text-red-400">-{fmtQty(g.outQty)}</span>}
+                  </span>
+                </h3>
+                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+                  {g.rows.map(t => {
+                    const d = parseDate(t.timestamp);
+                    const isIn = t.type === 'in';
+                    return (
+                      <li key={t.id} className="flex items-start gap-3 px-3 py-2.5">
+                        <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${isIn ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400'}`} aria-hidden="true">
+                          {isIn ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">{t.productName || 'Item sem nome'}</p>
+                            <span className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {isIn ? '+' : '-'}{fmtQty(t.quantity || 0)}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
+                            <span className="font-mono">{d ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
+                            {' · '}{isIn ? 'Entrada' : 'Saída'}{' · '}{t.userName || 'Sistema'}
+                          </p>
+                          {t.reason && <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{t.reason}</p>}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+
+          <div className="hidden md:block flex-1 min-h-0 overflow-auto max-h-[70dvh] lg:max-h-none">
             <table className="w-full min-w-[760px] text-xs border-separate border-spacing-0">
               <thead className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900">
                 <tr className="text-left">
@@ -297,6 +339,7 @@ export const Transactions = () => {
               })()}
             </table>
           </div>
+          </>
         ) : (
           <div className="flex flex-col items-center text-center py-14 px-6">
             <History size={22} className="text-zinc-300 dark:text-zinc-600" aria-hidden="true" />

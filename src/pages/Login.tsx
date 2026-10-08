@@ -316,7 +316,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div id="login-root-container" className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 md:p-6 relative overflow-hidden font-sans">
+    <div id="login-root-container" className="min-h-[100dvh] bg-zinc-950 flex flex-col items-center justify-center gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 relative overflow-hidden font-sans">
       {/* Fundo: pontilhado sutil que some nas bordas, luz azul parada atrás do card,
           granulação e vinheta. Só CSS: sem imagem externa e sem animação. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
@@ -328,7 +328,7 @@ const Login: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`w-full max-w-6xl lg:min-h-[680px] flex flex-col lg:flex-row items-stretch relative justify-center gap-0 z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]`}
+        className={`w-full max-w-6xl lg:min-h-[680px] flex flex-col lg:flex-row items-stretch relative justify-center gap-0 z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]`}
       >
         {/* Left Side: Branding & Info */}
         <motion.div
@@ -398,8 +398,13 @@ const Login: React.FC = () => {
           initial={false}
           animate={{ x: formX }}
           transition={sideSwapTransition}
-          className="w-full lg:w-[450px] p-8 md:p-12 lg:p-14 flex flex-col justify-center bg-white dark:bg-zinc-900 overflow-hidden"
+          className="w-full lg:w-[450px] p-6 sm:p-8 md:p-12 lg:p-14 flex flex-col justify-center bg-white dark:bg-zinc-900 overflow-hidden"
         >
+          {/* Celular/tablet: o painel azul some, então a marca vem para o topo do formulário. */}
+          <div className="lg:hidden mb-8 flex items-center gap-2.5">
+            <img src="/brand/munago-mecanica-icon.svg" alt="" width={36} height={36} className="h-9 w-9 rounded-lg" />
+            <span className="font-black text-xl tracking-tight text-zinc-900 dark:text-white">Munago <span className="text-amber-500 dark:text-amber-300">Mecânica</span></span>
+          </div>
           <AnimatePresence mode="wait" initial={false} custom={direction} onExitComplete={focusCurrentView}>
             {view === 'login' ? (
               <motion.div
@@ -783,8 +788,9 @@ const Login: React.FC = () => {
       </motion.div>
 
       {/* Footer info */}
-      <div className="absolute bottom-6 inset-x-4 flex justify-center pointer-events-none">
-        <div className="pointer-events-auto flex flex-col items-center w-full max-w-3xl gap-1.5 px-6 py-3 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 shadow-xl shadow-black/60 transition-[border-color,box-shadow,background-color] duration-300 ease-out motion-reduce:transition-none hover:bg-black/60 hover:border-blue-400/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.45)] text-center text-white/70 text-[11px] font-semibold tracking-[0.3em] uppercase">
+      {/* No fluxo (abaixo do card): em celular ou tela baixa não sobrepõe o formulário. */}
+      <div className="relative z-10 flex w-full justify-center">
+        <div className="flex flex-col items-center w-full max-w-3xl gap-1.5 px-4 sm:px-6 py-3 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 shadow-xl shadow-black/60 transition-[border-color,box-shadow,background-color] duration-300 ease-out motion-reduce:transition-none hover:bg-black/60 hover:border-blue-400/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.45)] text-center text-white/70 text-[10px] sm:text-[11px] font-semibold tracking-[0.15em] sm:tracking-[0.3em] uppercase">
           <span className="text-white">Munago Desenvolvedora de Software</span>
           <span>&copy; 2026 • Gestão Operacional • Versão 1.0.1</span>
         </div>

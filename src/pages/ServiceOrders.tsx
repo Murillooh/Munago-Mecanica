@@ -309,7 +309,7 @@ export const ServiceOrders = () => {
   return (
     <div className="w-full space-y-8 pb-20">
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between gap-4 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div className="flex items-baseline gap-3 min-w-0">
           <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Ordens de Serviço</h1>
           <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Orçamentos, manutenções em andamento e faturamento da oficina.</p>

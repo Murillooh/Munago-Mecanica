@@ -49,22 +49,25 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
 
   return (
     <>
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 px-4 pb-4">
-        <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.12)] flex items-center justify-around h-20 px-2 relative">
+      {/* pb com a área segura: no iPhone o menu fica acima da barra de gestos. */}
+      <nav aria-label="Navegação" className="lg:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.12)] flex items-center justify-around h-[4.25rem] px-1.5 relative">
           {items.map((item) => (
             <button
               key={item.id}
+              type="button"
+              aria-current={activeTab === item.id ? 'page' : undefined}
               onClick={() => item.id === 'more' ? setIsMenuOpen(true) : setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center gap-1.5 w-14 h-14 rounded-2xl transition-all relative ${
+              className={`flex flex-col items-center justify-center gap-1 min-w-[3.5rem] flex-1 max-w-[4.5rem] h-14 rounded-2xl transition-all relative ${
                 activeTab === item.id 
                 ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' 
                 : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
               }`}
             >
-              <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
-              <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
+              <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} aria-hidden="true" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">{item.label}</span>
               {activeTab === item.id && (
-                <motion.div 
+                <motion.div
                   layoutId="bottomTab"
                   className="absolute -bottom-1 w-1 h-1 bg-blue-600 rounded-full"
                 />
@@ -72,7 +75,7 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
             </button>
           ))}
         </div>
-      </div>
+      </nav>
 
       <AnimatePresence>
         {isMenuOpen && (
@@ -89,7 +92,7 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 p-8 rounded-t-[3rem] shadow-2xl"
+              className="absolute bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] rounded-t-[2rem] shadow-2xl max-h-[85dvh] overflow-y-auto"
             >
               <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto mb-8" />
               <h3 className="text-xl font-black text-zinc-900 dark:text-white mb-6 uppercase tracking-tight">Mais Opções</h3>
