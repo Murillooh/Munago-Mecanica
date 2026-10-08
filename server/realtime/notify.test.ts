@@ -15,10 +15,10 @@ describe('triggers de tempo real (0001_realtime_notify)', () => {
     await pglite.listen(CHANGES_CHANNEL, (payload) => got.push(payload));
 
     await db.insert(schema.products).values([
-      { id: 'p1', name: 'Pastilha' },
-      { id: 'p2', name: 'Vela' },
+      { id: 'p1', workspaceId: 'default', name: 'Pastilha' },
+      { id: 'p2', workspaceId: 'default', name: 'Vela' },
     ]);
-    await db.insert(schema.serviceOrders).values({ id: 'os1', customerName: 'Ana', scheduledDate: '2026-10-06', createdBy: 'u1' });
+    await db.insert(schema.serviceOrders).values({ id: 'os1', workspaceId: 'default', customerName: 'Ana', scheduledDate: '2026-10-06', createdBy: 'u1' });
     await new Promise((r) => setTimeout(r, 50));
 
     expect(got).toEqual(['products', 'serviceOrders']);

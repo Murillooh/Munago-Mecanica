@@ -11,6 +11,7 @@ import { createNotificationsRouter } from './routes/notifications';
 import { createUsersRouter, createPublicAccessRequestRouter } from './routes/users';
 import { createAiSearchesRouter } from './routes/aiSearches';
 import { createBackupsRouter } from './routes/backups';
+import { createAdminRouter } from './routes/admin';
 
 export interface ApiOptions extends ApiDeps {
   verifier: TokenVerifier;
@@ -37,7 +38,7 @@ export function createApiRouter(opts: ApiOptions): Router {
 
   for (const make of [
     createUsersRouter, createSettingsRouter, createProductsRouter, createCategoriesRouter,
-    createTransactionsRouter, createServiceOrdersRouter, createNotificationsRouter, createAiSearchesRouter, createBackupsRouter,
+    createTransactionsRouter, createServiceOrdersRouter, createNotificationsRouter, createAiSearchesRouter, createBackupsRouter, createAdminRouter,
   ]) {
     api.use(make(deps));
   }

@@ -11,6 +11,9 @@ import { and, eq, like } from 'drizzle-orm';
 import { createDb } from '../../server/db/client';
 import { products, transactions, users } from '../../server/db/schema';
 
+// Oficina que recebe os dados de teste (padrão: a do admin geral).
+const WORKSPACE_ID = process.env.SEED_WORKSPACE_ID ?? 'default';
+
 async function main() {
   const url = new URL(process.env.DATABASE_URL ?? '');
   if (url.pathname !== '/mecanica_dev' && !process.argv.includes('--force')) {
@@ -19,13 +22,14 @@ async function main() {
   }
 
   const db = createDb();
-  const [admin] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, 'admin')).limit(1);
+  const [admin] = await db.select({ id: users.id, name: users.name }).from(users)
+    .where(and(eq(users.workspaceId, WORKSPACE_ID), eq(users.role, 'admin'))).limit(1);
   if (!admin) throw new Error('Nenhum admin no banco: faça login uma vez no localhost antes de rodar.');
 
   const zeroed = await db
     .select({ id: products.id, name: products.name, minQuantity: products.minQuantity })
     .from(products)
-    .where(and(like(products.sku, 'DK-%'), eq(products.quantity, 0)));
+    .where(and(eq(products.workspaceId, WORKSPACE_ID), like(products.sku, 'DK-%'), eq(products.quantity, 0)));
   const toStock = zeroed.filter((p) => p.minQuantity > 0);
 
   await db.transaction(async (tx) => {
@@ -35,6 +39,7 @@ async function main() {
     if (toStock.length) {
       await tx.insert(transactions).values(toStock.map((p) => ({
         id: randomUUID(),
+        workspaceId: WORKSPACE_ID,
         productId: p.id,
         productName: p.name,
         type: 'in' as const,

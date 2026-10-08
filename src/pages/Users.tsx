@@ -216,7 +216,8 @@ export const Users = () => {
     deleteUser,
     isAdmin,
     canManageUsers,
-    profile
+    profile,
+    isSuperAdmin
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -235,9 +236,10 @@ export const Users = () => {
 
   const [newUser, setNewUser] = useState(EMPTY_NEW_USER);
 
+  // Pedidos do formulário público viram oficinas novas: só o admin geral analisa.
   useEffect(() => {
-    if (canManageUsers) fetchAccessRequests();
-  }, [canManageUsers]);
+    if (isSuperAdmin) fetchAccessRequests();
+  }, [isSuperAdmin]);
 
   const fetchAccessRequests = async () => {
     try {
@@ -298,9 +300,9 @@ export const Users = () => {
   const handleRequest = (request: any, action: 'approve' | 'reject') =>
     runBusy(request.id, async () => {
       try {
-        await apiPost(`/access-requests/${request.id}/${action}`, action === 'approve' ? { role: 'editor' } : undefined);
+        await apiPost(`/access-requests/${request.id}/${action}`);
         await fetchAccessRequests();
-        toast.success(action === 'approve' ? `${request.name} aprovado como Operador.` : 'Pedido recusado.');
+        toast.success(action === 'approve' ? `Oficina "${request.workshopName}" criada com ${request.name} como administrador.` : 'Pedido recusado.');
       } catch (err: any) {
         toast.error(`Erro ao ${action === 'approve' ? 'aprovar' : 'recusar'}: ${err.message}`);
       }

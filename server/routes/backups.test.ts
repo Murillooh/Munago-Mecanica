@@ -34,9 +34,9 @@ describe('backups', () => {
     const now = new Date('2026-10-06T12:00:00Z');
 
     expect(await runAutoBackupIfDue(h.db, now)).toBe(false); // desligado
-    await mergeSettings(h.db, { autoBackupEnabled: true });
+    await mergeSettings(h.db, 'default', { autoBackupEnabled: true });
     expect(await runAutoBackupIfDue(h.db, now)).toBe(true);
-    expect((await getSettings(h.db)).lastBackup).toBe(now.toISOString());
+    expect((await getSettings(h.db, 'default')).lastBackup).toBe(now.toISOString());
 
     expect(await runAutoBackupIfDue(h.db, new Date('2026-10-07T11:00:00Z'))).toBe(false); // < 24h
     expect(await runAutoBackupIfDue(h.db, new Date('2026-10-07T12:30:00Z'))).toBe(true);

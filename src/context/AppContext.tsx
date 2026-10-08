@@ -25,7 +25,7 @@ import {
   type LoginResult,
 } from '../lib/auth';
 import { Hub } from 'aws-amplify/utils';
-import { apiGet, apiPost, apiPatch, apiDelete, hydrateDates, subscribeChanges, ApiRequestError } from '../lib/api';
+import { apiGet, apiPost, apiPatch, apiDelete, hydrateDates, subscribeChanges, ApiRequestError, setActiveWorkspace } from '../lib/api';
 import { useGoogleAuth, fetchGoogleAccessToken } from '../hooks/useGoogleAuth';
 
 // Types
@@ -78,6 +78,18 @@ export interface UserProfile {
   permissions?: UserPermissions;
   status: 'pending' | 'approved' | 'denied';
   createdAt?: any;
+  /** Oficina à qual o usuário pertence. */
+  workspaceId?: string;
+  /** Admin geral: enxerga e administra todas as oficinas. */
+  isSuperAdmin?: boolean;
+  /** Oficina sendo exibida agora (a própria, ou a escolhida pelo admin geral). */
+  workspace?: Workspace | null;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  userCount?: number;
 }
 
 /** Usuário autenticado (Cognito). Mesmos nomes de campo que as telas usavam do Firebase. */
@@ -169,6 +181,9 @@ interface ApiUser {
   permissions: UserPermissions;
   photoUrl?: string | null;
   createdAt?: string;
+  workspaceId?: string;
+  isSuperAdmin?: boolean;
+  workspace?: Workspace | null;
 }
 
 const toProfile = (u: ApiUser): UserProfile => ({
@@ -180,6 +195,9 @@ const toProfile = (u: ApiUser): UserProfile => ({
   permissions: u.permissions,
   photoURL: u.photoUrl ?? undefined,
   createdAt: hydrateDates({ createdAt: u.createdAt }).createdAt,
+  workspaceId: u.workspaceId,
+  isSuperAdmin: u.isSuperAdmin,
+  workspace: u.workspace,
 });
 
 // Campos aceitos por PATCH /settings (o resto do formulário é só exibição).
@@ -228,6 +246,11 @@ interface AppContextType {
   handleLogout: () => Promise<void>;
   /** Relê o perfil no servidor (ex.: tela de acesso pendente verificando se já foi aprovado). */
   refreshProfile: () => Promise<void>;
+  isSuperAdmin: boolean;
+  /** Todas as oficinas (só preenchido para o admin geral). */
+  workspaces: Workspace[];
+  /** Admin geral: passa a operar na oficina escolhida (recarrega a página). */
+  switchWorkspace: (id: string) => void;
   markNotificationAsRead: (id: string) => Promise<void>;
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
@@ -326,6 +349,7 @@ export const AppProvider = ({ children }: { children: any }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [settings, setSettings] = useState<SystemSettings>(() => ({
@@ -463,6 +487,14 @@ export const AppProvider = ({ children }: { children: any }) => {
     return stopListening;
   }, [loadSession]);
 
+  const isSuperAdmin = !!profile?.isSuperAdmin;
+
+  const switchWorkspace = (id: string) => {
+    // A própria oficina não precisa de header.
+    setActiveWorkspace(id === profile?.workspaceId ? null : id);
+    window.location.reload();
+  };
+
   const isAdmin = profile?.role === 'admin';
   const permissions = profile?.permissions && Object.keys(profile.permissions).length > 0
     ? profile.permissions
@@ -508,6 +540,9 @@ export const AppProvider = ({ children }: { children: any }) => {
         unreadIdsRef.current = unread;
         setNotifications(list);
       },
+      workspaces: async () => {
+        if (isSuperAdmin) setWorkspaces(await apiGet<Workspace[]>('/workspaces'));
+      },
       users: async () => {
         if (canManageUsers) setAllUsers((await apiGet<ApiUser[]>('/users')).map(toProfile));
         // Admin pode ter mudado meu cargo/permissões.
@@ -521,7 +556,7 @@ export const AppProvider = ({ children }: { children: any }) => {
     return subscribeChanges((resource) => {
       loaders[resource]?.().catch((e) => handleApiError(e));
     });
-  }, [isApproved, canManageUsers, canSeeNotifications, loadSession]);
+  }, [isApproved, canManageUsers, canSeeNotifications, isSuperAdmin, loadSession]);
 
   const loginEmail = async (email: string, pass: string): Promise<LoginResult> => {
     const result = await cognitoLogin(email, pass);
@@ -541,6 +576,7 @@ export const AppProvider = ({ children }: { children: any }) => {
       // 'google_tokens' é da versão antiga (tokens no navegador); hoje ficam no servidor, por usuário.
       localStorage.removeItem('google_tokens');
       sessionStorage.clear();
+      setActiveWorkspace(null);
 
       await cognitoLogout();
 
@@ -887,6 +923,9 @@ export const AppProvider = ({ children }: { children: any }) => {
       completeNewPassword,
       handleLogout,
       refreshProfile: loadSession,
+      isSuperAdmin,
+      workspaces,
+      switchWorkspace,
       markNotificationAsRead,
       addProduct: addProductAction,
       updateProduct: updateProductAction,

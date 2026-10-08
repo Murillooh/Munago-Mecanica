@@ -28,6 +28,7 @@ const Notifications = lazy(() => import('./pages/Notifications').then(m => ({ de
 const SettingsView = lazy(() => import('./pages/Settings').then(m => ({ default: m.SettingsView })));
 const Users = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
 const Login = lazy(() => import('./pages/Login'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel').then(m => ({ default: m.AdminPanel })));
 
 const PageFallback = () => (
   <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite">
@@ -44,7 +45,8 @@ const AppContent = () => {
     isViewer, 
     isMonitorMode, 
     setIsMonitorMode, 
-    toggleMonitorMode 
+    toggleMonitorMode,
+    isSuperAdmin
   } = useApp();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
@@ -94,6 +96,10 @@ const AppContent = () => {
         return <Users />;
       case 'ai':
         return <AIAssistant />;
+      case 'admin':
+        // Só o admin geral; o servidor também bloqueia /admin/* para os demais.
+        if (isSuperAdmin) return <AdminPanel />;
+        return <Dashboard onSeeAllLowStock={() => { setInventoryLowStockFilter(true); setActiveTab('inventory'); }} onSeeAllHistory={() => setActiveTab('transactions')} onNewOS={() => setActiveTab('os')} />;
       default:
         return <Dashboard onSeeAllLowStock={() => { setInventoryLowStockFilter(true); setActiveTab('inventory'); }} onSeeAllHistory={() => setActiveTab('transactions')} onNewOS={() => setActiveTab('os')} />;
     }

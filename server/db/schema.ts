@@ -21,8 +21,18 @@ export interface Permissions {
   canPerformTransactions: boolean;
 }
 
+/** Oficina (tenant). Todo dado operacional pertence a uma; usuários enxergam só a sua. */
+export const workspaces = pgTable('workspaces', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  createdAt: createdAt(),
+});
+
+const workspaceId = () => text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' });
+
 export const users = pgTable('users', {
   id: text('id').primaryKey(), // Cognito sub (ou UID Firebase antes do primeiro login pós-migração)
+  workspaceId: workspaceId(),
   email: text('email').notNull(),
   name: text('name').notNull(),
   role: roleEnum('role').notNull().default('viewer'),
@@ -31,19 +41,21 @@ export const users = pgTable('users', {
   photoUrl: text('photo_url'),
   legacyFirebaseUid: text('legacy_firebase_uid'),
   createdAt: createdAt(),
-}, (t) => [uniqueIndex('users_email_uq').on(t.email)]);
+}, (t) => [uniqueIndex('users_email_uq').on(t.email), index('users_workspace_idx').on(t.workspaceId)]);
 
 export const categories = pgTable('categories', {
   id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
   name: text('name').notNull(),
   description: text('description'),
   imageUrl: text('image_url'),
   aiSuggestion: text('ai_suggestion'),
   createdAt: createdAt(),
-}, (t) => [uniqueIndex('categories_name_uq').on(t.name)]);
+}, (t) => [uniqueIndex('categories_workspace_name_uq').on(t.workspaceId, t.name)]);
 
 export const products = pgTable('products', {
   id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
   sku: text('sku'),
   name: text('name').notNull(),
   description: text('description'),
@@ -60,11 +72,15 @@ export const products = pgTable('products', {
   supplier: text('supplier'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => [index('products_name_idx').on(t.name), index('products_category_idx').on(t.category)]);
+}, (t) => [
+  index('products_name_idx').on(t.workspaceId, t.name),
+  index('products_category_idx').on(t.workspaceId, t.category),
+]);
 
 // Sem FK para products: histórico sobrevive à exclusão do produto.
 export const transactions = pgTable('transactions', {
   id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
   productId: text('product_id').notNull(),
   productName: text('product_name').notNull(),
   type: txTypeEnum('type').notNull(),
@@ -73,7 +89,7 @@ export const transactions = pgTable('transactions', {
   userId: text('user_id').notNull(),
   userName: text('user_name').notNull(),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('tx_timestamp_idx').on(t.timestamp), index('tx_product_idx').on(t.productId)]);
+}, (t) => [index('tx_timestamp_idx').on(t.workspaceId, t.timestamp), index('tx_product_idx').on(t.productId)]);
 
 export interface ServiceOrderItem {
   productId: string;
@@ -87,6 +103,7 @@ export interface ServiceOrderItem {
 
 export const serviceOrders = pgTable('service_orders', {
   id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
   customerName: text('customer_name').notNull(),
   customerPhone: text('customer_phone'),
   vehicleModel: text('vehicle_model'),
@@ -108,20 +125,24 @@ export const serviceOrders = pgTable('service_orders', {
   createdBy: text('created_by').notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => [index('os_created_idx').on(t.createdAt), index('os_paid_idx').on(t.paidAt)]);
+}, (t) => [index('os_created_idx').on(t.workspaceId, t.createdAt), index('os_paid_idx').on(t.paidAt)]);
 
 export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
   title: text('title').notNull(),
   message: text('message').notNull(),
   productId: text('product_id'),
   type: text('type').notNull().default('low_stock'),
   read: boolean('read').notNull().default(false),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('notif_unread_idx').on(t.productId, t.read, t.type)]);
+}, (t) => [
+  index('notif_unread_idx').on(t.productId, t.read, t.type),
+  index('notif_workspace_idx').on(t.workspaceId, t.timestamp),
+]);
 
 export const settings = pgTable('settings', {
-  id: text('id').primaryKey(), // 'global'
+  id: text('id').primaryKey(), // id da oficina (workspaces.id)
   data: jsonb('data').$type<Record<string, unknown>>().notNull().default({}),
   updatedAt: updatedAt(),
 });
@@ -148,6 +169,7 @@ export const aiSearches = pgTable('ai_searches', {
 
 export const backups = pgTable('backups', {
   id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
   productCount: integer('product_count').notNull(),
   transactionCount: integer('transaction_count').notNull(),
   categoryCount: integer('category_count').notNull(),

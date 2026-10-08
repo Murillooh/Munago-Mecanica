@@ -8,11 +8,14 @@
  */
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
-import { eq, inArray, like } from 'drizzle-orm';
+import { and, eq, inArray, like } from 'drizzle-orm';
 import { createDb } from '../../server/db/client';
 import { products, serviceOrders, transactions, users } from '../../server/db/schema';
 import { applyMovement } from '../../server/services/stock';
 import { getSettings } from '../../server/routes/settings';
+
+// Oficina que recebe os dados de teste (padrão: a do admin geral).
+const WORKSPACE_ID = process.env.SEED_WORKSPACE_ID ?? 'default';
 
 const TAG = '[teste DK160]';
 
@@ -74,22 +77,24 @@ async function main() {
   }
 
   const db = createDb();
-  const existing = await db.select({ id: serviceOrders.id }).from(serviceOrders).where(like(serviceOrders.observations, `${TAG}%`));
+  const existing = await db.select({ id: serviceOrders.id }).from(serviceOrders)
+    .where(and(eq(serviceOrders.workspaceId, WORKSPACE_ID), like(serviceOrders.observations, `${TAG}%`)));
   if (existing.length) {
     console.log(`Já existem ${existing.length} OS de teste; nada a fazer.`);
     await db.$client.end();
     return;
   }
 
-  const [admin] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, 'admin')).limit(1);
+  const [admin] = await db.select({ id: users.id, name: users.name }).from(users)
+    .where(and(eq(users.workspaceId, WORKSPACE_ID), eq(users.role, 'admin'))).limit(1);
   if (!admin) throw new Error('Nenhum admin no banco: faça login uma vez no localhost antes de rodar.');
 
   const skus = [...new Set(ORDERS.flatMap((o) => o.items.map((i) => i[0])))];
-  const parts = new Map((await db.select().from(products).where(inArray(products.sku, skus))).map((p) => [p.sku!, p]));
+  const parts = new Map((await db.select().from(products).where(and(eq(products.workspaceId, WORKSPACE_ID), inArray(products.sku, skus)))).map((p) => [p.sku!, p]));
   const missing = skus.filter((s) => !parts.has(s));
   if (missing.length) throw new Error(`Peças não encontradas (rode seed-dk160 antes): ${missing.join(', ')}`);
 
-  const { allowNegativeStock } = await getSettings(db);
+  const { allowNegativeStock } = await getSettings(db, WORKSPACE_ID);
   let created = 0;
 
   for (const o of ORDERS) {
@@ -107,6 +112,7 @@ async function main() {
     await db.transaction(async (tx) => {
       await tx.insert(serviceOrders).values({
         id,
+        workspaceId: WORKSPACE_ID,
         customerName: o.customer,
         customerPhone: o.phone,
         vehicleModel: 'Haojue DK 160',
@@ -125,7 +131,7 @@ async function main() {
         updatedAt: opened,
       });
       for (const item of items) {
-        await applyMovement(tx, { productId: item.productId, type: 'out', quantity: item.quantity, reason, userId: admin.id, userName: admin.name }, allowNegativeStock);
+        await applyMovement(tx, { workspaceId: WORKSPACE_ID, productId: item.productId, type: 'out', quantity: item.quantity, reason, userId: admin.id, userName: admin.name }, allowNegativeStock);
       }
       // Baixa com a data da OS, para o histórico e os gráficos ficarem coerentes.
       await tx.update(transactions).set({ timestamp: opened }).where(eq(transactions.reason, reason));

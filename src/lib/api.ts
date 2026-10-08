@@ -7,11 +7,27 @@ export class ApiRequestError extends Error {
   }
 }
 
+const WORKSPACE_KEY = 'activeWorkspaceId';
+
+/** Oficina escolhida pelo admin geral (null = a própria). O servidor ignora para os demais usuários. */
+export function getActiveWorkspace(): string | null {
+  try { return localStorage.getItem(WORKSPACE_KEY); } catch { return null; }
+}
+
+export function setActiveWorkspace(id: string | null) {
+  try {
+    if (id) localStorage.setItem(WORKSPACE_KEY, id);
+    else localStorage.removeItem(WORKSPACE_KEY);
+  } catch { /* sem storage: fica na própria oficina */ }
+}
+
 /** fetch com o token do Cognito. Use para qualquer rota /api do próprio servidor. */
 export async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const token = await getIdToken();
   const headers = new Headers(init.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
+  const workspace = getActiveWorkspace();
+  if (workspace) headers.set('X-Workspace-Id', workspace);
   return fetch(input, { ...init, headers });
 }
 
@@ -22,6 +38,11 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => ({}));
+  // Oficina escolhida foi excluída: volta para a própria.
+  if (body.code === 'WORKSPACE_NOT_FOUND' && getActiveWorkspace()) {
+    setActiveWorkspace(null);
+    window.location.reload();
+  }
   if (!res.ok) throw new ApiRequestError(res.status, body.code ?? 'HTTP_ERROR', body.error ?? `Erro ${res.status}`);
   return body as T;
 }
@@ -29,7 +50,8 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const apiGet = <T>(p: string) => api<T>(p);
 export const apiPost = <T>(p: string, body?: unknown) => api<T>(p, { method: 'POST', body: JSON.stringify(body ?? {}) });
 export const apiPatch = <T>(p: string, body: unknown) => api<T>(p, { method: 'PATCH', body: JSON.stringify(body) });
-export const apiDelete = (p: string) => api<void>(p, { method: 'DELETE' });
+export const apiDelete = (p: string, body?: unknown) =>
+  api<void>(p, { method: 'DELETE', ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 
 /**
  * Datas chegam como ISO string. As telas foram escritas para o Timestamp do Firestore

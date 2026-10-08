@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { categories, products } from '../db/schema';
-import { requirePermission } from '../auth/middleware';
+import { requirePermission, ws } from '../auth/middleware';
 import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { newId, type ApiDeps } from './deps';
 
@@ -22,14 +22,16 @@ const duplicate = () => new ApiError(409, 'CATEGORY_EXISTS', 'Já existe uma cat
 export function createCategoriesRouter({ db, bus }: ApiDeps) {
   const r = Router();
 
-  r.get('/categories', requirePermission(), asyncHandler(async (_req, res) => {
-    res.json(await db.select().from(categories).orderBy(asc(categories.name)));
+  const mine = (workspaceId: string, id: string) => and(eq(categories.workspaceId, workspaceId), eq(categories.id, id));
+
+  r.get('/categories', requirePermission(), asyncHandler(async (req, res) => {
+    res.json(await db.select().from(categories).where(eq(categories.workspaceId, ws(req))).orderBy(asc(categories.name)));
   }));
 
   r.post('/categories', requirePermission('canManageInventory'), asyncHandler(async (req, res) => {
     const data = categoryInput.parse(req.body);
     try {
-      const [row] = await db.insert(categories).values({ id: newId(), ...data }).returning();
+      const [row] = await db.insert(categories).values({ id: newId(), workspaceId: ws(req), ...data }).returning();
       bus.emitChange('categories');
       res.status(201).json(row);
     } catch (e) {
@@ -42,11 +44,12 @@ export function createCategoriesRouter({ db, bus }: ApiDeps) {
     const updates = categoryInput.partial().parse(req.body);
     try {
       const row = await db.transaction(async (tx) => {
-        const [old] = await tx.select().from(categories).where(eq(categories.id, req.params.id));
+        const [old] = await tx.select().from(categories).where(mine(ws(req), req.params.id));
         if (!old) throw new ApiError(404, 'NOT_FOUND', 'Categoria não encontrada.');
         const [updated] = await tx.update(categories).set(updates).where(eq(categories.id, old.id)).returning();
         if (updates.name && updates.name !== old.name) {
-          await tx.update(products).set({ category: updates.name }).where(eq(products.category, old.name));
+          await tx.update(products).set({ category: updates.name })
+            .where(and(eq(products.workspaceId, old.workspaceId), eq(products.category, old.name)));
         }
         return updated;
       });
@@ -58,9 +61,10 @@ export function createCategoriesRouter({ db, bus }: ApiDeps) {
   }));
 
   r.delete('/categories/:id', requirePermission('canManageInventory'), asyncHandler(async (req, res) => {
-    const [cat] = await db.select().from(categories).where(eq(categories.id, req.params.id));
+    const [cat] = await db.select().from(categories).where(mine(ws(req), req.params.id));
     if (cat) {
-      const [inUse] = await db.select({ id: products.id }).from(products).where(eq(products.category, cat.name)).limit(1);
+      const [inUse] = await db.select({ id: products.id }).from(products)
+        .where(and(eq(products.workspaceId, cat.workspaceId), eq(products.category, cat.name))).limit(1);
       if (inUse) {
         throw new ApiError(409, 'CATEGORY_IN_USE', 'Não é possível excluir uma categoria que possui produtos vinculados.');
       }

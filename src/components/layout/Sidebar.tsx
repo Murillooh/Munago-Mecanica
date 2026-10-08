@@ -12,6 +12,7 @@ import {
   PanelLeftOpen,
   Sparkles,
   Maximize2,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -53,7 +54,10 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
     serviceOrders,
     settings,
     isMonitorMode,
-    setIsMonitorMode
+    setIsMonitorMode,
+    isSuperAdmin,
+    workspaces,
+    switchWorkspace
   } = useApp();
 
   if (isMonitorMode) {
@@ -83,6 +87,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       items: [
         ...(isAdmin ? [{ id: 'alerts', label: 'Alertas', icon: Bell, count: unreadCount, tone: 'alert' as const }] : []),
         ...(canManageUsers ? [{ id: 'users', label: 'Equipe e acessos', icon: Users }] : []),
+        ...(isSuperAdmin ? [{ id: 'admin', label: 'Painel geral', icon: ShieldCheck }] : []),
         ...(isAdmin ? [{ id: 'settings', label: 'Configurações', icon: Settings }] : []),
       ],
     },
@@ -131,6 +136,27 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
           {isCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
         </button>
       </div>
+
+      {/* Admin geral: escolhe qual oficina está administrando */}
+      {isSuperAdmin && !isCollapsed && workspaces.length > 0 && (
+        <div className="shrink-0 border-b border-zinc-200 px-3 py-2.5 dark:border-zinc-800">
+          <label htmlFor="workspace-switcher" className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            Oficina ({workspaces.length})
+          </label>
+          <select
+            id="workspace-switcher"
+            value={profile?.workspace?.id ?? profile?.workspaceId ?? ''}
+            onChange={(e) => switchWorkspace(e.target.value)}
+            className="w-full cursor-pointer rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs font-medium text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+          >
+            {workspaces.map(w => (
+              <option key={w.id} value={w.id}>
+                {w.name}{w.id === profile?.workspaceId ? ' (minha)' : ''} · {w.userCount ?? 0} usuário(s)
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Navegação */}
       <nav className="flex-1 overflow-y-auto px-2.5 py-3" aria-label="Menu principal">

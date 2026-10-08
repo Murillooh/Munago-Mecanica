@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { serviceOrders } from '../db/schema';
-import { requirePermission } from '../auth/middleware';
+import { requirePermission, ws } from '../auth/middleware';
 import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { applyMovement } from '../services/stock';
 import { NO_SPLIT, splitRevenue } from '../services/revenueSplit';
@@ -55,14 +55,17 @@ const osPatch = osFields.omit({ items: true }).partial().strict();
 export function createServiceOrdersRouter({ db, bus }: ApiDeps) {
   const r = Router();
 
-  r.get('/service-orders', requirePermission(), asyncHandler(async (_req, res) => {
-    res.json(await db.select().from(serviceOrders).orderBy(desc(serviceOrders.createdAt)));
+  const mine = (workspaceId: string, id: string) => and(eq(serviceOrders.workspaceId, workspaceId), eq(serviceOrders.id, id));
+
+  r.get('/service-orders', requirePermission(), asyncHandler(async (req, res) => {
+    res.json(await db.select().from(serviceOrders).where(eq(serviceOrders.workspaceId, ws(req))).orderBy(desc(serviceOrders.createdAt)));
   }));
 
   r.post('/service-orders', requirePermission('canManageOS'), asyncHandler(async (req, res) => {
     const { companySharePercent, ...data } = osInput.parse(req.body);
     const user = req.user!;
-    const settings = await getSettings(db);
+    const workspaceId = ws(req);
+    const settings = await getSettings(db, workspaceId);
     const { allowNegativeStock } = settings;
     const id = newId();
     const reason = `Ordem de Serviço #${id.slice(-6).toUpperCase()}`;
@@ -71,10 +74,11 @@ export function createServiceOrdersRouter({ db, bus }: ApiDeps) {
       : NO_SPLIT;
 
     const { row, notified } = await db.transaction(async (tx) => {
-      const [row] = await tx.insert(serviceOrders).values({ id, ...data, ...split, createdBy: user.id }).returning();
+      const [row] = await tx.insert(serviceOrders).values({ id, workspaceId, ...data, ...split, createdBy: user.id }).returning();
       let notified = false;
       for (const item of data.items) {
         const m = await applyMovement(tx, {
+          workspaceId,
           productId: item.productId, type: 'out', quantity: item.quantity, reason, userId: user.id, userName: user.name,
         }, allowNegativeStock);
         notified ||= m.notified;
@@ -95,26 +99,26 @@ export function createServiceOrdersRouter({ db, bus }: ApiDeps) {
       throw parsed.error;
     }
     const { companySharePercent, ...data } = parsed.data;
-    const [current] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, req.params.id));
+    const [current] = await db.select().from(serviceOrders).where(mine(ws(req), req.params.id));
     if (!current) throw new ApiError(404, 'NOT_FOUND', 'Ordem de serviço não encontrada.');
 
     // Repasse: (re)calculado enquanto a OS está paga, com o % pedido, o já congelado ou o padrão; limpo se sair de 'paid'.
     const status = data.status ?? current.status;
     let split: Partial<typeof serviceOrders.$inferInsert> = NO_SPLIT;
     if (status === 'paid') {
-      const pct = companySharePercent ?? current.companySharePercent ?? (await getSettings(db)).companySharePercent;
+      const pct = companySharePercent ?? current.companySharePercent ?? (await getSettings(db, ws(req))).companySharePercent;
       split = { ...splitRevenue(data.totalAmount ?? current.totalAmount, pct), paidAt: current.paidAt ?? new Date() };
     }
 
     const [row] = await db.update(serviceOrders).set({ ...data, ...split, updatedAt: sql`now()` })
-      .where(eq(serviceOrders.id, req.params.id)).returning();
+      .where(mine(ws(req), req.params.id)).returning();
     bus.emitChange('serviceOrders');
     res.json(row);
   }));
 
   // Igual ao comportamento atual: excluir não devolve estoque.
   r.delete('/service-orders/:id', requirePermission('canManageOS'), asyncHandler(async (req, res) => {
-    await db.delete(serviceOrders).where(eq(serviceOrders.id, req.params.id));
+    await db.delete(serviceOrders).where(mine(ws(req), req.params.id));
     bus.emitChange('serviceOrders');
     res.status(204).end();
   }));

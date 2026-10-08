@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createHarness } from './test/apiHarness';
-import { notifications, products, serviceOrders, transactions, users } from './db/schema';
+import { notifications, products, serviceOrders, transactions, users, workspaces } from './db/schema';
 
 type H = Awaited<ReturnType<typeof createHarness>>;
 
@@ -292,24 +292,149 @@ describe('API v1', () => {
   describe('access requests', () => {
     const req = { name: 'Maria', email: 'maria@oficina.com', workshopName: 'Oficina da Maria' };
 
-    it('público cria; admin aprova e vira usuário no Cognito', async () => {
+    it('público cria; admin geral aprova e o solicitante ganha oficina própria', async () => {
       await request(h.app).post('/api/v1/access-requests').send(req).expect(201);
-      const [r] = (await h.as('admin').get('/access-requests?status=pending').expect(200)).body;
-      const ok = await h.as('admin').post(`/access-requests/${r.id}/approve`, { role: 'viewer' }).expect(200);
-      expect(ok.body.user).toMatchObject({ email: 'maria@oficina.com', role: 'viewer', status: 'approved' });
+      const [r] = (await h.as('boss').get('/access-requests?status=pending').expect(200)).body;
+      const ok = await h.as('boss').post(`/access-requests/${r.id}/approve`, {}).expect(200);
+      expect(ok.body.user).toMatchObject({ email: 'maria@oficina.com', role: 'admin', status: 'approved' });
+      expect(ok.body.user.workspaceId).not.toBe('default');
+      const [w] = await h.db.select().from(workspaces).where(eq(workspaces.id, ok.body.user.workspaceId));
+      expect(w.name).toBe('Oficina da Maria');
       expect(h.cognito.createUser).toHaveBeenCalledWith('maria@oficina.com', 'Maria');
-      expect((await h.as('admin').get('/access-requests?status=pending')).body).toHaveLength(0);
+      expect((await h.as('boss').get('/access-requests?status=pending')).body).toHaveLength(0);
     });
 
-    it('rejeitar; não-admin não lista', async () => {
+    it('rejeitar; só o admin geral lista (admin de oficina não)', async () => {
       await request(h.app).post('/api/v1/access-requests').send(req).expect(201);
       await h.as('editor').get('/access-requests').expect(403);
-      const [r] = (await h.as('admin').get('/access-requests')).body;
-      await h.as('admin').post(`/access-requests/${r.id}/reject`).expect(200);
+      await h.as('admin').get('/access-requests').expect(403);
+      const [r] = (await h.as('boss').get('/access-requests')).body;
+      await h.as('boss').post(`/access-requests/${r.id}/reject`).expect(200);
     });
 
     it('valida e-mail', async () => {
       await request(h.app).post('/api/v1/access-requests').send({ ...req, email: 'x' }).expect(400);
+    });
+  });
+
+  describe('isolamento entre oficinas', () => {
+    it('outra oficina não vê nem altera produtos, OS, movimentações, categorias e usuários', async () => {
+      const p = (await h.as('admin').post('/products', { name: 'Pastilha', quantity: 5, minQuantity: 1 }).expect(201)).body;
+      await h.as('admin').post('/categories', { name: 'Freios' }).expect(201);
+      const os = (await h.as('admin').post('/service-orders', {
+        customerName: 'Ana', scheduledDate: '2026-10-07',
+        items: [{ productId: p.id, name: 'Pastilha', quantity: 1, price: 10, total: 10 }],
+      }).expect(201)).body;
+
+      for (const path of ['/products', '/categories', '/service-orders', '/transactions', '/notifications']) {
+        expect((await h.as('outsider').get(path).expect(200)).body, path).toEqual([]);
+      }
+      expect((await h.as('outsider').get('/users').expect(200)).body.map((u: { id: string }) => u.id)).toEqual(['outsider']);
+
+      await h.as('outsider').patch(`/products/${p.id}`, { name: 'Hackeado' }).expect(404);
+      await h.as('outsider').del(`/products/${p.id}`).expect(204);
+      await h.as('outsider').patch(`/service-orders/${os.id}`, { customerName: 'X' }).expect(404);
+      await h.as('outsider').del(`/service-orders/${os.id}`).expect(204);
+      await h.as('outsider').post('/transactions', { productId: p.id, type: 'out', quantity: 1 }).expect(404);
+      await h.as('outsider').patch('/users/editor', { role: 'viewer' }).expect(404);
+      await h.as('outsider').del('/users/editor').expect(204);
+
+      const [prod] = await h.db.select().from(products).where(eq(products.id, p.id));
+      expect(prod).toMatchObject({ name: 'Pastilha', quantity: 4 });
+      expect(await h.db.select().from(serviceOrders)).toHaveLength(1);
+      expect(await h.db.select().from(users).where(eq(users.id, 'editor'))).toHaveLength(1);
+    });
+
+    it('OS da outra oficina não consegue usar produto alheio', async () => {
+      const p = (await h.as('admin').post('/products', { name: 'Vela', quantity: 5, minQuantity: 0 })).body;
+      await h.as('outsider').post('/service-orders', {
+        customerName: 'Intruso', scheduledDate: '2026-10-07',
+        items: [{ productId: p.id, name: 'Vela', quantity: 1, price: 1, total: 1 }],
+      }).expect(404);
+    });
+
+    it('configurações são por oficina', async () => {
+      await h.as('admin').patch('/settings', { storeName: 'Oficina A' }).expect(200);
+      expect((await h.as('outsider').get('/settings')).body.storeName).not.toBe('Oficina A');
+      const [w] = await h.db.select().from(workspaces).where(eq(workspaces.id, 'default'));
+      expect(w.name).toBe('Oficina A');
+    });
+
+    it('restaurar backup não sobrescreve produto de outra oficina', async () => {
+      const p = (await h.as('admin').post('/products', { name: 'Original', quantity: 1, minQuantity: 0 })).body;
+      await h.as('outsider').post('/backups/restore', {
+        products: [{ id: p.id, name: 'Sobrescrito', quantity: 0, minQuantity: 0 }], categories: [],
+      }).expect(200);
+      const [prod] = await h.db.select().from(products).where(eq(products.id, p.id));
+      expect(prod).toMatchObject({ name: 'Original', workspaceId: 'default' });
+    });
+
+    it('admin geral lista todas as oficinas e opera em qualquer uma', async () => {
+      await h.as('outsider').post('/products', { name: 'Da outra', quantity: 1, minQuantity: 0 }).expect(201);
+      const all = (await h.as('boss').get('/workspaces').expect(200)).body.map((w: { id: string }) => w.id).sort();
+      expect(all).toEqual(['default', 'other']);
+      expect((await h.as('admin').get('/workspaces')).body.map((w: { id: string }) => w.id)).toEqual(['default']);
+
+      expect((await h.as('boss').get('/products')).body).toEqual([]);
+      const there = (await h.as('boss', 'other').get('/products').expect(200)).body;
+      expect(there.map((p: { name: string }) => p.name)).toEqual(['Da outra']);
+      const me = (await h.as('boss', 'other').get('/me').expect(200)).body;
+      expect(me).toMatchObject({ isSuperAdmin: true, workspace: { id: 'other', name: 'Outra Oficina' } });
+
+      // Admin comum não usa o header para pular de oficina.
+      expect((await h.as('outsider', 'default').get('/products')).body.map((p: { name: string }) => p.name)).toEqual(['Da outra']);
+    });
+  });
+
+  describe('painel do admin geral', () => {
+    it('só o admin geral acessa; mostra todas as oficinas com números', async () => {
+      await h.as('admin').get('/admin/overview').expect(403);
+      await h.as('outsider').get('/admin/overview').expect(403);
+
+      const p = (await h.as('admin').post('/products', { name: 'Pastilha', quantity: 2, minQuantity: 5, price: 10 })).body;
+      await h.as('admin').post('/service-orders', {
+        customerName: 'Ana', scheduledDate: '2026-10-07', status: 'paid', totalAmount: 150,
+        items: [{ productId: p.id, name: 'Pastilha', quantity: 1, price: 10, total: 10 }],
+      }).expect(201);
+
+      const { body } = await h.as('boss').get('/admin/overview').expect(200);
+      expect(body.totals).toMatchObject({ workspaces: 2, users: 6, products: 1, serviceOrders: 1, revenue: 150 });
+      const def = body.workspaces.find((w: { id: string }) => w.id === 'default');
+      expect(def).toMatchObject({ productCount: 1, lowStockCount: 1, stockValue: 10, serviceOrderCount: 1, revenue: 150 });
+      expect(def.lastActivity).toBeTruthy();
+      const other = body.workspaces.find((w: { id: string }) => w.id === 'other');
+      expect(other).toMatchObject({ productCount: 0, serviceOrderCount: 0, lastActivity: null });
+      expect(other.users.map((u: { email: string }) => u.email)).toEqual(['outsider@y.com']);
+    });
+  });
+
+  describe('admin geral: renomear e excluir oficina', () => {
+    it('renomeia (só admin geral) e sincroniza o nome nas configurações', async () => {
+      await h.as('outsider').patch('/admin/workspaces/other', { name: 'X' }).expect(403);
+      const res = await h.as('boss').patch('/admin/workspaces/other', { name: 'Oficina Nova' }).expect(200);
+      expect(res.body.name).toBe('Oficina Nova');
+      expect((await h.as('outsider').get('/settings')).body.storeName).toBe('Oficina Nova');
+      await h.as('boss').patch('/admin/workspaces/nao-existe', { name: 'Y' }).expect(404);
+    });
+
+    it('exclui com confirmação, apagando dados, usuários e contas de login', async () => {
+      await h.as('outsider').post('/products', { name: 'Peça', quantity: 1, minQuantity: 0 }).expect(201);
+      await h.as('admin').del('/admin/workspaces/other').send({ confirmName: 'Outra Oficina' }).expect(403);
+      const wrong = await h.as('boss').del('/admin/workspaces/other').send({ confirmName: 'outra' }).expect(400);
+      expect(wrong.body.code).toBe('CONFIRMATION_MISMATCH');
+
+      await h.as('boss').del('/admin/workspaces/other').send({ confirmName: 'Outra Oficina' }).expect(204);
+      expect(await h.db.select().from(workspaces).where(eq(workspaces.id, 'other'))).toHaveLength(0);
+      expect(await h.db.select().from(users).where(eq(users.id, 'outsider'))).toHaveLength(0);
+      expect(await h.db.select().from(products).where(eq(products.workspaceId, 'other'))).toHaveLength(0);
+      expect(h.cognito.deleteUser).toHaveBeenCalledWith('outsider@y.com');
+      // Dados da oficina do admin geral continuam.
+      expect(await h.db.select().from(users).where(eq(users.id, 'admin'))).toHaveLength(1);
+    });
+
+    it('não exclui a própria oficina', async () => {
+      const res = await h.as('boss').del('/admin/workspaces/default').send({ confirmName: 'Munago Mecânica' }).expect(400);
+      expect(res.body.code).toBe('OWN_WORKSPACE');
     });
   });
 

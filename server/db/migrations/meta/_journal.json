@@ -29,6 +29,13 @@
       "when": 1791343549779,
       "tag": "0003_google_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791424118661,
+      "tag": "0004_workspaces",
+      "breakpoints": true
     }
   ]
 }

@@ -10,7 +10,8 @@ import {
   Settings, 
   LogOut, 
   Menu,
-  Sparkles
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -24,7 +25,8 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
     canManageUsers,
     notifications,
     handleLogout,
-    isViewer
+    isViewer,
+    isSuperAdmin
   } = useApp();
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -44,6 +46,7 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
     ...(isAdmin ? [{ id: 'alerts', label: 'Alertas', icon: Bell, count: unreadCount }] : []),
     ...(canManageUsers ? [{ id: 'users', label: 'Usuários', icon: User }] : []),
     ...(isAdmin ? [{ id: 'settings', label: 'Ajustes', icon: Settings }] : []),
+    ...(isSuperAdmin ? [{ id: 'admin', label: 'Painel geral', icon: ShieldCheck }] : []),
     { id: 'logout', label: 'Sair', icon: LogOut, color: 'text-red-500' }
   ];
 

@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { categories, products } from '../db/schema';
-import { requireAdmin } from '../auth/middleware';
+import { requireAdmin, ws } from '../auth/middleware';
 import { asyncHandler } from '../middleware/errorHandler';
 import { productInput } from './products';
 import type { ApiDeps } from './deps';
@@ -28,18 +28,22 @@ export function createBackupsRouter({ db, bus }: ApiDeps) {
   /** Restaura produtos e categorias de um backup do Drive (upsert por id, igual ao comportamento anterior). */
   r.post('/backups/restore', requireAdmin, asyncHandler(async (req, res) => {
     const data = restoreInput.parse(req.body);
+    const workspaceId = ws(req);
+    // setWhere: id que já pertence a outra oficina não é sobrescrito (a linha é ignorada).
     await db.transaction(async (tx) => {
       if (data.categories.length) {
-        await tx.insert(categories).values(data.categories).onConflictDoUpdate({
+        await tx.insert(categories).values(data.categories.map((c) => ({ ...c, workspaceId }))).onConflictDoUpdate({
           target: categories.id,
           set: fromExcluded(['name', 'description', 'imageUrl', 'aiSuggestion']),
+          setWhere: eq(categories.workspaceId, workspaceId),
         });
       }
       if (data.products.length) {
         const cols = Object.keys(productInput.shape).filter((c) => c !== 'id');
-        await tx.insert(products).values(data.products).onConflictDoUpdate({
+        await tx.insert(products).values(data.products.map((p) => ({ ...p, workspaceId }))).onConflictDoUpdate({
           target: products.id,
           set: { ...fromExcluded(cols), updatedAt: sql`now()` },
+          setWhere: eq(products.workspaceId, workspaceId),
         });
       }
     });

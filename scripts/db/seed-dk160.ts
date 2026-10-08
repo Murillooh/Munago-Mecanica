@@ -8,9 +8,12 @@
  */
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { createDb } from '../../server/db/client';
 import { categories, products } from '../../server/db/schema';
+
+// Oficina que recebe os dados de teste (padrão: a do admin geral).
+const WORKSPACE_ID = process.env.SEED_WORKSPACE_ID ?? 'default';
 
 type Part = [sku: string, name: string, minQuantity: number, description?: string];
 
@@ -253,19 +256,20 @@ async function main() {
   }
 
   const db = createDb();
-  const existingCats = new Set((await db.select({ name: categories.name }).from(categories)).map((c) => c.name));
+  const existingCats = new Set((await db.select({ name: categories.name }).from(categories).where(eq(categories.workspaceId, WORKSPACE_ID))).map((c) => c.name));
   const newCats = CATALOG.filter((c) => !existingCats.has(c.category));
   if (newCats.length) {
-    await db.insert(categories).values(newCats.map((c) => ({ id: randomUUID(), name: c.category, description: c.description || null })));
+    await db.insert(categories).values(newCats.map((c) => ({ id: randomUUID(), workspaceId: WORKSPACE_ID, name: c.category, description: c.description || null })));
   }
 
   const allSkus = CATALOG.flatMap((c) => c.parts.map((p) => p[0]));
-  const existingSkus = new Set((await db.select({ sku: products.sku }).from(products).where(inArray(products.sku, allSkus))).map((p) => p.sku));
+  const existingSkus = new Set((await db.select({ sku: products.sku }).from(products).where(and(eq(products.workspaceId, WORKSPACE_ID), inArray(products.sku, allSkus)))).map((p) => p.sku));
   const rows = CATALOG.flatMap((c) =>
     c.parts
       .filter(([sku]) => !existingSkus.has(sku))
       .map(([sku, name, minQuantity, description]) => ({
         id: randomUUID(),
+        workspaceId: WORKSPACE_ID,
         sku,
         name,
         category: c.category,

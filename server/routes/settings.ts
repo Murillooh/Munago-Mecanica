@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
-import { settings } from '../db/schema';
+import { settings, workspaces } from '../db/schema';
 import type { DB } from '../db/client';
-import { requireAdmin, requirePermission } from '../auth/middleware';
+import { requireAdmin, requirePermission, ws } from '../auth/middleware';
 import { asyncHandler } from '../middleware/errorHandler';
 import type { ApiDeps } from './deps';
 
@@ -42,13 +42,14 @@ const settingsPatch = z.object({
   companySharePercent: z.number().min(0).max(100),
 }).partial().strict();
 
-export async function getSettings(db: DB): Promise<SystemSettings> {
-  const [row] = await db.select().from(settings).where(eq(settings.id, 'global'));
+/** Configurações de uma oficina (a linha de settings usa o id da oficina). */
+export async function getSettings(db: DB, workspaceId: string): Promise<SystemSettings> {
+  const [row] = await db.select().from(settings).where(eq(settings.id, workspaceId));
   return { ...DEFAULT_SETTINGS, ...(row?.data ?? {}) } as SystemSettings;
 }
 
-export async function mergeSettings(db: DB, patch: Record<string, unknown>) {
-  await db.insert(settings).values({ id: 'global', data: patch })
+export async function mergeSettings(db: DB, workspaceId: string, patch: Record<string, unknown>) {
+  await db.insert(settings).values({ id: workspaceId, data: patch })
     .onConflictDoUpdate({
       target: settings.id,
       set: { data: sql`${settings.data} || ${JSON.stringify(patch)}::jsonb`, updatedAt: sql`now()` },
@@ -58,15 +59,21 @@ export async function mergeSettings(db: DB, patch: Record<string, unknown>) {
 export function createSettingsRouter({ db, bus }: ApiDeps) {
   const r = Router();
 
-  r.get('/settings', requirePermission(), asyncHandler(async (_req, res) => {
-    res.json(await getSettings(db));
+  r.get('/settings', requirePermission(), asyncHandler(async (req, res) => {
+    res.json(await getSettings(db, ws(req)));
   }));
 
   // Antes qualquer aprovado podia alterar (firestore.rules); agora só admin.
   r.patch('/settings', requireAdmin, asyncHandler(async (req, res) => {
-    await mergeSettings(db, settingsPatch.parse(req.body));
+    const patch = settingsPatch.parse(req.body);
+    await mergeSettings(db, ws(req), patch);
+    // Nome da oficina aparece na lista do admin geral.
+    if (patch.storeName) {
+      await db.update(workspaces).set({ name: patch.storeName }).where(eq(workspaces.id, ws(req)));
+      bus.emitChange('workspaces');
+    }
     bus.emitChange('settings');
-    res.json(await getSettings(db));
+    res.json(await getSettings(db, ws(req)));
   }));
 
   return r;
