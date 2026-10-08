@@ -16,6 +16,7 @@ import { toast, Toaster } from 'sonner';
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
 import { PendingApproval } from './components/PendingApproval';
+import { SupportChat } from './components/SupportChat';
 
 // Pages: cada uma vira um chunk próprio, baixado só quando a aba é aberta.
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
@@ -169,6 +170,8 @@ const AppContent = () => {
       {!isMonitorMode && (
         <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       )}
+
+      <SupportChat />
     </div>
   );
 };

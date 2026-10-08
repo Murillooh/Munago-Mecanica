@@ -21,6 +21,7 @@ import { createCognitoAdmin, createCognitoVerifier } from "./server/auth/cognito
 import { runAutoBackupIfDue } from "./server/services/backup";
 import { createGoogleOAuth } from "./server/google/oauth";
 import { createGoogleRouter } from "./server/routes/google";
+import { SUPPORT_MODELS, buildSupportPrompt, isTransientAiError, supportChatInput, toGeminiContents } from "./server/support/supportChat";
 
 dotenv.config();
 
@@ -261,6 +262,62 @@ async function startServer() {
       
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
+        res.end();
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+
+  // Chat de suporte (Ana): roteiro e base de conhecimento ficam aqui, não vêm do navegador. Sem busca na web.
+  app.post("/api/support/chat", ...requireLogin, geminiLimiter, async (req, res) => {
+    const parsed = supportChatInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Mensagem inválida.', code: 'VALIDATION' });
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({ error: "A assistente está indisponível no momento (IA não configurada)." });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    const timeout = setTimeout(() => {
+      res.write(`data: ${JSON.stringify({ error: "A resposta demorou demais. Tente de novo." })}\n\n`);
+      res.end();
+    }, 30000);
+
+    const request = {
+      contents: toGeminiContents(parsed.data.messages),
+      config: {
+        systemInstruction: buildSupportPrompt({ userName: req.user!.name, role: req.user!.role, screen: parsed.data.screen }),
+        temperature: 0.7,
+        maxOutputTokens: 900,
+      },
+    };
+    let wroteText = false;
+    try {
+      for (const [i, model] of SUPPORT_MODELS.entries()) {
+        try {
+          const stream = await ai.models.generateContentStream({ model, ...request });
+          for await (const chunk of stream) {
+            if (res.writableEnded) break;
+            if (chunk.text) { wroteText = true; res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`); }
+          }
+          break;
+        } catch (error) {
+          // Só troca de modelo se nada foi enviado ainda; senão a resposta sairia duplicada.
+          const canFallback = !wroteText && i < SUPPORT_MODELS.length - 1 && isTransientAiError(error);
+          if (!canFallback) throw error;
+          logger.warn({ model, err: (error as Error).message?.slice(0, 200) }, "Support chat: modelo sobrecarregado, usando reserva");
+        }
+      }
+      if (!res.writableEnded) {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
+    } catch (error: any) {
+      logger.error(error, "Support chat error");
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: isTransientAiError(error) ? "Estou recebendo muitas perguntas agora. Tenta de novo em um minutinho?" : "Não consegui responder agora. Tente de novo em instantes." })}\n\n`);
         res.end();
       }
     } finally {
