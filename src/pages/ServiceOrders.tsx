@@ -21,7 +21,10 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
-import { splitRevenue } from '../../server/services/revenueSplit';
+import { OSCharge } from '../components/OSCharge';
+
+/** Serviço lançado na OS (preço vem do catálogo; o repasse é calculado e guardado pelo servidor). */
+type OSService = { serviceId: string; name: string; price: number; quantity: number };
 
 type OSStatus = 'draft' | 'in_progress' | 'completed' | 'paid';
 
@@ -133,7 +136,7 @@ export const ServiceOrders = () => {
     deleteServiceOrder, 
     canManageOS,
     profile,
-    settings
+    services
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -155,7 +158,8 @@ export const ServiceOrders = () => {
   const [items, setItems] = useState<any[]>([]);
   const [osStatus, setOsStatus] = useState<OSStatus>('draft');
   const [observations, setObservations] = useState('');
-  const [companyPct, setCompanyPct] = useState(0);
+  const [osServices, setOsServices] = useState<OSService[]>([]);
+  const [serviceToAdd, setServiceToAdd] = useState('');
   const [activeModalTab, setActiveModalTab] = useState<'client' | 'items'>('client');
   const [productSearch, setProductSearch] = useState('');
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
@@ -172,7 +176,7 @@ export const ServiceOrders = () => {
       setItems(selectedOS.items || []);
       setOsStatus(selectedOS.status || 'draft');
       setObservations(selectedOS.observations || '');
-      setCompanyPct(selectedOS.companySharePercent ?? settings.companySharePercent ?? 0);
+      setOsServices(selectedOS.serviceItems || []);
     } else {
       setCustomerName('');
       setCustomerPhone('');
@@ -184,7 +188,7 @@ export const ServiceOrders = () => {
       setItems([]);
       setOsStatus('draft');
       setObservations('');
-      setCompanyPct(settings.companySharePercent ?? 0);
+      setOsServices([]);
     }
     setActiveModalTab('client');
   }, [selectedOS, isModalOpen]);
@@ -203,8 +207,21 @@ export const ServiceOrders = () => {
   const totalParts = items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const totalItemsLabor = items.reduce((acc, i) => acc + (i.laborCost * i.quantity), 0);
   const totalOSLabor = totalItemsLabor + generalLaborCost;
-  const totalOSAmount = totalParts + totalOSLabor;
-  const split = splitRevenue(totalOSAmount, companyPct);
+  const totalServices = osServices.reduce((acc, s) => acc + s.price * s.quantity, 0);
+  const totalOSAmount = Math.round((totalParts + totalOSLabor + totalServices) * 100) / 100;
+  // Com cobrança emitida ou OS paga, o servidor não aceita mudar serviços.
+  const servicesLocked = !canManageOS || selectedOS?.status === 'paid' || !!selectedOS?.asaasPaymentId;
+
+  const addService = () => {
+    const s = services.find(x => x.id === serviceToAdd);
+    if (!s) return;
+    setOsServices(prev => prev.some(x => x.serviceId === s.id)
+      ? prev.map(x => x.serviceId === s.id ? { ...x, quantity: x.quantity + 1 } : x)
+      : [...prev, { serviceId: s.id, name: s.name, price: s.price, quantity: 1 }]);
+    setServiceToAdd('');
+  };
+  const setServiceQty = (id: string, qty: number) =>
+    setOsServices(prev => qty < 1 ? prev.filter(x => x.serviceId !== id) : prev.map(x => x.serviceId === id ? { ...x, quantity: qty } : x));
 
   const allOS = serviceOrders || [];
   const statusStats = OS_STEPS.map(step => {
@@ -277,8 +294,8 @@ export const ServiceOrders = () => {
       status: osStatus,
       observations,
       totalAmount: totalOSAmount,
-      // O servidor calcula e congela os valores; daqui só vai o % (e só quando paga).
-      companySharePercent: osStatus === 'paid' ? companyPct : undefined,
+      // Só id + quantidade chegam ao servidor; ele calcula o repasse pelo catálogo.
+      serviceItems: osServices.map(s => ({ ...s, repasseAmount: 0 })),
       updatedAt: new Date()
     };
 
@@ -398,7 +415,7 @@ export const ServiceOrders = () => {
             const stepIndex = OS_STEPS.findIndex(s => s.value === status);
             const parts = (os.items || []).reduce((a: number, i: any) => a + (i.price || 0) * (i.quantity || 0), 0);
             const labor = (os.generalLaborCost || 0) + (os.items || []).reduce((a: number, i: any) => a + (i.laborCost || 0) * (i.quantity || 0), 0);
-            const itemCount = (os.items || []).length;
+            const itemCount = (os.items || []).length + (os.serviceItems || []).length;
             const wa = whatsappLink(os.customerPhone);
             return (
               <article
@@ -443,15 +460,9 @@ export const ServiceOrders = () => {
                     >
                       {brl.format(os.totalAmount || 0)}
                     </p>
-                    {os.status === 'paid' && os.companyAmount != null ? (
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums truncate" title={`Repasse: empresa ${os.companySharePercent}% · oficina ${100 - (os.companySharePercent ?? 0)}%`}>
-                        Empresa {brl.format(os.companyAmount)} · Oficina {brl.format(os.workshopAmount ?? 0)}
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums truncate">
-                        {formatEntry(os.scheduledDate)} · {itemCount} {itemCount === 1 ? 'item' : 'itens'}
-                      </p>
-                    )}
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums truncate">
+                      {formatEntry(os.scheduledDate)} · {itemCount} {itemCount === 1 ? 'item' : 'itens'}
+                    </p>
                   </div>
                   <div className="flex items-center shrink-0">
                     {wa && (
@@ -572,39 +583,22 @@ export const ServiceOrders = () => {
                   })}
                 </div>
 
-                {osStatus === 'paid' && (
-                  <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Repasse do pagamento</p>
-                    <div className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      <label htmlFor="os-company-share">Empresa</label>
-                      <div className="relative">
-                        <input
-                          id="os-company-share"
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="0.5"
-                          inputMode="decimal"
-                          value={companyPct}
-                          onChange={e => setCompanyPct(Math.min(100, Math.max(0, Number(e.target.value))))}
-                          disabled={!canManageOS}
-                          className="w-20 rounded-md border border-zinc-200 bg-white py-1 pl-2 pr-6 text-right font-mono text-sm tabular-nums text-zinc-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                        />
-                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-xs text-zinc-400">%</span>
-                      </div>
-                      <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">{brl.format(split.companyAmount)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      <span>Oficina</span>
-                      <span className="font-mono text-xs text-zinc-500">{(100 - companyPct).toLocaleString('pt-BR')}%</span>
-                      <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">{brl.format(split.workshopAmount)}</span>
-                    </div>
-                    {selectedOS?.paidAt && (
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 sm:ml-auto">
-                        Pago em {new Date(selectedOS.paidAt).toLocaleDateString('pt-BR')}
-                      </p>
-                    )}
-                  </div>
+                {osStatus === 'paid' && selectedOS?.paidAt && (
+                  <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                    Pago em {new Date(selectedOS.paidAt).toLocaleDateString('pt-BR')}
+                  </p>
+                )}
+
+                {selectedOS && selectedOS.status !== 'paid' && canManageOS && (
+                  <OSCharge
+                    osId={selectedOS.id}
+                    hasCharge={!!selectedOS.asaasPaymentId}
+                    amount={selectedOS.totalAmount || 0}
+                    customerName={selectedOS.customerName}
+                    whatsappHref={whatsappLink(selectedOS.customerPhone)}
+                    // O servidor já marcou como paga: alinha o formulário para um "Salvar" não desfazer.
+                    onPaid={() => setOsStatus('paid')}
+                  />
                 )}
               </header>
 
@@ -619,8 +613,8 @@ export const ServiceOrders = () => {
                     className={`relative -mb-px flex items-center gap-2 py-3 text-sm transition-colors focus-visible:outline-none focus-visible:text-blue-600 ${activeModalTab === tab ? 'font-semibold text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'}`}
                   >
                     {label}
-                    {tab === 'items' && items.length > 0 && (
-                      <span className="rounded bg-zinc-100 px-1.5 py-px font-mono text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{items.length}</span>
+                    {tab === 'items' && items.length + osServices.length > 0 && (
+                      <span className="rounded bg-zinc-100 px-1.5 py-px font-mono text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{items.length + osServices.length}</span>
                     )}
                     {activeModalTab === tab && <motion.span layoutId="os-tab-underline" className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-600" />}
                   </button>
@@ -794,10 +788,63 @@ export const ServiceOrders = () => {
                       )}
                     </div>
 
+                    {/* Serviços do catálogo da mecânica: valor automático */}
+                    <section aria-labelledby="os-services-heading" className="space-y-2">
+                      <div className="flex flex-wrap items-end justify-between gap-2">
+                        <h3 id="os-services-heading" className="text-sm font-semibold text-zinc-900 dark:text-white">Serviços</h3>
+                        {!servicesLocked && services.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <label htmlFor="os-service-add" className="sr-only">Adicionar serviço</label>
+                            <select
+                              id="os-service-add"
+                              value={serviceToAdd}
+                              onChange={e => setServiceToAdd(e.target.value)}
+                              className={`${fieldClass} w-56 py-1.5 text-sm cursor-pointer`}
+                            >
+                              <option value="">Escolher serviço…</option>
+                              {services.map(s => <option key={s.id} value={s.id}>{s.name} · {brl.format(s.price)}</option>)}
+                            </select>
+                            <button type="button" onClick={addService} disabled={!serviceToAdd} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40 cursor-pointer">
+                              <Plus size={14} aria-hidden="true" /> Adicionar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {osServices.length > 0 ? (
+                        <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+                          {osServices.map(s => (
+                            <li key={s.serviceId} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                              <span className="min-w-0 flex-1 truncate font-medium text-zinc-900 dark:text-zinc-100">{s.name}</span>
+                              <div className="flex items-center gap-1">
+                                {!servicesLocked && (
+                                  <button type="button" aria-label={`Diminuir ${s.name}`} onClick={() => setServiceQty(s.serviceId, s.quantity - 1)} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"><MinusCircle size={16} /></button>
+                                )}
+                                <span className="w-7 text-center font-mono tabular-nums">{s.quantity}</span>
+                                {!servicesLocked && (
+                                  <button type="button" aria-label={`Aumentar ${s.name}`} onClick={() => setServiceQty(s.serviceId, s.quantity + 1)} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"><PlusCircle size={16} /></button>
+                                )}
+                              </div>
+                              <span className="w-24 text-right font-mono tabular-nums font-medium text-zinc-900 dark:text-zinc-100">{brl.format(s.price * s.quantity)}</span>
+                              {!servicesLocked && (
+                                <button type="button" aria-label={`Remover ${s.name}`} onClick={() => setServiceQty(s.serviceId, 0)} className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"><Trash2 size={16} /></button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="rounded-lg border border-dashed border-zinc-200 px-4 py-3 text-xs text-zinc-500 dark:border-zinc-700">
+                          {services.length === 0 ? 'Cadastre os serviços da oficina na tela "Serviços" para lançá-los aqui.' : 'Nenhum serviço lançado.'}
+                        </p>
+                      )}
+                    </section>
+
                     {/* Fechamento em formato de recibo */}
                     <dl className="ml-auto w-full max-w-sm space-y-2 rounded-lg bg-zinc-50 p-4 text-sm dark:bg-zinc-800/40">
                       <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
                         <dt>Peças</dt><dd className="font-mono tabular-nums">{brl.format(totalParts)}</dd>
+                      </div>
+                      <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
+                        <dt>Serviços</dt><dd className="font-mono tabular-nums">{brl.format(totalServices)}</dd>
                       </div>
                       <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
                         <dt>Mão de obra dos itens</dt><dd className="font-mono tabular-nums">{brl.format(totalItemsLabor)}</dd>
@@ -834,7 +881,7 @@ export const ServiceOrders = () => {
                     'Somente leitura: seu perfil não pode editar OS.'
                   ) : (
                     <>
-                      {items.length} {items.length === 1 ? 'item' : 'itens'} · total{' '}
+                      {items.length + osServices.length} {items.length + osServices.length === 1 ? 'item' : 'itens'} · total{' '}
                       <span className="font-mono font-semibold tabular-nums text-zinc-900 dark:text-white">{brl.format(totalOSAmount)}</span>
                     </>
                   )}

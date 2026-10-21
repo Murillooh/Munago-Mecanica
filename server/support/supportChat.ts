@@ -43,7 +43,7 @@ const ROLE_NAMES: Record<string, string> = { admin: 'Administrador', editor: 'Op
 /** Como o sistema funciona hoje. Manter alinhado com as telas quando algo mudar. */
 const KNOWLEDGE = `
 # Munago Mecânica: guia do sistema
-Sistema web de gestão para oficinas de motos: almoxarifado (estoque de peças), ordens de serviço (OS), movimentações, alertas, equipe e IA. Funciona no computador e no celular (iPhone/Android). No computador o menu fica à esquerda; no celular fica embaixo (Início, Estoque, Serviços, IA e Menu, que abre Movimentações, Alertas, Usuários e Ajustes).
+Sistema web de gestão para oficinas de motos: almoxarifado (estoque de peças), ordens de serviço (OS), movimentações, alertas, equipe e IA. Funciona no computador e no celular (iPhone/Android). No computador o menu fica à esquerda; no celular fica embaixo (Início, Estoque, OS, IA e Menu, que abre Serviços, Movimentações, Alertas, Usuários e Ajustes).
 
 ## Acesso e conta
 - Entrar: e-mail e senha, ou o botão "Conta Google" na tela de login.
@@ -68,10 +68,14 @@ Sistema web de gestão para oficinas de motos: almoxarifado (estoque de peças),
 - Quando uma peça chega ao estoque mínimo, o sistema cria um alerta automaticamente.
 
 ## Ordens de serviço (OS)
-- "Nova OS": aba "Cliente e veículo" (nome, telefone/WhatsApp, placa no estilo Mercosul, marca e modelo, data de entrada, relato e diagnóstico) e aba "Peças e serviços" (busca peças do estoque, quantidade, mão de obra por item e mão de obra geral). O total é calculado sozinho.
+- "Nova OS": aba "Cliente e veículo" (nome, telefone/WhatsApp, placa no estilo Mercosul, marca e modelo, data de entrada, relato e diagnóstico) e aba "Peças e serviços" (busca peças do estoque, quantidade, mão de obra por item, serviços do catálogo em "Escolher serviço…" > "Adicionar", e mão de obra geral). O total é calculado sozinho.
 - Etapas: Orçamento, Em manutenção, Aguardando retirada e Pago. Muda clicando na régua de etapas no topo da OS.
 - Ao abrir a OS, as peças usadas já saem do estoque. Depois de criada, os itens da OS não podem ser alterados (só os demais campos). Excluir uma OS não devolve as peças ao estoque.
-- Repasse: quando a OS fica "Pago", o total é dividido entre empresa e oficina pelo percentual padrão (definido em Configurações > Repasse do pagamento), que pode ser ajustado naquela OS. O valor fica registrado com a data do pagamento.
+- Repasse: cada serviço do catálogo tem um repasse para a empresa (R$ fixo ou %). Quando a OS fica "Pago", a empresa recebe a soma dos repasses dos serviços da OS e a oficina fica com o resto (peças e mão de obra são 100% da oficina). O repasse não aparece na OS; é configurado na tela "Serviços".
+- Cobrança: numa OS já salva, o quadro "Cobrança" pede o CPF ou CNPJ do cliente e "Gerar cobrança": aparece o QR Code Pix, "Copiar Pix", "Abrir fatura" (Pix, boleto ou cartão) e "Enviar no WhatsApp". O pagamento cai dividido pelo Asaas (parte da oficina na carteira dela) e a OS vira "Pago" sozinha. Depois de gerar a cobrança, o valor e os serviços da OS não podem mudar.
+
+## Serviços
+- Catálogo de serviços da oficina: "Novo serviço" com nome, valor cobrado do cliente e repasse para a empresa em R$ ou % (o sistema mostra quanto fica para a mecânica e para a empresa). Lápis edita, lixeira exclui. Mudar um serviço não altera OS já criadas.
 - No cartão da OS há atalho para falar com o cliente no WhatsApp.
 
 ## Movimentações
@@ -86,7 +90,7 @@ Sistema web de gestão para oficinas de motos: almoxarifado (estoque de peças),
 
 ## Configurações (administrador)
 - Oficina: nome, telefone, e-mail e endereço (aparecem no menu e nos relatórios). Clique em "Salvar".
-- Repasse do pagamento: percentual padrão da empresa; o resto é da oficina.
+- Recebimentos: "Carteira Asaas da mecânica" (walletId da conta Asaas no CNPJ da oficina), para onde vai a parte da oficina nas cobranças.
 - Backup e dados: backup automático diário no banco; Google Drive com "Conectar Google Drive", "Fazer backup" e "Restaurar". Mostra se está conectado e com qual conta. O sistema só acessa os arquivos de backup que ele mesmo criou no Drive.
 - Aparência: tema Claro, Escuro ou Automático (vale para o navegador) e cor de destaque (vale para todos).
 - Alertas e Modo Monitor: som de alerta de estoque baixo e rolagem automática do Modo Monitor.

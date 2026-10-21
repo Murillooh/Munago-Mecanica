@@ -41,7 +41,7 @@ const ACCENT_COLORS = [
 ];
 
 // Campos de texto que só são gravados ao clicar em "Salvar"
-const FORM_KEYS = ['storeName', 'contactPhone', 'contactEmail', 'address', 'companySharePercent'] as const;
+const FORM_KEYS = ['storeName', 'contactPhone', 'contactEmail', 'address', 'asaasWalletId'] as const;
 
 const fieldClass =
   'w-full rounded-lg border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50 dark:bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none transition-colors focus:border-blue-600 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-blue-600/20';
@@ -208,7 +208,6 @@ export const SettingsView = () => {
 
   const soundOn = form.enableSoundAlerts !== false;
   const autoScrollOn = form.monitorAutoScrollEnabled !== false;
-  const companyShare = form.companySharePercent ?? 0;
 
   return (
     <div className="w-full space-y-4 pb-24 lg:pb-6">
@@ -289,36 +288,22 @@ export const SettingsView = () => {
         </Section>
 
         {/* Financeiro */}
-        <Section id="sec-finance" icon={Percent} title="Repasse do pagamento" description="Divisão padrão do total quando uma OS é marcada como Pago. Dá para ajustar em cada OS.">
-          <div className="px-4 py-3 flex flex-wrap items-end gap-6">
-            <div className="space-y-1">
-              <label htmlFor="company-share" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Parte da empresa</label>
-              <div className="relative w-32">
-                <input
-                  id="company-share"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.5"
-                  inputMode="decimal"
-                  value={companyShare}
-                  onChange={e => setForm({ ...form, companySharePercent: Math.min(100, Math.max(0, Number(e.target.value))) })}
-                  className={`${fieldClass} pr-8 text-right font-mono font-semibold`}
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-sm text-zinc-400">%</span>
-              </div>
-            </div>
-            <div className="flex-1 min-w-[200px] pb-1 space-y-1">
-              <div className="flex h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800" aria-hidden="true">
-                <span className="bg-blue-600" style={{ width: `${companyShare}%` }} />
-                <span className="bg-emerald-500" style={{ width: `${100 - companyShare}%` }} />
-              </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                Empresa <strong className="text-zinc-900 dark:text-white">{companyShare.toLocaleString('pt-BR')}%</strong>
-                {' · '}
-                Oficina <strong className="text-zinc-900 dark:text-white">{(100 - companyShare).toLocaleString('pt-BR')}%</strong>
-              </p>
-            </div>
+        <Section id="sec-finance" icon={Percent} title="Recebimentos" description="Para onde vai a parte da mecânica nas cobranças. O repasse para a empresa é definido em cada serviço, na tela Serviços.">
+          <div className="px-4 py-3 space-y-1">
+            <label htmlFor="asaas-wallet" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Carteira Asaas da mecânica</label>
+            <input
+              id="asaas-wallet"
+              value={form.asaasWalletId || ''}
+              onChange={e => setForm({ ...form, asaasWalletId: e.target.value.trim() })}
+              maxLength={100}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="ex.: 0a1b2c3d-..."
+              className={`${fieldClass} max-w-md font-mono`}
+            />
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Identificador da carteira (walletId) da conta Asaas no CNPJ da mecânica. Nas cobranças, a parte da oficina cai direto nela.
+            </p>
           </div>
         </Section>
 

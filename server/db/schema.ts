@@ -107,6 +107,32 @@ export interface ServiceOrderItem {
   observation?: string;
 }
 
+export type RepasseType = 'fixed' | 'percent';
+
+/** Serviço como entrou na OS: preço e repasse copiados do catálogo na hora (mudar o catálogo não altera a OS). */
+export interface ServiceOrderService {
+  serviceId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  repasseType: RepasseType;
+  repasseValue: number;
+  /** Repasse da linha (todas as unidades) para a empresa. */
+  repasseAmount: number;
+}
+
+/** Catálogo de serviços da oficina, com o repasse que vai para a empresa. */
+export const services = pgTable('services', {
+  id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
+  name: text('name').notNull(),
+  price: money('price').notNull().default(0),
+  repasseType: text('repasse_type').$type<RepasseType>().notNull().default('fixed'),
+  repasseValue: money('repasse_value').notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index('services_workspace_idx').on(t.workspaceId, t.name)]);
+
 export const serviceOrders = pgTable('service_orders', {
   id: text('id').primaryKey(),
   workspaceId: workspaceId(),
@@ -115,6 +141,9 @@ export const serviceOrders = pgTable('service_orders', {
   vehicleModel: text('vehicle_model'),
   vehiclePlate: text('vehicle_plate'),
   items: jsonb('items').$type<ServiceOrderItem[]>().notNull().default([]),
+  serviceItems: jsonb('service_items').$type<ServiceOrderService[]>().notNull().default([]),
+  /** Soma dos repasses dos serviços: vai para a empresa quando a OS é paga. */
+  repasseAmount: money('repasse_amount').notNull().default(0),
   generalLaborCost: money('general_labor_cost').notNull().default(0),
   totalLaborCost: money('total_labor_cost').notNull().default(0),
   totalPartsCost: money('total_parts_cost').notNull().default(0),
@@ -128,10 +157,16 @@ export const serviceOrders = pgTable('service_orders', {
   companyAmount: money('company_amount'),
   workshopAmount: money('workshop_amount'),
   paidAt: timestamp('paid_at', { withTimezone: true }),
+  // Cobrança no Asaas (rota /service-orders/:id/charge); o webhook acha a OS pelo id.
+  asaasPaymentId: text('asaas_payment_id'),
+  paymentUrl: text('payment_url'),
   createdBy: text('created_by').notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => [index('os_created_idx').on(t.workspaceId, t.createdAt), index('os_paid_idx').on(t.paidAt)]);
+}, (t) => [
+  index('os_created_idx').on(t.workspaceId, t.createdAt), index('os_paid_idx').on(t.paidAt),
+  uniqueIndex('os_asaas_payment_uq').on(t.asaasPaymentId),
+]);
 
 export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),

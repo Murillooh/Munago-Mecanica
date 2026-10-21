@@ -8,6 +8,7 @@ import { errorHandler } from '../middleware/errorHandler';
 import { users, workspaces } from '../db/schema';
 import type { DB } from '../db/client';
 import type { CognitoAdmin } from '../auth/cognito';
+import type { PaymentGateway } from '../services/asaas';
 
 // Token fake: "sub|email"
 const fakeVerifier = {
@@ -57,9 +58,21 @@ export async function createHarness(extra?: (db: DB) => (r: Router) => void) {
     { id: 'boss', workspaceId: 'default', email: 'boss@x.com', name: 'Boss', role: 'admin', status: 'approved' },
   ]);
 
+  // Gateway de pagamento falso: cada cobrança vira "pay-N", pendente até o teste mudar o status.
+  let p = 0;
+  const paymentStatus = new Map<string, string>();
+  const payments: PaymentGateway = {
+    createCharge: vi.fn(async () => { const id = `pay-${++p}`; paymentStatus.set(id, 'PENDING'); return { id, invoiceUrl: `https://pague.test/${id}` }; }),
+    getCharge: vi.fn(async (id: string) => ({ status: paymentStatus.get(id) ?? 'PENDING' })),
+    getPixQrCode: vi.fn(async () => ({ payload: 'pix-copia-e-cola', encodedImage: 'aW1n' })),
+  };
+
   const app = express();
   app.use(express.json());
-  app.use('/api/v1', createApiRouter({ db, bus, cognito, verifier: fakeVerifier, bootstrapAdmins: ['boss@x.com'], extra: extra?.(db) }));
+  app.use('/api/v1', createApiRouter({
+    db, bus, cognito, payments, asaasWebhookToken: 'whk-test',
+    verifier: fakeVerifier, bootstrapAdmins: ['boss@x.com'], extra: extra?.(db),
+  }));
   app.use(errorHandler);
 
   /** `workspace`: oficina pedida via header (só vale para o admin geral). */
@@ -74,5 +87,5 @@ export async function createHarness(extra?: (db: DB) => (r: Router) => void) {
     };
   };
 
-  return { app, db, bus, changes, cognito, as, anon: request(app) };
+  return { app, db, bus, changes, cognito, payments, paymentStatus, as, anon: request(app) };
 }

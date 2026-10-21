@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 
 export type Resource =
   | 'products' | 'categories' | 'transactions' | 'serviceOrders'
-  | 'notifications' | 'users' | 'settings' | 'accessRequests' | 'workspaces';
+  | 'notifications' | 'users' | 'settings' | 'accessRequests' | 'workspaces' | 'services';
 
 /**
  * Avisa quem está ouvindo (SSE) que um recurso mudou; o cliente refaz o GET.

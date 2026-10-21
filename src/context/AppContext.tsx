@@ -119,6 +119,15 @@ export interface Category {
   createdAt: any;
 }
 
+/** Serviço do catálogo da oficina: preço e repasse para a empresa (R$ fixo ou % do preço). */
+export interface Service {
+  id: string;
+  name: string;
+  price: number;
+  repasseType: 'fixed' | 'percent';
+  repasseValue: number;
+}
+
 export interface SystemSettings {
   storeName: string;
   logoUrl?: string;
@@ -131,8 +140,8 @@ export interface SystemSettings {
   enableSoundAlerts?: boolean;
   monitorAutoScrollEnabled?: boolean;
   monitorScrollIntervalSeconds?: number;
-  /** % do total da OS que vai para a empresa no pagamento (o resto é da oficina). */
-  companySharePercent?: number;
+  /** Carteira Asaas da oficina: recebe a parte dela no split das cobranças. */
+  asaasWalletId?: string;
   lastFirestoreBackup?: string;
 }
 
@@ -161,11 +170,18 @@ export interface ServiceOrder {
   scheduledDate: string;
   completionDate?: string;
   observations?: string;
-  /** Repasse congelado pelo servidor quando a OS fica 'paid'. Na escrita, só companySharePercent é aceito. */
+  /** Serviços da OS (preço e repasse copiados do catálogo pelo servidor). Na escrita, só serviceId e quantity. */
+  serviceItems?: { serviceId: string; name: string; price: number; quantity: number; repasseAmount: number }[];
+  /** Soma dos repasses dos serviços (vai para a empresa no pagamento). */
+  repasseAmount?: number;
+  /** Repasse congelado pelo servidor quando a OS fica 'paid'. */
   companySharePercent?: number | null;
   companyAmount?: number | null;
   workshopAmount?: number | null;
   paidAt?: string | null;
+  /** Cobrança emitida no Asaas (link da fatura). */
+  asaasPaymentId?: string | null;
+  paymentUrl?: string | null;
   createdAt: any;
   updatedAt: any;
   createdBy: string;
@@ -200,13 +216,13 @@ const toProfile = (u: ApiUser): UserProfile => ({
   workspace: u.workspace,
 });
 
-// Campos aceitos por PATCH /settings (o resto do formulário é só exibição).
 const OPEN_TAB_KEY = 'munago_open_tab';
 
+// Campos aceitos por PATCH /settings (o resto do formulário é só exibição).
 const SETTINGS_KEYS = [
   'storeName', 'logoUrl', 'contactPhone', 'contactEmail', 'address', 'allowNegativeStock', 'accentColor',
   'autoBackupEnabled', 'enableSoundAlerts', 'monitorAutoScrollEnabled', 'monitorScrollIntervalSeconds',
-  'companySharePercent',
+  'asaasWalletId',
 ] as const;
 
 /** Remove null/undefined para não violar a validação da API em campos opcionais. */
@@ -228,6 +244,7 @@ interface AppContextType {
   transactions: Transaction[];
   notifications: Notification[];
   categories: Category[];
+  services: Service[];
   serviceOrders: ServiceOrder[];
   allUsers: UserProfile[];
   users: UserProfile[];
@@ -350,6 +367,7 @@ export const AppProvider = ({ children }: { children: any }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -450,6 +468,7 @@ export const AppProvider = ({ children }: { children: any }) => {
     setTransactions([]);
     setNotifications([]);
     setCategories([]);
+    setServices([]);
     setServiceOrders([]);
     setAllUsers([]);
     unreadIdsRef.current = null;
@@ -534,6 +553,7 @@ export const AppProvider = ({ children }: { children: any }) => {
       products: async () => setProducts((await apiGet<Product[]>('/products')).map(hydrateDates)),
       transactions: async () => setTransactions((await apiGet<Transaction[]>('/transactions')).map(hydrateDates)),
       categories: async () => setCategories((await apiGet<Category[]>('/categories')).map(hydrateDates)),
+      services: async () => setServices(await apiGet<Service[]>('/services')),
       serviceOrders: async () => setServiceOrders((await apiGet<ServiceOrder[]>('/service-orders')).map(hydrateDates)),
       settings: async () => {
         const s = await apiGet<SystemSettings & { lastBackup?: string }>('/settings');
@@ -700,8 +720,9 @@ export const AppProvider = ({ children }: { children: any }) => {
       toast.error('Acesso restrito: Você não possui permissão para gerar Ordens de Serviço.');
       return;
     }
-    // Erro sobe para a tela, que mostra o toast.
-    await apiPost('/service-orders', compact(os));
+    // Erro sobe para a tela, que mostra o toast. Serviços: só id + quantidade (preço e repasse vêm do catálogo).
+    const serviceItems = (os.serviceItems ?? []).map(s => ({ serviceId: s.serviceId, quantity: s.quantity }));
+    await apiPost('/service-orders', compact({ ...os, serviceItems, companySharePercent: undefined, repasseAmount: undefined }));
   };
 
   const updateServiceOrderAction = async (id: string, updates: Partial<ServiceOrder>) => {
@@ -710,13 +731,18 @@ export const AppProvider = ({ children }: { children: any }) => {
       return;
     }
     // Itens e autor não mudam após criar (estoque já foi baixado).
-    // Valores do repasse são calculados pelo servidor; só o % pode ser enviado.
-    const { id: _id, createdAt: _c, updatedAt: _u, createdBy: _b, companyAmount: _ca, workshopAmount: _wa, paidAt: _pa, items, ...data } = updates;
+    // Repasse e cobrança são do servidor; serviços vão só como id + quantidade, e só se mudaram.
+    const {
+      id: _id, createdAt: _c, updatedAt: _u, createdBy: _b, companyAmount: _ca, workshopAmount: _wa, paidAt: _pa,
+      companySharePercent: _csp, repasseAmount: _ra, asaasPaymentId: _ap, paymentUrl: _pu, items, serviceItems, ...data
+    } = updates;
     const current = serviceOrders.find(o => o.id === id);
     if (items && current && JSON.stringify(items) !== JSON.stringify(current.items)) {
       toast.warning('Os itens de uma OS não podem ser alterados após a criação. Os demais campos foram salvos.');
     }
-    await apiPatch(`/service-orders/${id}`, compact(data));
+    const asInput = (list?: ServiceOrder['serviceItems']) => (list ?? []).map(s => ({ serviceId: s.serviceId, quantity: s.quantity }));
+    const servicesChanged = serviceItems && JSON.stringify(asInput(serviceItems)) !== JSON.stringify(asInput(current?.serviceItems));
+    await apiPatch(`/service-orders/${id}`, compact({ ...data, serviceItems: servicesChanged ? asInput(serviceItems) : undefined }));
   };
 
   const deleteServiceOrderAction = async (id: string) => {
@@ -915,6 +941,7 @@ export const AppProvider = ({ children }: { children: any }) => {
       transactions,
       notifications,
       categories,
+      services,
       serviceOrders,
       allUsers,
       users: allUsers,

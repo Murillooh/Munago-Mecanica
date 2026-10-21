@@ -11,3 +11,6 @@ project.zip
 scripts/migrate/out/
 firebase-applet-config.json
 eb-bundle.zip
+
+# estado local de plugins do Claude Code
+.omc/

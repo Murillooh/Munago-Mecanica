@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
   Package, 
-  FileText, 
+  FileText,
+  Wrench,
   History, 
   Bell, 
   User, 
@@ -34,7 +35,7 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
   const items = [
     ...(canViewReports ? [{ id: 'dashboard', label: 'Início', icon: LayoutDashboard }] : []),
     ...(canViewInventory ? [{ id: 'inventory', label: 'Estoque', icon: Package }] : []),
-    ...(canViewOS ? [{ id: 'os', label: 'Serviços', icon: FileText }] : []),
+    ...(canViewOS ? [{ id: 'os', label: 'OS', icon: FileText }] : []),
     ...(!isViewer ? [{ id: 'ai', label: 'IA', icon: Sparkles }] : []),
     ...(isAdmin || canManageUsers ? [{ id: 'more', label: 'Menu', icon: Menu }] : []),
   ];
@@ -42,6 +43,7 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const moreItems = [
+    ...(canViewOS ? [{ id: 'services', label: 'Serviços', icon: Wrench }] : []),
     ...(canPerformTransactions ? [{ id: 'transactions', label: 'Movimentações', icon: History }] : []),
     ...(isAdmin ? [{ id: 'alerts', label: 'Alertas', icon: Bell, count: unreadCount }] : []),
     ...(canManageUsers ? [{ id: 'users', label: 'Usuários', icon: User }] : []),

@@ -23,6 +23,7 @@ const AIAssistant = lazy(() => import('./components/AIAssistant'));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Inventory = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
 const ServiceOrders = lazy(() => import('./pages/ServiceOrders').then(m => ({ default: m.ServiceOrders })));
+const Services = lazy(() => import('./pages/Services').then(m => ({ default: m.Services })));
 const Transactions = lazy(() => import('./pages/Transactions').then(m => ({ default: m.Transactions })));
 const Notifications = lazy(() => import('./pages/Notifications').then(m => ({ default: m.Notifications })));
 const SettingsView = lazy(() => import('./pages/Settings').then(m => ({ default: m.SettingsView })));
@@ -88,6 +89,8 @@ const AppContent = () => {
         return <Transactions />;
       case 'os':
         return <ServiceOrders />;
+      case 'services':
+        return <Services />;
       case 'alerts':
         return <Notifications />;
       case 'settings':

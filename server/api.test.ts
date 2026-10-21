@@ -166,40 +166,205 @@ describe('API v1', () => {
       await h.as('editor').del(`/service-orders/${id}`).expect(204);
     });
 
-    describe('repasse no pagamento', () => {
-      it('ao pagar usa o % padrão; OS não paga não tem repasse', async () => {
-        await h.as('admin').patch('/settings', { companySharePercent: 30 }).expect(200);
-        const id = (await h.as('editor').post('/service-orders', os([item(a, 1)]))).body.id;
-        const open = await h.as('editor').patch(`/service-orders/${id}`, { status: 'completed' }).expect(200);
-        expect(open.body).toMatchObject({ companySharePercent: null, companyAmount: null, workshopAmount: null, paidAt: null });
+    describe('repasse por serviço', () => {
+      // Revisão R$ 100 com R$ 10 fixos para a empresa; Alinhamento R$ 50 com 20% (R$ 10 por unidade).
+      let rev: string;
+      let ali: string;
+      beforeEach(async () => {
+        rev = (await h.as('editor').post('/services', { name: 'Revisão', price: 100, repasseType: 'fixed', repasseValue: 10 }).expect(201)).body.id;
+        ali = (await h.as('editor').post('/services', { name: 'Alinhamento', price: 50, repasseType: 'percent', repasseValue: 20 }).expect(201)).body.id;
+      });
+      // Peças 100 + mão de obra 50 + serviços (100 + 2×50) = 350; repasse 10 + 2×10 = 30.
+      const withServices = () => ({
+        ...os([item(a, 1)]), totalAmount: 350,
+        serviceItems: [{ serviceId: rev, quantity: 1 }, { serviceId: ali, quantity: 2 }],
+      });
 
-        const paid = await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
-        expect(paid.body).toMatchObject({ companySharePercent: 30, companyAmount: 45, workshopAmount: 105 });
+      it('valor e repasse vêm do catálogo; ao pagar, empresa recebe a soma dos repasses', async () => {
+        const res = await h.as('editor').post('/service-orders', withServices()).expect(201);
+        expect(res.body).toMatchObject({ repasseAmount: 30, companyAmount: null, workshopAmount: null });
+        expect(res.body.serviceItems).toEqual([
+          expect.objectContaining({ serviceId: rev, name: 'Revisão', price: 100, quantity: 1, repasseAmount: 10 }),
+          expect.objectContaining({ serviceId: ali, name: 'Alinhamento', price: 50, quantity: 2, repasseAmount: 20 }),
+        ]);
+        const paid = await h.as('editor').patch(`/service-orders/${res.body.id}`, { status: 'paid' }).expect(200);
+        expect(paid.body).toMatchObject({ companyAmount: 30, workshopAmount: 320 });
         expect(paid.body.paidAt).toBeTruthy();
       });
 
-      it('% ajustado na OS fica congelado mesmo se o padrão mudar', async () => {
-        await h.as('admin').patch('/settings', { companySharePercent: 30 }).expect(200);
-        const id = (await h.as('editor').post('/service-orders', { ...os([item(a, 1)]), status: 'paid', companySharePercent: 40 }).expect(201)).body.id;
-        await h.as('admin').patch('/settings', { companySharePercent: 10 }).expect(200);
-
-        const upd = await h.as('editor').patch(`/service-orders/${id}`, { observations: 'cliente pagou no pix' }).expect(200);
-        expect(upd.body).toMatchObject({ companySharePercent: 40, companyAmount: 60, workshopAmount: 90 });
+      it('o navegador não define preço nem repasse do serviço', async () => {
+        const body = { ...withServices(), serviceItems: [{ serviceId: rev, quantity: 1, price: 1, repasseAmount: 0 }] };
+        const res = await h.as('editor').post('/service-orders', { ...body, totalAmount: 250 }).expect(201);
+        expect(res.body.serviceItems[0]).toMatchObject({ price: 100, repasseAmount: 10 });
+        expect(res.body.repasseAmount).toBe(10);
       });
 
-      it('centavos: empresa + oficina sempre fecham o total', async () => {
-        const body = { ...os([item(a, 1)]), totalAmount: 100.01, status: 'paid', companySharePercent: 33.33 };
-        const res = await h.as('editor').post('/service-orders', body).expect(201);
-        expect(res.body.companyAmount + res.body.workshopAmount).toBeCloseTo(100.01, 2);
-        expect(res.body.companyAmount).toBe(33.33);
+      it('OS sem serviços: tudo fica com a mecânica', async () => {
+        const res = await h.as('editor').post('/service-orders', { ...os([item(a, 1)]), status: 'paid' }).expect(201);
+        expect(res.body).toMatchObject({ repasseAmount: 0, companyAmount: 0, workshopAmount: 150 });
       });
 
-      it('sair de pago limpa o repasse; % fora de 0–100 → 400', async () => {
-        const id = (await h.as('editor').post('/service-orders', { ...os([item(a, 1)]), status: 'paid', companySharePercent: 50 })).body.id;
+      it('mudar o serviço no catálogo não altera OS já criada', async () => {
+        const id = (await h.as('editor').post('/service-orders', withServices())).body.id;
+        await h.as('editor').patch(`/services/${rev}`, { price: 500, repasseValue: 99 }).expect(200);
+        const paid = await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
+        expect(paid.body.companyAmount).toBe(30);
+      });
+
+      it('trocar serviços da OS recalcula o repasse; sair de pago limpa e voltar recalcula', async () => {
+        const id = (await h.as('editor').post('/service-orders', withServices())).body.id;
+        const upd = await h.as('editor').patch(`/service-orders/${id}`, { serviceItems: [{ serviceId: rev, quantity: 3 }], totalAmount: 450 }).expect(200);
+        expect(upd.body).toMatchObject({ repasseAmount: 30 });
+        expect(upd.body.serviceItems).toHaveLength(1);
+        await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
         const back = await h.as('editor').patch(`/service-orders/${id}`, { status: 'completed' }).expect(200);
-        expect(back.body).toMatchObject({ companySharePercent: null, companyAmount: null, paidAt: null });
-        await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid', companySharePercent: 120 }).expect(400);
+        expect(back.body).toMatchObject({ companyAmount: null, workshopAmount: null, paidAt: null });
+        const again = await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
+        expect(again.body).toMatchObject({ companyAmount: 30, workshopAmount: 420 });
       });
+
+      it('serviço de outra oficina não entra; total menor que o repasse → 400', async () => {
+        const alheio = (await h.as('outsider').post('/services', { name: 'X', price: 10, repasseType: 'fixed', repasseValue: 1 })).body.id;
+        await h.as('editor').post('/service-orders', { ...os([]), serviceItems: [{ serviceId: alheio, quantity: 1 }] }).expect(404);
+        await h.as('editor').post('/service-orders', { ...withServices(), totalAmount: 20 }).expect(400);
+      });
+    });
+  });
+
+  describe('serviços (catálogo da mecânica)', () => {
+    const svc = (over: object = {}) => ({ name: 'Troca de óleo', price: 100, repasseType: 'fixed', repasseValue: 10, ...over });
+
+    it('editor cria, lista, edita e exclui; viewer só lê', async () => {
+      const id = (await h.as('editor').post('/services', svc()).expect(201)).body.id;
+      expect((await h.as('viewer').get('/services').expect(200)).body).toEqual([expect.objectContaining({ id, name: 'Troca de óleo', price: 100, repasseType: 'fixed', repasseValue: 10 })]);
+      await h.as('viewer').post('/services', svc()).expect(403);
+      expect((await h.as('editor').patch(`/services/${id}`, { repasseType: 'percent', repasseValue: 15 }).expect(200)).body).toMatchObject({ repasseType: 'percent', repasseValue: 15 });
+      await h.as('editor').del(`/services/${id}`).expect(204);
+      expect((await h.as('editor').get('/services')).body).toEqual([]);
+      expect(h.changes).toContain('services');
+    });
+
+    it('repasse não passa do preço (fixo) nem de 100% (percentual)', async () => {
+      await h.as('editor').post('/services', svc({ repasseValue: 101 })).expect(400);
+      await h.as('editor').post('/services', svc({ repasseType: 'percent', repasseValue: 120 })).expect(400);
+      const id = (await h.as('editor').post('/services', svc())).body.id;
+      await h.as('editor').patch(`/services/${id}`, { price: 5 }).expect(400);
+    });
+
+    it('cada oficina vê só os próprios serviços', async () => {
+      const id = (await h.as('editor').post('/services', svc())).body.id;
+      expect((await h.as('outsider').get('/services')).body).toEqual([]);
+      await h.as('outsider').patch(`/services/${id}`, { price: 1 }).expect(404);
+      await h.as('outsider').del(`/services/${id}`).expect(204);
+      expect((await h.as('editor').get('/services')).body).toHaveLength(1);
+    });
+  });
+
+  describe('cobrança da OS (Asaas com split)', () => {
+    const doc = '529.982.247-25';
+    /** OS de R$ 40 com um serviço de R$ 40 cujo repasse é `repasse` (padrão R$ 10: oficina 30, empresa 10). */
+    const newOS = async (repasse: { repasseType: 'fixed' | 'percent'; repasseValue: number } | null = { repasseType: 'fixed', repasseValue: 10 }) => {
+      const serviceItems = repasse
+        ? [{ serviceId: (await h.as('admin').post('/services', { name: 'Revisão', price: 40, ...repasse }).expect(201)).body.id, quantity: 1 }]
+        : [];
+      return (await h.as('admin').post('/service-orders', {
+        customerName: 'Ana', customerPhone: '11999990000', scheduledDate: '2026-10-20', items: [], serviceItems, totalAmount: 40,
+      }).expect(201)).body;
+    };
+    const setup = async (repasse?: Parameters<typeof newOS>[0]) => {
+      await h.as('admin').patch('/settings', { asaasWalletId: 'wallet-oficina' }).expect(200);
+      return newOS(repasse);
+    };
+
+    it('sem carteira da mecânica configurada não cobra', async () => {
+      const os = await newOS();
+      const res = await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(400);
+      expect(res.body.code).toBe('WALLET_MISSING');
+      expect(h.payments.createCharge).not.toHaveBeenCalled();
+    });
+
+    it('cria a cobrança com a parte da oficina indo para a carteira dela', async () => {
+      const os = await setup();
+      const res = await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(201);
+      expect(res.body).toMatchObject({ status: 'PENDING', paymentUrl: 'https://pague.test/pay-1', pix: { payload: 'pix-copia-e-cola' } });
+      expect(h.payments.createCharge).toHaveBeenCalledWith(expect.objectContaining({
+        value: 40, cpfCnpj: '52998224725', customerName: 'Ana', externalReference: os.id,
+        split: { walletId: 'wallet-oficina', percent: 75 },
+      }));
+      const [row] = await h.db.select().from(serviceOrders).where(eq(serviceOrders.id, os.id));
+      expect(row).toMatchObject({ asaasPaymentId: 'pay-1', paymentUrl: 'https://pague.test/pay-1', status: 'draft' });
+    });
+
+    it('cobrar de novo devolve a mesma cobrança', async () => {
+      const os = await setup();
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(201);
+      const again = await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(201);
+      expect(again.body.paymentUrl).toBe('https://pague.test/pay-1');
+      expect(h.payments.createCharge).toHaveBeenCalledTimes(1);
+    });
+
+    it('repasse de 100%: cobra sem split e sem exigir carteira', async () => {
+      const os = await newOS({ repasseType: 'percent', repasseValue: 100 });
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(201);
+      expect(h.payments.createCharge).toHaveBeenCalledWith(expect.objectContaining({ split: undefined }));
+    });
+
+    it('sem serviços: a oficina recebe 100%', async () => {
+      const os = await setup(null);
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(201);
+      expect(h.payments.createCharge).toHaveBeenCalledWith(expect.objectContaining({ split: { walletId: 'wallet-oficina', percent: 100 } }));
+    });
+
+    it('valida CPF/CNPJ, valor e situação da OS; respeita permissão e oficina', async () => {
+      const os = await setup();
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: '123' }).expect(400);
+      const zero = (await h.as('admin').post('/service-orders', { customerName: 'B', scheduledDate: '2026-10-20', items: [], totalAmount: 0 })).body;
+      await h.as('admin').post(`/service-orders/${zero.id}/charge`, { cpfCnpj: doc }).expect(400);
+      await h.as('admin').patch(`/service-orders/${os.id}`, { status: 'paid' }).expect(200);
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(409);
+      const other = await newOS();
+      await h.as('viewer').post(`/service-orders/${other.id}/charge`, { cpfCnpj: doc }).expect(403);
+      await h.as('outsider').post(`/service-orders/${other.id}/charge`, { cpfCnpj: doc }).expect(404);
+    });
+
+    it('verificar: pagamento recebido marca a OS como paga e congela o repasse', async () => {
+      const os = await setup();
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc });
+      expect((await h.as('editor').get(`/service-orders/${os.id}/charge`).expect(200)).body.status).toBe('PENDING');
+      h.paymentStatus.set('pay-1', 'RECEIVED');
+      const res = await h.as('editor').get(`/service-orders/${os.id}/charge`).expect(200);
+      expect(res.body.status).toBe('RECEIVED');
+      const [row] = await h.db.select().from(serviceOrders).where(eq(serviceOrders.id, os.id));
+      expect(row).toMatchObject({ status: 'paid', companyAmount: 10, workshopAmount: 30 });
+      expect(row.paidAt).toBeTruthy();
+      expect(h.changes).toContain('serviceOrders');
+    });
+
+    it('com cobrança emitida o valor da OS não muda', async () => {
+      const os = await setup();
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc });
+      expect((await h.as('admin').patch(`/service-orders/${os.id}`, { totalAmount: 99 }).expect(409)).body.code).toBe('CHARGE_EXISTS');
+      await h.as('admin').patch(`/service-orders/${os.id}`, { totalAmount: 40, observations: 'ok' }).expect(200);
+    });
+
+    it('OS sem cobrança → 404 ao verificar', async () => {
+      const os = await setup();
+      await h.as('admin').get(`/service-orders/${os.id}/charge`).expect(404);
+    });
+
+    it('webhook do Asaas: exige o token e marca a OS como paga', async () => {
+      const os = await setup();
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc });
+      const event = { event: 'PAYMENT_RECEIVED', payment: { id: 'pay-1', externalReference: os.id, status: 'RECEIVED' } };
+      await request(h.app).post('/api/v1/asaas/webhook').send(event).expect(401);
+      await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'errado').send(event).expect(401);
+      await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'whk-test').send(event).expect(200);
+      const [row] = await h.db.select().from(serviceOrders).where(eq(serviceOrders.id, os.id));
+      expect(row).toMatchObject({ status: 'paid', companyAmount: 10, workshopAmount: 30 });
+      // Evento repetido ou de cobrança desconhecida não quebra.
+      await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'whk-test').send(event).expect(200);
+      await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'whk-test')
+        .send({ event: 'PAYMENT_RECEIVED', payment: { id: 'nao-existe' } }).expect(200);
     });
   });
 

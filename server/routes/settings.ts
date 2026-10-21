@@ -15,8 +15,6 @@ export const DEFAULT_SETTINGS = {
   enableSoundAlerts: true,
   monitorAutoScrollEnabled: true,
   monitorScrollIntervalSeconds: 12,
-  /** % do total da OS repassado à empresa no pagamento (o resto é da oficina). Ajustável por OS. */
-  companySharePercent: 0,
   lastBackup: '',
 };
 
@@ -25,6 +23,8 @@ export type SystemSettings = typeof DEFAULT_SETTINGS & {
   contactPhone?: string;
   contactEmail?: string;
   address?: string;
+  /** Carteira Asaas da oficina: recebe a parte dela no split das cobranças. */
+  asaasWalletId?: string;
 };
 
 const settingsPatch = z.object({
@@ -39,7 +39,7 @@ const settingsPatch = z.object({
   enableSoundAlerts: z.boolean(),
   monitorAutoScrollEnabled: z.boolean(),
   monitorScrollIntervalSeconds: z.number().int().min(3).max(600),
-  companySharePercent: z.number().min(0).max(100),
+  asaasWalletId: z.string().trim().max(100),
 }).partial().strict();
 
 /** Configurações de uma oficina (a linha de settings usa o id da oficina). */

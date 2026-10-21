@@ -43,6 +43,20 @@
       "when": 1791450000000,
       "tag": "0005_unassigned_signups",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792500000000,
+      "tag": "0006_os_asaas_charge",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792600000000,
+      "tag": "0007_services",
+      "breakpoints": true
     }
   ]
 }
