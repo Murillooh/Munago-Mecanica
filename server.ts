@@ -19,6 +19,7 @@ import { createApiRouter } from "./server/api";
 import { authMiddleware, requireAdmin, requirePermission } from "./server/auth/middleware";
 import { createCognitoAdmin, createCognitoVerifier } from "./server/auth/cognito";
 import { runAutoBackupIfDue } from "./server/services/backup";
+import { createAsaasGateway } from "./server/services/asaas";
 import { createGoogleOAuth } from "./server/google/oauth";
 import { createGoogleRouter } from "./server/routes/google";
 import { SUPPORT_MODELS, buildSupportPrompt, isTransientAiError, supportChatInput, toGeminiContents } from "./server/support/supportChat";
@@ -185,6 +186,8 @@ async function startServer() {
     db, bus, verifier, bootstrapAdmins,
     cognito: createCognitoAdmin(cognitoConfig),
     publicLimiter: accessRequestLimiter,
+    payments: process.env.ASAAS_API_KEY ? createAsaasGateway(process.env.ASAAS_API_KEY, process.env.ASAAS_ENV ?? 'sandbox') : undefined,
+    asaasWebhookToken: process.env.ASAAS_WEBHOOK_TOKEN,
     extra: (r) => r.use(createGoogleRouter(googleOAuth)),
   }));
 
