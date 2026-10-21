@@ -10,6 +10,9 @@ import zipfile
 root = pathlib.Path(__file__).resolve().parents[2]
 out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / 'eb-bundle.zip')
 
+# `vite build` sozinho apaga dist/server.cjs: sem ele o app não sobe no Beanstalk (502).
+if not (root / 'dist' / 'server.cjs').is_file():
+    sys.exit('dist/server.cjs não existe: rode `npm run build` (completo) antes de empacotar.')
 files = [p for p in (root / 'dist').rglob('*') if p.is_file()]
 files += [p for p in (root / '.platform').rglob('*') if p.is_file()]
 files += [root / n for n in ('package.json', 'package-lock.json', 'Procfile', 'server/db/certs/rds-global-bundle.pem')]
