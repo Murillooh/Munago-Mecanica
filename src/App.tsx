@@ -1,5 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence, MotionConfig } from 'motion/react';
+import { iosSpring } from './lib/motion';
 import { 
   Mail, 
   Lock, 
@@ -160,20 +161,16 @@ const AppContent = () => {
         }`}
       >
         <div className={`w-full overflow-x-clip ${isMonitorMode ? 'px-4 sm:px-6 lg:px-8 2xl:px-12 py-5 max-w-none' : 'px-4 sm:px-6 lg:px-8 2xl:px-10 py-6 max-w-none'}`}>
-          {/* Troca de aba estilo iOS: a tela nova entra na hora (sem esperar a antiga sair), esmaecendo e subindo de leve.
-              MotionConfig respeita "reduzir movimento" do aparelho. */}
-          <MotionConfig reducedMotion="user">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <Suspense fallback={<PageFallback />}>
-                {renderContent()}
-              </Suspense>
-            </motion.div>
-          </MotionConfig>
+          {/* Troca de aba estilo iOS: a tela nova entra na hora (sem esperar a antiga sair), esmaecendo e assentando com mola. */}
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10, scale: 0.992 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+          >
+            <Suspense fallback={<PageFallback />}>
+              {renderContent()}
+            </Suspense>
+          </motion.div>
         </div>
       </main>
 
@@ -291,10 +288,13 @@ const AppToaster = () => {
 
 const App = () => {
   return (
-    <BrowserRouter>
-      <RootApp />
-      <AppToaster />
-    </BrowserRouter>
+    // Mola macOS/iOS como padrão de todas as animações; "reduzir movimento" do aparelho desliga.
+    <MotionConfig transition={iosSpring} reducedMotion="user">
+      <BrowserRouter>
+        <RootApp />
+        <AppToaster />
+      </BrowserRouter>
+    </MotionConfig>
   );
 };
 

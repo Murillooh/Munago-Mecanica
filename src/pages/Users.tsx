@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { iosSheet } from '../lib/motion';
 import {
   ShieldCheck,
   Search,
@@ -180,10 +181,10 @@ const Dialog: React.FC<{ title: string; subtitle?: string; onClose: () => void; 
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelId}
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 16 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
+        initial={{ opacity: 0, y: 8, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 6, scale: 0.97 }}
+        transition={iosSheet}
         className="flex max-h-[100dvh] sm:max-h-[min(820px,calc(100dvh-3rem))] w-full max-w-2xl flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl"
       >
         <header className="flex items-start justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
@@ -749,10 +750,10 @@ export const Users = () => {
               role="alertdialog"
               aria-modal="true"
               aria-labelledby="delete-user-title"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
+              initial={{ opacity: 0, y: 8, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.97 }}
+              transition={iosSheet}
               className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6"
             >
               <span className="inline-flex p-2.5 rounded-xl border bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40">

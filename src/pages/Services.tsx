@@ -117,8 +117,8 @@ export const Services = () => {
       )}
 
       {draft && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="service-form-title">
-          <form onSubmit={save} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        <div className="ios-fade fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="service-form-title">
+          <form onSubmit={save} className="ios-pop w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
             <div className="flex items-center justify-between">
               <h2 id="service-form-title" className="text-lg font-bold text-zinc-900 dark:text-white">{draft.id ? 'Editar serviço' : 'Novo serviço'}</h2>
               <button type="button" onClick={() => setDraft(null)} aria-label="Fechar" className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"><X size={18} /></button>
@@ -184,8 +184,8 @@ export const Services = () => {
       )}
 
       {toDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="service-delete-title">
-          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        <div className="ios-fade fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="service-delete-title">
+          <div className="ios-pop w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
             <h2 id="service-delete-title" className="text-lg font-bold text-zinc-900 dark:text-white">Excluir "{toDelete.name}"?</h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">As OS que já usaram este serviço não mudam.</p>
             <div className="flex justify-end gap-2">

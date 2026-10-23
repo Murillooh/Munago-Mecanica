@@ -18,6 +18,7 @@ import {
   ChevronsUpDown,
   type LucideIcon,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useApp } from '../../context/AppContext';
 import { toast } from 'sonner';
 
@@ -220,14 +221,22 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
                         isCollapsed ? 'justify-center' : 'gap-3 px-3'
                       } ${
                         active
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 font-semibold text-white shadow-md shadow-blue-600/25'
+                          ? 'font-semibold text-white'
                           : 'font-medium hover:bg-zinc-900/5 hover:text-zinc-900 dark:hover:bg-white/5 dark:hover:text-zinc-100'
                       }`}
                     >
-                      <item.icon size={18} strokeWidth={active ? 2.25 : 1.75} className="shrink-0" aria-hidden="true" />
-                      {!isCollapsed && <span className="truncate">{item.label}</span>}
+                      {/* Pílula do item ativo: desliza até o item clicado, como no macOS (layoutId compartilhado). */}
+                      {active && (
+                        <motion.span
+                          layoutId="sidebar-active-pill"
+                          className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md shadow-blue-600/25"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <item.icon size={18} strokeWidth={active ? 2.25 : 1.75} className="relative shrink-0" aria-hidden="true" />
+                      {!isCollapsed && <span className="relative truncate">{item.label}</span>}
                       {showCount && !isCollapsed && (
-                        <span className={`ml-auto min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums ${
+                        <span className={`relative ml-auto min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums ${
                           active
                             ? 'bg-white/25 text-white'
                             : item.tone === 'alert'
