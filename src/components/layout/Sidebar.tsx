@@ -14,6 +14,8 @@ import {
   Sparkles,
   Maximize2,
   ShieldCheck,
+  Building2,
+  ChevronsUpDown,
   type LucideIcon,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -97,7 +99,11 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
 
   const storeName = (!settings?.storeName || settings.storeName.toLowerCase().includes('loc')) ? 'Munago Mecânica' : settings.storeName;
   const roleLabel = isAdmin ? 'Administrador' : profile?.role === 'editor' ? 'Operador' : profile?.role === 'viewer' ? 'Visualizador' : 'Colaborador';
-  const initials = (profile?.name || 'US').substring(0, 2).toUpperCase();
+  // Iniciais do primeiro e do último nome ("Murillo Silva" → "MS"); nome único → só a primeira letra.
+  const nameParts = (profile?.name || 'Usuário').trim().split(/\s+/);
+  const initials = (nameParts[0][0] + (nameParts.length > 1 ? nameParts[nameParts.length - 1][0] : '')).toUpperCase();
+  const activeWorkspaceId = profile?.workspace?.id ?? profile?.workspaceId ?? '';
+  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
 
   const go = (id: string) => {
     if (id === 'inventory') setInventoryLowStockFilter(false);
@@ -117,10 +123,10 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       className={`hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 ${isCollapsed ? 'w-[4.25rem]' : 'w-64'} border-r border-zinc-200 bg-white text-zinc-600 transition-[width] duration-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400`}
     >
       {/* Marca + recolher */}
-      <div className={`flex h-14 shrink-0 items-center border-b border-zinc-200 dark:border-zinc-800 ${isCollapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-2'}`}>
+      <div className={`flex h-16 shrink-0 items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-2'}`}>
         {!isCollapsed && (
           <div className="flex min-w-0 items-center gap-2.5">
-            <img src="/brand/munago-mecanica-icon.svg" alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-md" />
+            <img src="/brand/munago-mecanica-icon.svg" alt="" width={32} height={32} className="h-8 w-8 shrink-0 rounded-xl shadow-sm" />
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{storeName}</p>
               <p className="truncate text-[11px] text-zinc-500">Gestão da oficina</p>
@@ -139,24 +145,40 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
         </button>
       </div>
 
-      {/* Admin geral: escolhe qual oficina está administrando */}
+      {/* Admin geral: escolhe qual oficina está administrando (cartão; o select nativo fica por cima, invisível) */}
       {isSuperAdmin && !isCollapsed && workspaces.length > 0 && (
-        <div className="shrink-0 border-b border-zinc-200 px-3 py-2.5 dark:border-zinc-800">
-          <label htmlFor="workspace-switcher" className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-            Oficina ({workspaces.length})
-          </label>
-          <select
-            id="workspace-switcher"
-            value={profile?.workspace?.id ?? profile?.workspaceId ?? ''}
-            onChange={(e) => switchWorkspace(e.target.value)}
-            className="w-full cursor-pointer rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs font-medium text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
-          >
-            {workspaces.map(w => (
-              <option key={w.id} value={w.id}>
-                {w.name}{w.id === profile?.workspaceId ? ' (minha)' : ''} · {w.userCount ?? 0} usuário(s)
-              </option>
-            ))}
-          </select>
+        <div className="shrink-0 px-3 pt-3">
+          <div className="relative rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3 text-white shadow-lg shadow-blue-900/20 focus-within:ring-2 focus-within:ring-blue-400">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-100/80">Oficina ativa</p>
+            <div className="mt-1.5 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15">
+                <Building2 size={16} aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1 leading-tight">
+                <p className="truncate text-sm font-semibold">
+                  {activeWorkspace?.name ?? storeName}
+                  {activeWorkspace?.id === profile?.workspaceId && <span className="ml-1 text-[11px] font-normal text-blue-100/80">(minha)</span>}
+                </p>
+                <p className="truncate text-[11px] text-blue-100/80">
+                  {activeWorkspace?.userCount ?? 0} {activeWorkspace?.userCount === 1 ? 'usuário' : 'usuários'} · {workspaces.length} oficinas
+                </p>
+              </div>
+              <ChevronsUpDown size={16} className="shrink-0 text-blue-100/80" aria-hidden="true" />
+            </div>
+            <label htmlFor="workspace-switcher" className="sr-only">Trocar de oficina</label>
+            <select
+              id="workspace-switcher"
+              value={activeWorkspaceId}
+              onChange={(e) => switchWorkspace(e.target.value)}
+              className="absolute inset-0 h-full w-full cursor-pointer rounded-2xl opacity-0"
+            >
+              {workspaces.map(w => (
+                <option key={w.id} value={w.id}>
+                  {w.name}{w.id === profile?.workspaceId ? ' (minha)' : ''} · {w.userCount ?? 0} usuário(s)
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
@@ -180,22 +202,23 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
                       onClick={() => go(item.id)}
                       aria-current={active ? 'page' : undefined}
                       aria-label={isCollapsed ? `${item.label}${showCount ? ` (${item.count})` : ''}` : undefined}
-                      className={`relative flex h-9 w-full items-center rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
-                        isCollapsed ? 'justify-center' : 'gap-2.5 px-2.5'
+                      className={`relative flex h-10 w-full items-center rounded-xl text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
+                        isCollapsed ? 'justify-center' : 'gap-3 px-3'
                       } ${
                         active
-                          ? 'bg-zinc-100 font-semibold text-zinc-900 dark:bg-zinc-800/80 dark:text-white'
-                          : 'font-medium hover:bg-zinc-50 hover:text-zinc-900 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 font-semibold text-white shadow-md shadow-blue-600/25'
+                          : 'font-medium hover:bg-zinc-900/5 hover:text-zinc-900 dark:hover:bg-white/5 dark:hover:text-zinc-100'
                       }`}
                     >
-                      {active && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-blue-600" aria-hidden="true" />}
-                      <item.icon size={18} strokeWidth={active ? 2.25 : 1.75} className={`shrink-0 ${active ? 'text-blue-600 dark:text-blue-400' : ''}`} aria-hidden="true" />
+                      <item.icon size={18} strokeWidth={active ? 2.25 : 1.75} className="shrink-0" aria-hidden="true" />
                       {!isCollapsed && <span className="truncate">{item.label}</span>}
                       {showCount && !isCollapsed && (
-                        <span className={`ml-auto rounded px-1.5 py-px font-mono text-[11px] tabular-nums ${
-                          item.tone === 'alert'
-                            ? 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400'
-                            : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'
+                        <span className={`ml-auto min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums ${
+                          active
+                            ? 'bg-white/25 text-white'
+                            : item.tone === 'alert'
+                              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                              : 'bg-zinc-900/5 text-zinc-600 dark:bg-white/10 dark:text-zinc-300'
                         }`}>
                           {item.count! > 99 ? '99+' : item.count}
                         </span>
@@ -219,13 +242,13 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       </nav>
 
       {/* Rodapé: usuário + ações */}
-      <div className="shrink-0 border-t border-zinc-200 p-2.5 dark:border-zinc-800">
-        <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1.5' : 'gap-2.5 px-1'}`}>
+      <div className="shrink-0 p-3">
+        <div className={`flex items-center rounded-2xl border border-zinc-900/5 bg-zinc-900/[0.03] dark:border-white/10 dark:bg-white/5 ${isCollapsed ? 'flex-col gap-1.5 p-1.5' : 'gap-2.5 p-2'}`}>
           <div className="relative shrink-0" title={isCollapsed ? `${profile?.name || 'Usuário'} · ${roleLabel}` : undefined}>
             {profile?.photoURL ? (
-              <img src={profile.photoURL} alt="" className="h-8 w-8 rounded-md object-cover" referrerPolicy="no-referrer" />
+              <img src={profile.photoURL} alt="" className="h-9 w-9 rounded-full object-cover" referrerPolicy="no-referrer" />
             ) : (
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-200 font-mono text-[11px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200" aria-hidden="true">{initials}</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white shadow-sm" aria-hidden="true">{initials}</span>
             )}
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950" aria-label="Online" />
           </div>
