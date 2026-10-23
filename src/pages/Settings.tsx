@@ -51,8 +51,8 @@ const fieldClass =
 const secondaryBtn =
   'inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors disabled:opacity-60 cursor-pointer';
 
-const Section: React.FC<{ id: string; icon: React.ElementType; title: string; description: string; children: React.ReactNode }> = ({ id, icon: Icon, title, description, children }) => (
-  <section aria-labelledby={id} className="bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs overflow-hidden">
+const Section: React.FC<{ id: string; icon: React.ElementType; title: string; description: string; children: React.ReactNode; className?: string }> = ({ id, icon: Icon, title, description, children, className = '' }) => (
+  <section aria-labelledby={id} className={`h-full ${className} bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs overflow-hidden`}>
     <header className="flex items-center gap-2.5 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900">
       <span className="p-1.5 rounded-lg border bg-white dark:bg-zinc-800 border-zinc-200/70 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400">
         <Icon size={14} aria-hidden="true" />
@@ -227,8 +227,8 @@ export const SettingsView = () => {
         </>}
       />
 
-      <form id="settings-form" onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <div className="space-y-4">
+      {/* Em linhas: as seções lado a lado ficam com a mesma altura (Backup ocupa a largura toda). */}
+      <form id="settings-form" onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Oficina */}
         <Section id="sec-store" icon={Store} title="Oficina" description="Aparece no menu, nos relatórios em PDF e nas ordens de serviço.">
           <div className="p-4 space-y-3">
@@ -283,96 +283,6 @@ export const SettingsView = () => {
           </div>
         </Section>
 
-        {/* Financeiro */}
-        <Section id="sec-finance" icon={Percent} title="Recebimentos" description="Para onde vai a parte da mecânica nas cobranças. O repasse para a empresa é definido em cada serviço, na tela Serviços.">
-          <div className="px-4 py-3 space-y-1">
-            <label htmlFor="asaas-wallet" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Carteira Asaas da mecânica</label>
-            <input
-              id="asaas-wallet"
-              value={form.asaasWalletId || ''}
-              onChange={e => setForm({ ...form, asaasWalletId: e.target.value.trim() })}
-              maxLength={100}
-              spellCheck={false}
-              autoComplete="off"
-              placeholder="ex.: 0a1b2c3d-..."
-              className={`${fieldClass} max-w-md font-mono`}
-            />
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Identificador da carteira (walletId) da conta Asaas no CNPJ da mecânica. Nas cobranças, a parte da oficina cai direto nela.
-            </p>
-          </div>
-        </Section>
-
-        {/* Backup e dados */}
-        <Section id="sec-backup" icon={Database} title="Backup e dados" description="Cópias de segurança do estoque, OS e movimentações.">
-          <Row
-            title="Backup automático diário"
-            description={
-              form.lastFirestoreBackup
-                ? `Último backup: ${new Date(form.lastFirestoreBackup).toLocaleString('pt-BR')}`
-                : 'Gera uma cópia por dia no banco de dados.'
-            }
-          >
-            <Switch
-              checked={Boolean(form.autoBackupEnabled)}
-              disabled={savingKey === 'autobackup'}
-              label="Backup automático diário"
-              onChange={() => saveNow('autobackup', { autoBackupEnabled: !form.autoBackupEnabled }, !form.autoBackupEnabled ? 'Backup automático ativado.' : 'Backup automático desativado.')}
-            />
-          </Row>
-          <Row
-            title="Google Drive"
-            description={
-              <span className="flex flex-col gap-1">
-                <span>Envie uma cópia manual para o seu Drive ou restaure a partir dela.</span>
-                <span className="flex items-center gap-1.5" aria-live="polite">
-                  {!drive ? (
-                    <><Loader2 size={12} className="animate-spin" aria-hidden="true" /> Verificando conexão…</>
-                  ) : !drive.configured ? (
-                    <><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" /> Google não configurado no servidor.</>
-                  ) : drive.connected ? (
-                    <>
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">Conectado</span>
-                      {drive.email && <span className="truncate">· {drive.email}</span>}
-                    </>
-                  ) : (
-                    <><span className="h-2 w-2 rounded-full bg-zinc-400" aria-hidden="true" /> Não conectado</>
-                  )}
-                </span>
-              </span>
-            }
-          >
-            {drive?.connected ? (
-              <>
-                <button type="button" onClick={handleBackupToDrive} className={secondaryBtn}>
-                  <Cloud size={14} className="text-blue-600" aria-hidden="true" /> Fazer backup
-                </button>
-                <button type="button" onClick={handleRestoreFromDrive} className={secondaryBtn}>
-                  <History size={14} className="text-emerald-600" aria-hidden="true" /> Restaurar
-                </button>
-                <button
-                  type="button"
-                  onClick={disconnectDrive}
-                  disabled={disconnecting}
-                  aria-label="Desconectar conta Google"
-                  title="Desconectar conta Google"
-                  className="inline-flex items-center justify-center rounded-lg p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:hover:bg-red-950/40 cursor-pointer"
-                >
-                  {disconnecting ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Unlink size={14} aria-hidden="true" />}
-                </button>
-              </>
-            ) : drive?.configured ? (
-              <button type="button" onClick={() => openGoogleAuth('drive')} disabled={isConnectingDrive} className={secondaryBtn}>
-                {isConnectingDrive ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Link2 size={14} className="text-blue-600" aria-hidden="true" />}
-                Conectar Google Drive
-              </button>
-            ) : null}
-          </Row>
-        </Section>
-        </div>
-
-        <div className="space-y-4">
         {/* Aparência */}
         <Section id="sec-appearance" icon={Palette} title="Aparência" description="Tema e cor de destaque. O tema vale só para este navegador; a cor vale para todos.">
           <Row title="Tema">
@@ -456,6 +366,26 @@ export const SettingsView = () => {
           </div>
         </Section>
 
+        {/* Financeiro */}
+        <Section id="sec-finance" icon={Percent} title="Recebimentos" description="Para onde vai a parte da mecânica nas cobranças. O repasse para a empresa é definido em cada serviço, na tela Serviços.">
+          <div className="px-4 py-3 space-y-1">
+            <label htmlFor="asaas-wallet" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Carteira Asaas da mecânica</label>
+            <input
+              id="asaas-wallet"
+              value={form.asaasWalletId || ''}
+              onChange={e => setForm({ ...form, asaasWalletId: e.target.value.trim() })}
+              maxLength={100}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="ex.: 0a1b2c3d-..."
+              className={`${fieldClass} max-w-md font-mono`}
+            />
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Identificador da carteira (walletId) da conta Asaas no CNPJ da mecânica. Nas cobranças, a parte da oficina cai direto nela.
+            </p>
+          </div>
+        </Section>
+
         {/* Alertas e monitor */}
         <Section id="sec-alerts" icon={Bell} title="Alertas e Modo Monitor" description="Salvos na hora, para todos os usuários.">
           <Row title="Alerta sonoro de estoque baixo" description="Toca um sinal discreto quando um produto chega ao estoque mínimo.">
@@ -507,7 +437,74 @@ export const SettingsView = () => {
             />
           </Row>
         </Section>
-        </div>
+
+        {/* Backup e dados */}
+        <Section className="xl:col-span-2" id="sec-backup" icon={Database} title="Backup e dados" description="Cópias de segurança do estoque, OS e movimentações.">
+          <Row
+            title="Backup automático diário"
+            description={
+              form.lastFirestoreBackup
+                ? `Último backup: ${new Date(form.lastFirestoreBackup).toLocaleString('pt-BR')}`
+                : 'Gera uma cópia por dia no banco de dados.'
+            }
+          >
+            <Switch
+              checked={Boolean(form.autoBackupEnabled)}
+              disabled={savingKey === 'autobackup'}
+              label="Backup automático diário"
+              onChange={() => saveNow('autobackup', { autoBackupEnabled: !form.autoBackupEnabled }, !form.autoBackupEnabled ? 'Backup automático ativado.' : 'Backup automático desativado.')}
+            />
+          </Row>
+          <Row
+            title="Google Drive"
+            description={
+              <span className="flex flex-col gap-1">
+                <span>Envie uma cópia manual para o seu Drive ou restaure a partir dela.</span>
+                <span className="flex items-center gap-1.5" aria-live="polite">
+                  {!drive ? (
+                    <><Loader2 size={12} className="animate-spin" aria-hidden="true" /> Verificando conexão…</>
+                  ) : !drive.configured ? (
+                    <><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" /> Google não configurado no servidor.</>
+                  ) : drive.connected ? (
+                    <>
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">Conectado</span>
+                      {drive.email && <span className="truncate">· {drive.email}</span>}
+                    </>
+                  ) : (
+                    <><span className="h-2 w-2 rounded-full bg-zinc-400" aria-hidden="true" /> Não conectado</>
+                  )}
+                </span>
+              </span>
+            }
+          >
+            {drive?.connected ? (
+              <>
+                <button type="button" onClick={handleBackupToDrive} className={secondaryBtn}>
+                  <Cloud size={14} className="text-blue-600" aria-hidden="true" /> Fazer backup
+                </button>
+                <button type="button" onClick={handleRestoreFromDrive} className={secondaryBtn}>
+                  <History size={14} className="text-emerald-600" aria-hidden="true" /> Restaurar
+                </button>
+                <button
+                  type="button"
+                  onClick={disconnectDrive}
+                  disabled={disconnecting}
+                  aria-label="Desconectar conta Google"
+                  title="Desconectar conta Google"
+                  className="inline-flex items-center justify-center rounded-lg p-2 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:hover:bg-red-950/40 cursor-pointer"
+                >
+                  {disconnecting ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Unlink size={14} aria-hidden="true" />}
+                </button>
+              </>
+            ) : drive?.configured ? (
+              <button type="button" onClick={() => openGoogleAuth('drive')} disabled={isConnectingDrive} className={secondaryBtn}>
+                {isConnectingDrive ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Link2 size={14} className="text-blue-600" aria-hidden="true" />}
+                Conectar Google Drive
+              </button>
+            ) : null}
+          </Row>
+        </Section>
       </form>
     </div>
   );
