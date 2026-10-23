@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { 
   Mail, 
   Lock, 
@@ -160,19 +160,20 @@ const AppContent = () => {
         }`}
       >
         <div className={`w-full overflow-x-clip ${isMonitorMode ? 'px-4 sm:px-6 lg:px-8 2xl:px-12 py-5 max-w-none' : 'px-4 sm:px-6 lg:px-8 2xl:px-10 py-6 max-w-none'}`}>
-          <AnimatePresence mode="wait">
+          {/* Troca de aba estilo iOS: a tela nova entra na hora (sem esperar a antiga sair), esmaecendo e subindo de leve.
+              MotionConfig respeita "reduzir movimento" do aparelho. */}
+          <MotionConfig reducedMotion="user">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             >
               <Suspense fallback={<PageFallback />}>
                 {renderContent()}
               </Suspense>
             </motion.div>
-          </AnimatePresence>
+          </MotionConfig>
         </div>
       </main>
 

@@ -362,9 +362,8 @@ export const Inventory = () => {
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+    // Sem animação própria: a troca de aba (App) já anima a entrada da tela.
+    <motion.div
       className="space-y-8 pb-32"
     >
       <PageHero
