@@ -49,6 +49,24 @@ import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { InventoryAISummary } from '../components/InventoryAISummary';
 import { apiGet } from '../lib/api';
 
+/** Cor fixa por categoria (mesma categoria, mesma cor): chip e ícone em degradê. Classes por extenso para o Tailwind. */
+const CATEGORY_TONES = [
+  { chip: 'bg-sky-500/12 text-sky-700 dark:text-sky-300', icon: 'from-sky-400 to-blue-600' },
+  { chip: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300', icon: 'from-emerald-400 to-teal-600' },
+  { chip: 'bg-violet-500/12 text-violet-700 dark:text-violet-300', icon: 'from-fuchsia-400 to-violet-600' },
+  { chip: 'bg-amber-500/15 text-amber-700 dark:text-amber-300', icon: 'from-amber-300 to-orange-500' },
+  { chip: 'bg-pink-500/12 text-pink-700 dark:text-pink-300', icon: 'from-pink-400 to-rose-600' },
+  { chip: 'bg-cyan-500/12 text-cyan-700 dark:text-cyan-300', icon: 'from-cyan-400 to-sky-600' },
+  { chip: 'bg-lime-500/15 text-lime-700 dark:text-lime-300', icon: 'from-lime-400 to-green-600' },
+  { chip: 'bg-indigo-500/12 text-indigo-700 dark:text-indigo-300', icon: 'from-indigo-400 to-blue-700' },
+];
+const NO_CATEGORY_TONE = { chip: 'bg-zinc-500/12 text-zinc-600 dark:text-zinc-300', icon: 'from-zinc-400 to-zinc-600' };
+/** Cor pela posição da categoria na lista ordenada: categorias diferentes ganham cores diferentes (até 8). */
+const categoryTone = (name: string | undefined, sortedCategories: string[]) => {
+  const i = name ? sortedCategories.indexOf(name) : -1;
+  return i < 0 ? NO_CATEGORY_TONE : CATEGORY_TONES[i % CATEGORY_TONES.length];
+};
+
 export const Inventory = () => {
   const { 
     products, 
@@ -120,6 +138,12 @@ export const Inventory = () => {
       })
       .catch(() => {});
   }, []);
+
+  // Ordem fixa das categorias existentes: define a cor de cada uma nos cartões.
+  const categoryOrder = useMemo(
+    () => [...new Set<string>((products || []).map(p => p.category).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [products],
+  );
 
   const filteredProducts = useMemo(() => {
     return (products || []).filter(p => {
@@ -495,7 +519,11 @@ export const Inventory = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4">
           <AnimatePresence>
             {filteredProducts.map((p) => {
-              const isLow = p.quantity <= (p.minQuantity || 5);
+              const minQty = p.minQuantity || 5;
+              // Mesma regra de "baixo" de antes (≤ mínimo); zerado ganha destaque próprio.
+              const stock: 'out' | 'low' | 'ok' = p.quantity <= 0 ? 'out' : p.quantity <= minQty ? 'low' : 'ok';
+              const coverage = Math.max(4, Math.min(100, (p.quantity / (minQty * 2)) * 100));
+              const tone = categoryTone(p.category, categoryOrder);
               return (
                 <motion.div
                   layout
@@ -503,90 +531,106 @@ export const Inventory = () => {
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
-                  className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3 sm:p-3.5 rounded-xl shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between group relative"
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-xs transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 sm:p-3.5 motion-safe:hover:-translate-y-0.5"
                 >
+                  {/* Faixa de alerta no topo quando o estoque está zerado ou baixo */}
+                  {stock !== 'ok' && (
+                    <span className={`absolute inset-x-0 top-0 h-1 ${stock === 'out' ? 'bg-gradient-to-r from-rose-500 to-pink-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`} aria-hidden="true" />
+                  )}
                   <div>
-                    {/* Top Tag & Actions */}
-                    <div className="flex items-center justify-between gap-1 mb-2">
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded truncate max-w-[110px] ${
-                        isLow ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                      }`}>
-                        {p.category || 'Sem Categoria'}
+                    {/* Categoria (cor própria) + situação + ações */}
+                    <div className="mb-2.5 flex items-center justify-between gap-1">
+                      <span className={`max-w-[120px] truncate rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${tone.chip}`} title={p.category || 'Sem categoria'}>
+                        {p.category || 'Sem categoria'}
                       </span>
-
                       {canManageInventory && (
-                        <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                          <button 
+                        <div className="flex items-center gap-0.5 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                          <button
                             onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
-                            className="p-1 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 rounded transition-colors"
-                            title="Editar Peça"
+                            className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400"
+                            title="Editar peça"
+                            aria-label={`Editar ${p.name}`}
                           >
-                            <Edit2 size={13} />
+                            <Edit2 size={13} aria-hidden="true" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => setDeleteProductConfirm(p.id)}
-                            className="p-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                            className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400"
                             title="Excluir"
+                            aria-label={`Excluir ${p.name}`}
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={13} aria-hidden="true" />
                           </button>
                         </div>
                       )}
                     </div>
 
-                    {/* Image & Product Info */}
-                    <div className="flex items-center gap-2.5 mb-2.5">
-                      <div className="w-11 h-11 rounded-lg border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50 dark:bg-zinc-800 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    {/* Foto ou ícone + nome */}
+                    <div className="mb-3 flex items-center gap-2.5">
+                      <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ${p.imageUrl ? 'border border-zinc-200 dark:border-zinc-700' : `bg-gradient-to-br text-white ring-1 ring-white/20 ${tone.icon}`}`}>
                         {p.imageUrl ? (
-                          <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
-                          <Package size={18} className="text-zinc-400" />
+                          <Package size={19} aria-hidden="true" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="text-[10px] font-mono text-zinc-400 block truncate leading-none">
-                          {p.sku || 'S/ SKU'}
-                        </span>
-                        <h3 className="text-xs font-semibold text-zinc-900 dark:text-white line-clamp-2 mt-1 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={p.name}>
+                        <span className="block truncate font-mono text-[10px] leading-none text-zinc-400">{p.sku || 'S/ SKU'}</span>
+                        <h3 className="mt-1 line-clamp-2 text-xs font-semibold leading-tight text-zinc-900 transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400" title={p.name}>
                           {p.name}
                         </h3>
                       </div>
                     </div>
 
-                    {/* Stock & Cost Row */}
-                    <div className="grid grid-cols-2 gap-2 py-2 border-t border-zinc-100 dark:border-zinc-800/80 text-xs">
-                      <div>
-                        <span className="text-[9px] uppercase tracking-wide font-medium text-zinc-400 block">Saldo</span>
-                        <div className="flex items-baseline gap-0.5">
-                          <span className={`text-base font-bold tabular-nums ${isLow ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-white'}`}>
-                            {p.quantity}
+                    {/* Saldo × mínimo (barra) e custo */}
+                    <div className="rounded-xl bg-zinc-900/[0.03] p-2.5 dark:bg-white/[0.04]">
+                      <div className="flex items-end justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="block text-[9px] font-medium uppercase tracking-wide text-zinc-400">Saldo</span>
+                          <div className="flex items-baseline gap-1">
+                            <span className={`text-lg font-bold tabular-nums leading-none ${stock === 'out' ? 'text-rose-600 dark:text-rose-400' : stock === 'low' ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-900 dark:text-white'}`}>
+                              {p.quantity}
+                            </span>
+                            <span className="text-[10px] text-zinc-400">/ mín {minQty}</span>
+                          </div>
+                        </div>
+                        <div className="min-w-0 text-right">
+                          <span className="block text-[9px] font-medium uppercase tracking-wide text-zinc-400">Custo médio</span>
+                          <span className="block truncate text-xs font-semibold tabular-nums text-zinc-800 dark:text-zinc-200" title={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}>
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}
                           </span>
-                          <span className="text-[9px] font-medium text-zinc-400">UN</span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[9px] uppercase tracking-wide font-medium text-zinc-400 block">Custo Médio</span>
-                        <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 tabular-nums block truncate" title={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}>
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}
-                        </span>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-900/10 dark:bg-white/10" role="img" aria-label={`Saldo ${p.quantity} de mínimo ${minQty}`}>
+                          <div
+                            className={`h-full rounded-full ${stock === 'out' ? 'bg-rose-500' : stock === 'low' ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}
+                            style={{ width: `${coverage}%` }}
+                          />
+                        </div>
+                        {stock !== 'ok' && (
+                          <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold uppercase ${stock === 'out' ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'}`}>
+                            {stock === 'out' ? 'Zerado' : 'Baixo'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions */}
+                  {/* Entrada e saída */}
                   {canPerformTransactions && (
-                    <div className="flex gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
-                      <button 
+                    <div className="mt-3 flex gap-1.5">
+                      <button
                         onClick={() => { setSelectedProduct(p); setMovementType('in'); setIsMovementModalOpen(true); }}
-                        className="flex-1 py-1 px-1.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-md font-semibold text-[11px] transition-colors flex items-center justify-center gap-1"
+                        className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-500/10 px-1.5 py-1.5 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/20 dark:text-emerald-300"
                       >
-                        <ArrowDownLeft size={12} /> Entrar
+                        <ArrowDownLeft size={12} aria-hidden="true" /> Entrar
                       </button>
-                      <button 
+                      <button
                         onClick={() => { setSelectedProduct(p); setMovementType('out'); setIsMovementModalOpen(true); }}
-                        className="flex-1 py-1 px-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400 rounded-md font-semibold text-[11px] transition-colors flex items-center justify-center gap-1"
+                        className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-rose-500/10 px-1.5 py-1.5 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-500/20 dark:text-rose-300"
                       >
-                        <ArrowUpRight size={12} /> Sair
+                        <ArrowUpRight size={12} aria-hidden="true" /> Sair
                       </button>
                     </div>
                   )}
