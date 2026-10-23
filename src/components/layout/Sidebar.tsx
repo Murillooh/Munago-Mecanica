@@ -115,6 +115,20 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
     toast.info('Modo Monitor ativado: a tela selecionada agora ocupa 100% do display.');
   };
 
+  const logoutIcon = 'flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 dark:hover:bg-red-950/40 cursor-pointer';
+
+  // Foto (Google) ou iniciais, com contorno e o ponto verde de online.
+  const avatar = (size: string) => (
+    <span className="relative inline-flex shrink-0">
+      {profile?.photoURL ? (
+        <img src={profile.photoURL} alt="" className={`${size} rounded-full object-cover ring-2 ring-zinc-900/10 dark:ring-white/15`} referrerPolicy="no-referrer" />
+      ) : (
+        <span className={`${size} flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white ring-2 ring-zinc-900/10 dark:ring-white/15`} aria-hidden="true">{initials}</span>
+      )}
+      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950" aria-label="Online" />
+    </span>
+  );
+
   const iconButton = 'flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer';
 
   return (
@@ -241,38 +255,44 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
         ))}
       </nav>
 
-      {/* Rodapé: usuário + ações */}
+      {/* Rodapé: cartão do usuário (foto, nome, e-mail, função) + sair */}
       <div className="shrink-0 p-3">
-        <div className={`flex items-center rounded-2xl border border-zinc-900/5 bg-zinc-900/[0.03] dark:border-white/10 dark:bg-white/5 ${isCollapsed ? 'flex-col gap-1.5 p-1.5' : 'gap-2.5 p-2'}`}>
-          <div className="relative shrink-0" title={isCollapsed ? `${profile?.name || 'Usuário'} · ${roleLabel}` : undefined}>
-            {profile?.photoURL ? (
-              <img src={profile.photoURL} alt="" className="h-9 w-9 rounded-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white shadow-sm" aria-hidden="true">{initials}</span>
-            )}
-            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950" aria-label="Online" />
-          </div>
-          {!isCollapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">{profile?.name || 'Usuário'}</p>
-              <p className="truncate text-[11px] text-zinc-500">{roleLabel}</p>
-            </div>
-          )}
-          <div className={`flex ${isCollapsed ? 'flex-col' : ''} items-center gap-0.5`}>
+        {isCollapsed ? (
+          <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-zinc-900/5 bg-zinc-900/[0.03] p-1.5 dark:border-white/10 dark:bg-white/5">
+            <span title={`${profile?.name || 'Usuário'} · ${roleLabel}`}>{avatar('h-9 w-9')}</span>
             <button type="button" onClick={enterMonitor} aria-label="Modo Monitor" title="Modo Monitor: tela cheia, sem menu" className={iconButton}>
               <Maximize2 size={16} aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Sair"
-              title="Sair"
-              className="flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 dark:hover:bg-red-950/40 cursor-pointer"
-            >
+            <button type="button" onClick={handleLogout} aria-label="Sair da conta" title="Sair da conta" className={logoutIcon}>
               <LogOut size={16} aria-hidden="true" />
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="relative rounded-2xl border border-zinc-900/10 bg-zinc-900/[0.03] p-3 dark:border-white/10 dark:bg-white/[0.04]">
+            <button type="button" onClick={enterMonitor} aria-label="Modo Monitor" title="Modo Monitor: tela cheia, sem menu" className={`absolute right-2 top-2 ${iconButton}`}>
+              <Maximize2 size={14} aria-hidden="true" />
+            </button>
+            <div className="flex items-center gap-3 pr-6">
+              {avatar('h-11 w-11')}
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{profile?.name || 'Usuário'}</p>
+                {profile?.email && <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">{profile.email}</p>}
+                <span className="mt-1 inline-block rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+                  {roleLabel}
+                </span>
+              </div>
+            </div>
+            <div className="mt-3 border-t border-zinc-900/10 pt-2 dark:border-white/10">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 dark:text-red-400 cursor-pointer"
+              >
+                <LogOut size={16} aria-hidden="true" /> Sair da conta
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );
