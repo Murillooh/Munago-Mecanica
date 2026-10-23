@@ -56,7 +56,7 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
     <>
       {/* pb com a área segura: no iPhone o menu fica acima da barra de gestos. */}
       <nav aria-label="Navegação" className="lg:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-zinc-200/50 dark:border-zinc-800/50 rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.12)] flex items-center justify-around h-[4.25rem] px-1.5 relative">
+        <div className="bg-white/60 dark:bg-zinc-900/55 backdrop-blur-2xl backdrop-saturate-[1.8] border border-white/70 dark:border-white/10 rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.12)] flex items-center justify-around h-[4.25rem] px-1.5 relative">
           {items.map((item) => (
             <button
               key={item.id}

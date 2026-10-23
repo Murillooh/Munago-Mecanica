@@ -109,7 +109,7 @@ const AppContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 transition-colors selection:bg-blue-600/20 selection:text-blue-600">
+    <div className="ios-glass min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 transition-colors selection:bg-blue-600/20 selection:text-blue-600">
       {/* Floating control when in Monitor Mode */}
       <AnimatePresence>
         {isMonitorMode && (

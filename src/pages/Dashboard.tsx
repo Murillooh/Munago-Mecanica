@@ -450,69 +450,142 @@ export const Dashboard = ({
 
   return (
     <div className="w-full space-y-5">
-      {/* Top Operational Command Bar with Generous Spacing */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 pb-6 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div>
-          <div className="flex items-center gap-2.5 text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">{settings.storeName || 'Munago Mecânica'}</span>
-            <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">/</span>
-            <span className="text-zinc-900 dark:text-zinc-200 font-medium">Monitoramento Operacional</span>
-            <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">·</span>
-            <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Sincronizado
-            </span>
-          </div>
+      {/* Topo: saudação, ações e indicadores em vidro sobre o degradê azul (estilo iOS) */}
+      <section aria-labelledby="dash-hello" className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 p-4 sm:p-6 text-white shadow-xl shadow-blue-900/20">
+        {/* Pontilhado sutil à direita */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-30"
+          style={{ backgroundImage: 'radial-gradient(rgb(255 255 255 / 0.35) 1px, transparent 1px)', backgroundSize: '18px 18px', maskImage: 'linear-gradient(to left, black, transparent)', WebkitMaskImage: 'linear-gradient(to left, black, transparent)' }}
+        />
 
-          <div className="flex items-baseline gap-4 mt-2 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
-              Painel de Monitoramento
+        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-blue-100/90">
+              <Calendar size={14} aria-hidden="true" />
+              <span className="first-letter:uppercase tabular-nums">
+                {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <span aria-hidden="true" className="text-blue-200/50">·</span>
+              <span className="inline-flex items-center gap-1.5 font-medium text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Sincronizado
+              </span>
+            </p>
+            <h1 id="dash-hello" className="mt-1.5 text-2xl sm:text-3xl font-bold tracking-tight">
+              Olá{profile?.name ? `, ${profile.name.trim().split(/\s+/)[0]}` : ''}
             </h1>
-            <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
-              {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </span>
+            <p className="mt-0.5 text-xs text-blue-100/80">{settings.storeName || 'Munago Mecânica'} · Monitoramento operacional</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={handleExportPDF}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/15 cursor-pointer"
+            >
+              <Download size={14} aria-hidden="true" />
+              <span>Relatório PDF</span>
+            </button>
+            {!isViewer && (
+              <button
+                onClick={generateSummary}
+                disabled={isGeneratingSummary}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/15 disabled:opacity-70 cursor-pointer"
+              >
+                {isGeneratingSummary ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
+                <span>Diagnóstico Executivo</span>
+              </button>
+            )}
+            {canManageOS && (
+              <button
+                onClick={onNewOS}
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50 cursor-pointer"
+              >
+                <Plus size={15} aria-hidden="true" />
+                <span>Nova OS</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Export PDF Button */}
-          <button
-            onClick={handleExportPDF}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-xs"
-          >
-            <Download size={14} className="text-zinc-500" />
-            <span>Relatório PDF</span>
-          </button>
+        {/* Indicadores em vidro */}
+        <div
+          id="widget-section-kpis"
+          className={`relative mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 rounded-3xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
+        >
+          {/* Patrimônio */}
+          <div className="flex flex-col justify-between rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md transition-colors hover:bg-white/15">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500 shadow-sm"><Package size={15} aria-hidden="true" /></span>
+              <span className="text-sm font-semibold">Patrimônio em estoque</span>
+            </div>
+            <p className="mt-3 text-3xl font-bold tracking-tight tabular-nums">{formatBRL(totalStockValue)}</p>
+            <p className="mt-1 text-xs text-blue-100/85">{totalItems} referências · média {formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}</p>
+          </div>
 
-          {/* AI Diagnostic Button */}
-          {!isViewer && (
-            <button
-              onClick={generateSummary}
-              disabled={isGeneratingSummary}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200/80 dark:hover:bg-zinc-700/80 rounded-lg transition-colors border border-zinc-200/70 dark:border-zinc-700 shadow-xs"
-            >
-              {isGeneratingSummary ? (
-                <Loader2 size={14} className="animate-spin text-blue-600" />
-              ) : (
-                <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
+          {/* Faturamento 30 dias */}
+          <div className="flex flex-col justify-between rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md transition-colors hover:bg-white/15">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 shadow-sm"><TrendingUp size={15} aria-hidden="true" /></span>
+              <span className="text-sm font-semibold">Faturamento 30 dias</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="whitespace-nowrap text-3xl font-bold tracking-tight tabular-nums">{formatBRL(revenue30.total)}</p>
+              <div className="w-14 min-w-0 shrink"><Sparkline id="spark-revenue" data={revenue30.daily} color="#ffffff" /></div>
+            </div>
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-blue-100/85">
+              {revenue30.delta !== null && (
+                <span className={`inline-flex items-center gap-0.5 font-semibold ${revenue30.delta >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  {revenue30.delta >= 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownLeft size={13} aria-hidden="true" />}
+                  {revenue30.delta >= 0 ? '+' : ''}{revenue30.delta}%
+                </span>
               )}
-              <span>Diagnóstico Executivo</span>
-            </button>
-          )}
+              {revenue30.count} OS concluídas
+            </p>
+          </div>
 
-          {/* New Service Order Primary CTA */}
-          {canManageOS && (
-            <button
-              onClick={onNewOS}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
-            >
-              <Plus size={15} />
-              <span>Nova OS</span>
-            </button>
-          )}
+          {/* Disponibilidade */}
+          <div className="flex flex-col justify-between rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md transition-colors hover:bg-white/15">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500 shadow-sm"><Boxes size={15} aria-hidden="true" /></span>
+              <span className="text-sm font-semibold">Disponibilidade</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-3xl font-bold tracking-tight tabular-nums">{healthyRate}%</p>
+              <div className="w-14 min-w-0 shrink" title="Saídas diárias · últimos 14 dias"><Sparkline id="spark-out" data={outDaily14} color="#c4b5fd" /></div>
+            </div>
+            <p className="mt-1 text-xs text-blue-100/85 tabular-nums">
+              {new Intl.NumberFormat('pt-BR').format(totalUnits)} un · {healthyItemsCount} acima do mínimo
+            </p>
+          </div>
+
+          {/* Risco de ruptura */}
+          <button
+            type="button"
+            onClick={onSeeAllLowStock}
+            className={`flex flex-col justify-between rounded-2xl border p-4 text-left backdrop-blur-md transition-colors cursor-pointer ${
+              lowStockProducts.length > 0
+                ? 'border-rose-400/60 bg-gradient-to-br from-rose-500/25 to-violet-600/30 hover:from-rose-500/35'
+                : 'border-white/20 bg-white/10 hover:bg-white/15'
+            }`}
+          >
+            <div className="flex w-full items-center gap-2">
+              <span className={`flex h-7 w-7 items-center justify-center rounded-lg shadow-sm ${lowStockProducts.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                {lowStockProducts.length > 0 ? <AlertTriangle size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}
+              </span>
+              <span className="text-sm font-semibold">Risco de ruptura</span>
+              {lowStockProducts.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-rose-400 motion-safe:animate-pulse" aria-hidden="true" />}
+              <ChevronRight size={16} className="ml-auto text-blue-100/80" aria-hidden="true" />
+            </div>
+            <p className="mt-3 text-3xl font-bold tracking-tight tabular-nums">
+              {lowStockProducts.length} <span className="text-base font-normal text-blue-100/80">itens</span>
+            </p>
+            <p className="mt-1 text-xs text-blue-100/85">
+              {lowStockProducts.length > 0 ? 'Abaixo do mínimo: risco de parar OS' : 'Nenhuma ruptura agora'}
+            </p>
+          </button>
         </div>
-      </div>
+      </section>
 
       {/* ========================================================================= */}
       {/* WALL MONITOR AUTO-SCROLL CONTROL BAR (Ativo apenas com Modo Monitor ligado) */}
@@ -682,121 +755,6 @@ export const Dashboard = ({
       {/* BENTO GRID ARCHITECTURE (VARYING SIZES, SUBTLE BORDERS & GENEROUS GAPS) */}
       {/* ========================================================================= */}
       <div className="space-y-4">
-
-        {/* ----------------------------------------------------------------------- */}
-        {/* SEÇÃO 1: INDICADORES GERAIS & RUPTURA (BENTO 1, 2, 3)                   */}
-        {/* ----------------------------------------------------------------------- */}
-        <div
-          id="widget-section-kpis"
-          className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-kpis')}`}
-        >
-          {/* KPI 1: PATRIMÔNIO VALORADO */}
-          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Patrimônio em Estoque</span>
-                <span className={`p-1.5 rounded-xl border ${iconBadge.blue}`}>
-                  <Package size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
-                {formatBRL(totalStockValue)}
-              </p>
-              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">{totalItems} referências cadastradas</p>
-            </div>
-            <div className="pt-4 mt-5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-              <span className="text-zinc-500">Valor médio / item</span>
-              <span className="font-semibold text-zinc-800 dark:text-zinc-200 tabular-nums">
-                {formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}
-              </span>
-            </div>
-          </div>
-
-          {/* KPI 2: FATURAMENTO DE OS (30 DIAS) */}
-          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Faturamento 30 dias</span>
-                <span className={`p-1.5 rounded-xl border ${iconBadge.emerald}`}>
-                  <TrendingUp size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
-                {formatBRL(revenue30.total)}
-              </p>
-              <div className="mt-1.5 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                {revenue30.delta !== null && (
-                  <span className={`inline-flex items-center gap-0.5 font-semibold ${revenue30.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {revenue30.delta >= 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownLeft size={13} aria-hidden="true" />}
-                    {revenue30.delta >= 0 ? '+' : ''}{revenue30.delta}%
-                  </span>
-                )}
-                <span>{revenue30.count} OS concluídas</span>
-              </div>
-            </div>
-            <div className="pt-3 mt-3">
-              <Sparkline id="spark-revenue" data={revenue30.daily} color={darkMode ? '#3987e5' : '#2a78d6'} />
-            </div>
-          </div>
-
-          {/* KPI 3: DISPONIBILIDADE & VOLUME */}
-          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Disponibilidade</span>
-                <span className={`p-1.5 rounded-xl border ${iconBadge.indigo}`}>
-                  <Boxes size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
-                {healthyRate}%
-              </p>
-              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                {new Intl.NumberFormat('pt-BR').format(totalUnits)} un · {healthyItemsCount} itens acima do mínimo
-              </p>
-            </div>
-            <div className="pt-3 mt-3 space-y-2">
-              <Sparkline id="spark-out" data={outDaily14} color={darkMode ? '#d95926' : '#eb6834'} />
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Saídas diárias · últimos 14 dias</p>
-            </div>
-          </div>
-
-          {/* KPI 4: MONITOR DE RUPTURA */}
-          <button
-            type="button"
-            onClick={onSeeAllLowStock}
-            className={`text-left p-6 rounded-2xl border shadow-xs transition-colors cursor-pointer flex flex-col justify-between ${
-              lowStockProducts.length > 0
-                ? 'bg-red-50/60 dark:bg-red-950/20 border-red-200/90 dark:border-red-900/60 hover:border-red-300 dark:hover:border-red-800'
-                : 'bg-white dark:bg-zinc-900/90 border-zinc-200/70 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700'
-            }`}
-          >
-            <div className="w-full">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Risco de Ruptura</span>
-                <span className={`p-2 rounded-xl border ${lowStockProducts.length > 0 ? iconBadge.red : iconBadge.emerald}`}>
-                  {lowStockProducts.length > 0 ? <AlertTriangle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
-                </span>
-              </div>
-              <p className={`mt-2 text-2xl font-bold tracking-tight tabular-nums ${
-                lowStockProducts.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-white'
-              }`}>
-                {lowStockProducts.length} <span className="text-lg font-normal text-zinc-500">itens</span>
-              </p>
-              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                {lowStockProducts.length > 0
-                  ? 'Abaixo do estoque mínimo: risco de parar OS'
-                  : 'Nenhuma ruptura no catálogo agora'}
-              </p>
-            </div>
-            <div className="w-full pt-4 mt-5 border-t border-zinc-200/70 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-              <span className="text-zinc-500">Ação requerida</span>
-              <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                Ver itens <ChevronRight size={13} aria-hidden="true" />
-              </span>
-            </div>
-          </button>
-        </div>
 
         {/* ----------------------------------------------------------------------- */}
         {/* SEÇÃO 2: BALANÇO LOGÍSTICO & PÁTIO DE OS (BENTO 4, 5)                  */}
