@@ -28,7 +28,10 @@ export const PageHero: React.FC<{
 }> = ({ icon: Icon, title, subtitle, eyebrow, titleAside, actions, children, statsClassName, statsId }) => {
   const titleId = React.useId();
   return (
-    <section aria-labelledby={titleId} className="relative shrink-0 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 p-4 text-white shadow-xl shadow-blue-900/20 sm:p-6">
+    <section aria-labelledby={titleId} className="relative shrink-0 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-800 p-4 text-white shadow-xl shadow-blue-900/25 sm:p-6">
+      {/* Halos de luz para o degradê não ficar chapado */}
+      <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-28 h-72 w-72 rounded-full bg-cyan-400/35 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-36 right-0 h-80 w-96 rounded-full bg-fuchsia-500/30 blur-3xl" />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-30"
@@ -69,6 +72,21 @@ export const PageHero: React.FC<{
 };
 
 /**
+ * Cor de cada indicador, a partir da cor do ícone: degradê do bloco, ícone em degradê e o brilho colorido dele.
+ * Classes escritas por extenso para o Tailwind gerar.
+ */
+const VIVID: Record<string, { tile: string; icon: string; glow: string }> = {
+  'bg-blue-500': { tile: 'from-sky-400/35 via-blue-500/15 to-blue-600/10 border-sky-200/45', icon: 'bg-gradient-to-br from-sky-400 to-blue-600', glow: 'shadow-sky-500/50' },
+  'bg-sky-500': { tile: 'from-cyan-400/35 via-sky-500/15 to-sky-600/10 border-cyan-200/45', icon: 'bg-gradient-to-br from-cyan-400 to-sky-600', glow: 'shadow-cyan-500/50' },
+  'bg-emerald-500': { tile: 'from-emerald-400/35 via-teal-500/15 to-emerald-600/10 border-emerald-200/45', icon: 'bg-gradient-to-br from-emerald-400 to-teal-600', glow: 'shadow-emerald-500/50' },
+  'bg-violet-500': { tile: 'from-fuchsia-400/30 via-violet-500/20 to-violet-600/10 border-violet-200/45', icon: 'bg-gradient-to-br from-fuchsia-400 to-violet-600', glow: 'shadow-violet-500/50' },
+  'bg-amber-500': { tile: 'from-amber-300/35 via-orange-400/15 to-orange-500/10 border-amber-200/45', icon: 'bg-gradient-to-br from-amber-300 to-orange-500', glow: 'shadow-amber-500/50' },
+  'bg-rose-500': { tile: 'from-rose-400/35 via-pink-500/15 to-rose-600/10 border-rose-200/45', icon: 'bg-gradient-to-br from-rose-400 to-pink-600', glow: 'shadow-rose-500/50' },
+  'bg-zinc-500': { tile: 'from-white/20 via-white/10 to-white/5 border-white/30', icon: 'bg-gradient-to-br from-slate-300 to-slate-500', glow: 'shadow-slate-500/40' },
+  default: { tile: 'from-white/20 via-white/10 to-white/5 border-white/30', icon: 'bg-gradient-to-br from-sky-400 to-blue-600', glow: 'shadow-blue-500/40' },
+};
+
+/**
  * Indicador em vidro dentro do PageHero. Com `onClick` vira botão (com seta);
  * `selected` marca filtro ativo; `alert` usa o tom vermelho/roxo de urgência.
  */
@@ -86,15 +104,16 @@ export const HeroStat: React.FC<{
   alert?: boolean;
   className?: string;
 }> = ({ icon: Icon, iconClass, label, value, hint, aside, onClick, selected, alert, className = '' }) => {
+  const vivid = VIVID[iconClass] ?? VIVID.default;
   const tone = alert
-    ? 'border-rose-400/60 bg-gradient-to-br from-rose-500/25 to-violet-600/30 hover:from-rose-500/35'
+    ? 'border-rose-300/70 bg-gradient-to-br from-rose-500/45 via-pink-500/25 to-violet-600/40 shadow-lg shadow-rose-900/30 hover:from-rose-500/55'
     : selected
-      ? 'border-white/70 bg-white/25 ring-2 ring-white/40'
-      : 'border-white/20 bg-white/10 hover:bg-white/15';
+      ? `bg-gradient-to-br ${vivid.tile} border-white/80 ring-2 ring-white/50`
+      : `bg-gradient-to-br ${vivid.tile} hover:brightness-110`;
   const body = (
     <>
       <div className="flex w-full items-center gap-2">
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg shadow-sm ${iconClass}`}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-lg ring-1 ring-white/35 ${vivid.icon} ${vivid.glow}`}>
           <Icon size={15} aria-hidden="true" />
         </span>
         {/* Quebra em vez de cortar: no celular os blocos ficam 2 por linha. */}
@@ -110,7 +129,8 @@ export const HeroStat: React.FC<{
       {hint && <div className="mt-1 text-xs text-blue-100/85">{hint}</div>}
     </>
   );
-  const cls = `flex flex-col justify-between rounded-2xl border p-4 text-left text-white backdrop-blur-md transition-colors ${tone} ${className}`;
+  // Brilho de vidro no topo + leve subida ao passar o mouse (sem animação para quem pediu menos movimento).
+  const cls = `flex flex-col justify-between rounded-2xl border p-4 text-left text-white backdrop-blur-md shadow-[inset_0_1px_0_rgb(255_255_255/0.28)] transition duration-200 motion-safe:hover:-translate-y-0.5 ${tone} ${className}`;
   return onClick ? (
     <button type="button" onClick={onClick} aria-pressed={selected} className={`${cls} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}>
       {body}
