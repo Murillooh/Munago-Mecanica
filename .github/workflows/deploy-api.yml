@@ -1,0 +1,86 @@
+# Deploy da API no Elastic Beanstalk a cada push na main (a Vercel cuida do frontend).
+# A AWS confia no GitHub por OIDC: sem chave de acesso guardada. O papel só aceita a branch main deste repositório.
+# Configuração no GitHub: variáveis AWS_DEPLOY_ROLE_ARN e EB_BUCKET; segredo DATABASE_URL_PROD.
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: sa-east-1
+  EB_APP: mecanica
+  EB_ENV: mecanica-prod
+  API_URL: https://d9s0ezt2x3m4l.cloudfront.net
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+
+      # Build completo (frontend + dist/server.cjs); o script recusa empacotar sem o servidor.
+      - run: npm run build
+      - run: python3 scripts/aws/package-eb.py bundle.zip
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Migrações antes do servidor novo: elas só acrescentam, então o servidor antigo segue funcionando.
+      - name: Migrações do banco de produção
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+        run: npm run db:migrate
+
+      - name: Deploy no Elastic Beanstalk
+        env:
+          EB_BUCKET: ${{ vars.EB_BUCKET }}
+        run: |
+          set -euo pipefail
+          V="gh-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+          aws s3 cp bundle.zip "s3://${EB_BUCKET}/mecanica/${V}.zip" --only-show-errors
+          aws elasticbeanstalk create-application-version --application-name "$EB_APP" --version-label "$V" \
+            --source-bundle "S3Bucket=${EB_BUCKET},S3Key=mecanica/${V}.zip" --process --query ApplicationVersion.VersionLabel --output text
+          for i in $(seq 1 30); do
+            s=$(aws elasticbeanstalk describe-application-versions --application-name "$EB_APP" --version-labels "$V" --query 'ApplicationVersions[0].Status' --output text)
+            [ "$s" = "PROCESSED" ] && break
+            [ "$s" = "FAILED" ] && { echo "Versão não processada"; exit 1; }
+            sleep 5
+          done
+          aws elasticbeanstalk update-environment --environment-name "$EB_ENV" --version-label "$V" --query Status --output text
+          aws elasticbeanstalk wait environment-updated --environment-names "$EB_ENV"
+          aws elasticbeanstalk describe-environments --environment-names "$EB_ENV" \
+            --query 'Environments[0].[Status,Health,VersionLabel]' --output text
+
+      # API no ar: sem login deve responder 401 (502/5xx = app não subiu).
+      - name: Conferir API no ar
+        run: |
+          for i in $(seq 1 12); do
+            c=$(curl -s -o /dev/null -w '%{http_code}' "$API_URL/api/v1/services")
+            echo "tentativa $i: $c"
+            [ "$c" = "401" ] && exit 0
+            sleep 10
+          done
+          echo "A API não respondeu como esperado depois do deploy."
+          exit 1
