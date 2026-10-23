@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { macZoom, macZoomProps } from '../lib/motion';
 import { 
   Package, 
   History, 
@@ -1025,9 +1026,8 @@ export const Dashboard = ({
         {isDiagnosticOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              {...macZoomProps()}
+              transition={macZoom}
               className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden"
             >
               <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">

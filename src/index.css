@@ -133,10 +133,11 @@
  * com a curva de desaceleração das folhas do iOS. Quem pediu "reduzir movimento" não vê animação.
  */
 @keyframes ios-fade { from { opacity: 0; } }
-@keyframes ios-pop { from { opacity: 0; transform: translateY(8px) scale(0.95); } }
+/* Nasce no ponto clicado (--zx/--zy, de macZoomStyle) e cresce até o centro, como abrir um app no macOS. */
+@keyframes ios-pop { from { opacity: 0; transform: translate(var(--zx, 0px), var(--zy, 8px)) scale(0.08); } }
 @media (prefers-reduced-motion: no-preference) {
   .ios-fade { animation: ios-fade 0.2s ease-out both; }
-  .ios-pop { animation: ios-pop 0.34s cubic-bezier(0.32, 0.72, 0, 1) both; }
+  .ios-pop { animation: ios-pop 0.46s cubic-bezier(0.32, 0.72, 0, 1) both; }
   /* Toque estilo iPhone: o botão afunda de leve ao ser pressionado. */
   .ios-glass button:not(:disabled):active { scale: 0.97; }
 }

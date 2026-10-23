@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { macZoom, macZoomProps } from '../lib/motion';
 import { 
   X, 
   Search, 
@@ -715,9 +716,8 @@ export const Inventory = () => {
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              {...macZoomProps()}
+              transition={macZoom}
               className="relative bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden z-10"
             >
               <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/90 flex items-center justify-between">
@@ -831,9 +831,8 @@ export const Inventory = () => {
               className="fixed inset-0"
             />
             <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              {...macZoomProps()}
+              transition={macZoom}
               className="relative bg-white dark:bg-zinc-900 w-full max-w-2xl lg:max-w-5xl rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] z-10"
             >
               {/* Modal Header */}
@@ -1218,9 +1217,8 @@ export const Inventory = () => {
         {deleteProductConfirm && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-zinc-950/70 backdrop-blur-sm">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              {...macZoomProps()}
+              transition={macZoom}
               className="bg-white dark:bg-zinc-900 p-6 sm:p-7 rounded-2xl shadow-2xl max-w-sm w-full text-center border border-zinc-200/80 dark:border-zinc-800"
             >
               <div className="w-12 h-12 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center mx-auto mb-4 border border-red-200/60 dark:border-red-900/50">

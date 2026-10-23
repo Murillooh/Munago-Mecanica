@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { macZoom, macZoomProps } from '../lib/motion';
 import { 
   X, 
   Sparkles, 
@@ -289,9 +290,8 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
 
       <div className="flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8">
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          {...macZoomProps()}
+          transition={macZoom}
           className="relative w-full max-w-5xl transform overflow-hidden rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl transition-all"
         >
           {/* Header */}

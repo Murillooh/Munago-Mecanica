@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { iosSheet } from '../lib/motion';
+import { macZoom } from '../lib/motion';
 import { MessageCircleQuestion, RotateCcw, Send, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
@@ -214,10 +214,12 @@ export const SupportChat: React.FC = () => {
           <motion.section
             role="dialog"
             aria-label="Chat de ajuda com a Ana"
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.96 }}
-            transition={iosSheet}
+            // Nasce do botão redondo (canto inferior direito) e cresce, como abrir um app no macOS.
+            initial={{ opacity: 0, scale: 0.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.1 }}
+            transition={macZoom}
+            style={{ transformOrigin: 'bottom right' }}
             className="fixed z-[70] flex flex-col overflow-hidden bg-white shadow-2xl dark:bg-zinc-900 inset-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(600px,calc(100dvh-3rem))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-zinc-200 sm:pt-0 sm:pb-0 dark:sm:border-zinc-800"
           >
             {/* Cabeçalho */}

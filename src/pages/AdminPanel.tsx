@@ -5,6 +5,7 @@ import { apiDelete, apiGet, apiPatch, setActiveWorkspace } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { SignupQueue } from '../components/SignupQueue';
 import { HeroStat, PageHero, heroBtn } from '../components/PageHero';
+import { macZoomStyle } from '../lib/motion';
 
 interface WorkspaceUser {
   id: string;
@@ -316,7 +317,7 @@ export const AdminPanel = () => {
 
       {toDelete && (
         <div className="ios-fade fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-ws-title">
-          <div className="ios-pop w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+          <div style={macZoomStyle()} className="ios-pop w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-950/40">
               <Trash2 size={20} aria-hidden="true" />
             </div>

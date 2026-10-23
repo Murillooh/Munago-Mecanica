@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { iosSheet } from '../lib/motion';
+import { macZoom, macZoomProps } from '../lib/motion';
 import { 
   FileText, 
   Plus, 
@@ -525,10 +525,8 @@ export const ServiceOrders = () => {
               role="dialog"
               aria-modal="true"
               aria-labelledby="os-dialog-title"
-              initial={{ opacity: 0, y: 8, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 6, scale: 0.97 }}
-              transition={iosSheet}
+              {...macZoomProps()}
+              transition={macZoom}
               className="flex h-[100dvh] sm:h-auto sm:max-h-[min(860px,calc(100dvh-3rem))] w-full max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl"
             >
               {/* Cabeçalho: número da OS + etapa */}
@@ -916,10 +914,8 @@ export const ServiceOrders = () => {
               aria-modal="true"
               aria-labelledby="os-delete-title"
               aria-describedby="os-delete-desc"
-              initial={{ opacity: 0, y: 8, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 6, scale: 0.97 }}
-              transition={iosSheet}
+              {...macZoomProps()}
+              transition={macZoom}
               className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6"
             >
               <span className="inline-flex p-2.5 rounded-xl border bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40">
