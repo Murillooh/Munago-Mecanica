@@ -9,6 +9,15 @@ import { z } from 'zod';
 /** Modelo principal e reserva (usada quando o principal está sobrecarregado). */
 export const SUPPORT_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'] as const;
 
+/**
+ * Ordem de tentativas das rotas de IA: o pedido original e, se der erro passageiro, reservas sem busca na web
+ * (a busca do Google tem cota própria, bem menor, e costuma acabar antes da do modelo).
+ */
+export function geminiAttempts(model: string, search: boolean) {
+  const all = [{ model, search }, { model: SUPPORT_MODELS[0], search: false }, { model: SUPPORT_MODELS[1], search: false }];
+  return all.filter((a, i) => all.findIndex((b) => b.model === a.model && b.search === a.search) === i);
+}
+
 /** Erro passageiro do Gemini (sobrecarga/cota): vale tentar o modelo reserva. */
 export function isTransientAiError(error: unknown): boolean {
   const msg = String((error as { message?: unknown })?.message ?? '');

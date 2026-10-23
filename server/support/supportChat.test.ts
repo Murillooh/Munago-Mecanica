@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSupportPrompt, isTransientAiError, supportChatInput, toGeminiContents } from './supportChat';
+import { buildSupportPrompt, geminiAttempts, isTransientAiError, supportChatInput, toGeminiContents } from './supportChat';
 
 describe('chat de suporte (Ana)', () => {
   it('personaliza com primeiro nome, perfil e tela atual', () => {
@@ -33,6 +33,18 @@ describe('chat de suporte (Ana)', () => {
     expect(isTransientAiError(new Error('Incomplete JSON segment at the end'))).toBe(true);
     expect(isTransientAiError(new Error('API key not valid'))).toBe(false);
     expect(isTransientAiError(undefined)).toBe(false);
+  });
+
+  it('tentativas de IA: pedido original e depois reservas sem busca, sem repetir', () => {
+    expect(geminiAttempts('gemini-flash-latest', true)).toEqual([
+      { model: 'gemini-flash-latest', search: true },
+      { model: 'gemini-flash-latest', search: false },
+      { model: 'gemini-flash-lite-latest', search: false },
+    ]);
+    expect(geminiAttempts('gemini-flash-latest', false)).toEqual([
+      { model: 'gemini-flash-latest', search: false },
+      { model: 'gemini-flash-lite-latest', search: false },
+    ]);
   });
 
   it('valida entrada: mensagem vazia, longa demais ou papel inválido', () => {

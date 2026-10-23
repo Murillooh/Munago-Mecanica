@@ -22,7 +22,7 @@ import { runAutoBackupIfDue } from "./server/services/backup";
 import { createAsaasGateway } from "./server/services/asaas";
 import { createGoogleOAuth } from "./server/google/oauth";
 import { createGoogleRouter } from "./server/routes/google";
-import { SUPPORT_MODELS, buildSupportPrompt, isTransientAiError, supportChatInput, toGeminiContents } from "./server/support/supportChat";
+import { SUPPORT_MODELS, buildSupportPrompt, geminiAttempts, isTransientAiError, supportChatInput, toGeminiContents } from "./server/support/supportChat";
 
 dotenv.config();
 
@@ -197,12 +197,20 @@ async function startServer() {
     if (!parsed.success) return res.status(400).json({ error: 'Requisição de IA inválida.', code: 'VALIDATION' });
     const { model, contents, config, systemInstruction } = parsed.data;
     try {
-      const response = await ai.models.generateContent({
-        model,
-        contents,
-        config: { ...config, systemInstruction }
-      });
-      res.json({ text: response.text });
+      const attempts = geminiAttempts(model, false);
+      for (const [i, attempt] of attempts.entries()) {
+        try {
+          const response = await ai.models.generateContent({
+            model: attempt.model,
+            contents,
+            config: { ...config, systemInstruction }
+          });
+          return res.json({ text: response.text });
+        } catch (error) {
+          if (i === attempts.length - 1 || !isTransientAiError(error)) throw error;
+          logger.warn({ model: attempt.model, err: (error as Error).message?.slice(0, 200) }, "Gemini: usando reserva");
+        }
+      }
     } catch (error: any) {
       const isQuotaError = error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED");
       if (isQuotaError) {
@@ -235,22 +243,34 @@ async function startServer() {
     }, 30000);
 
     try {
-      const stream = await ai.models.generateContentStream({
-        model,
-        contents: typeof contents === 'string' ? [{ role: 'user', parts: [{ text: contents }] }] : contents,
-        config: {
-          ...config,
-          systemInstruction,
-          tools: [{ googleSearch: {} }],
+      // Com cota da busca esgotada ou modelo sobrecarregado, responde sem busca pelo modelo reserva.
+      const attempts = geminiAttempts(model, true);
+      let wroteText = false;
+      for (const [i, attempt] of attempts.entries()) {
+        try {
+          const stream = await ai.models.generateContentStream({
+            model: attempt.model,
+            contents: typeof contents === 'string' ? [{ role: 'user', parts: [{ text: contents }] }] : contents,
+            config: {
+              ...config,
+              systemInstruction,
+              tools: attempt.search ? [{ googleSearch: {} }] : undefined,
+            }
+          });
+          for await (const chunk of stream) {
+            if (res.writableEnded) break;
+            if (chunk.text) wroteText = true;
+            res.write(`data: ${JSON.stringify({
+              text: chunk.text,
+              groundingMetadata: chunk.candidates?.[0]?.groundingMetadata
+            })}\n\n`);
+          }
+          break;
+        } catch (error) {
+          // Só troca se nada foi enviado ainda; senão a resposta sairia duplicada.
+          if (wroteText || i === attempts.length - 1 || !isTransientAiError(error)) throw error;
+          logger.warn({ model: attempt.model, search: attempt.search, err: (error as Error).message?.slice(0, 200) }, "Gemini: usando reserva");
         }
-      });
-
-      for await (const chunk of stream) {
-        if (res.writableEnded) break;
-        res.write(`data: ${JSON.stringify({
-          text: chunk.text,
-          groundingMetadata: chunk.candidates?.[0]?.groundingMetadata
-        })}\n\n`);
       }
       if (!res.writableEnded) {
         res.write('data: [DONE]\n\n');
