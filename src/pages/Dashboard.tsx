@@ -453,7 +453,7 @@ export const Dashboard = ({
     <div className="w-full space-y-5">
       {/* Topo: saudação, ações e indicadores em vidro sobre o degradê azul (estilo iOS) */}
       <PageHero
-        eyebrow={<>
+        titleAside={<>
           <Calendar size={14} aria-hidden="true" />
           <span className="first-letter:uppercase tabular-nums">
             {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

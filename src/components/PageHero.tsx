@@ -17,13 +17,15 @@ export const PageHero: React.FC<{
   subtitle?: React.ReactNode;
   /** Linha pequena acima do título (data, status...). */
   eyebrow?: React.ReactNode;
+  /** Texto pequeno na mesma linha do título, logo depois dele (quebra para baixo se não couber). */
+  titleAside?: React.ReactNode;
   actions?: React.ReactNode;
   children?: React.ReactNode;
   /** Classes do grid de indicadores (padrão: 1 → 2 → 4 colunas). */
   statsClassName?: string;
   /** id do grid de indicadores (o Modo Monitor rola até ele). */
   statsId?: string;
-}> = ({ icon: Icon, title, subtitle, eyebrow, actions, children, statsClassName, statsId }) => {
+}> = ({ icon: Icon, title, subtitle, eyebrow, titleAside, actions, children, statsClassName, statsId }) => {
   const titleId = React.useId();
   return (
     <section aria-labelledby={titleId} className="relative shrink-0 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 p-4 text-white shadow-xl shadow-blue-900/20 sm:p-6">
@@ -41,14 +43,17 @@ export const PageHero: React.FC<{
       <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           {eyebrow && <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-blue-100/90">{eyebrow}</div>}
-          <h1 id={titleId} className="flex items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl">
-            {Icon && (
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15">
-                <Icon size={19} aria-hidden="true" />
-              </span>
-            )}
-            {title}
-          </h1>
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h1 id={titleId} className="flex items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl">
+              {Icon && (
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15">
+                  <Icon size={19} aria-hidden="true" />
+                </span>
+              )}
+              {title}
+            </h1>
+            {titleAside && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-blue-100/90">{titleAside}</div>}
+          </div>
           {subtitle && <p className="mt-1 text-xs text-blue-100/85 sm:text-sm">{subtitle}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2.5">{actions}</div>}
