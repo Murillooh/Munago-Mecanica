@@ -22,7 +22,7 @@ import { runAutoBackupIfDue } from "./server/services/backup";
 import { createAsaasGateway } from "./server/services/asaas";
 import { createGoogleOAuth } from "./server/google/oauth";
 import { createGoogleRouter } from "./server/routes/google";
-import { SUPPORT_MODELS, buildSupportPrompt, geminiAttempts, isTransientAiError, supportChatInput, toGeminiContents } from "./server/support/supportChat";
+import { FIRST_TEXT_MS, SUPPORT_MODELS, buildSupportPrompt, geminiAttempts, isTransientAiError, supportChatInput, toGeminiContents } from "./server/support/supportChat";
 
 dotenv.config();
 
@@ -199,16 +199,21 @@ async function startServer() {
     try {
       const attempts = geminiAttempts(model, false);
       for (const [i, attempt] of attempts.entries()) {
+        // Sem stream não há 1º texto: o prazo vale para a resposta inteira (2× o do stream).
+        const slow = new AbortController();
+        const deadline = i < attempts.length - 1 ? setTimeout(() => slow.abort(), 2 * FIRST_TEXT_MS) : undefined;
         try {
           const response = await ai.models.generateContent({
             model: attempt.model,
             contents,
-            config: { ...config, systemInstruction }
+            config: { ...config, systemInstruction, abortSignal: slow.signal }
           });
           return res.json({ text: response.text });
         } catch (error) {
           if (i === attempts.length - 1 || !isTransientAiError(error)) throw error;
           logger.warn({ model: attempt.model, err: (error as Error).message?.slice(0, 200) }, "Gemini: usando reserva");
+        } finally {
+          clearTimeout(deadline);
         }
       }
     } catch (error: any) {
@@ -247,6 +252,9 @@ async function startServer() {
       const attempts = geminiAttempts(model, true);
       let wroteText = false;
       for (const [i, attempt] of attempts.entries()) {
+        // Modelo que não começa a responder no prazo é cancelado (exceto a última tentativa).
+        const slow = new AbortController();
+        const deadline = i < attempts.length - 1 ? setTimeout(() => slow.abort(), FIRST_TEXT_MS) : undefined;
         try {
           const stream = await ai.models.generateContentStream({
             model: attempt.model,
@@ -255,11 +263,12 @@ async function startServer() {
               ...config,
               systemInstruction,
               tools: attempt.search ? [{ googleSearch: {} }] : undefined,
+              abortSignal: slow.signal,
             }
           });
           for await (const chunk of stream) {
             if (res.writableEnded) break;
-            if (chunk.text) wroteText = true;
+            if (chunk.text) { wroteText = true; clearTimeout(deadline); }
             res.write(`data: ${JSON.stringify({
               text: chunk.text,
               groundingMetadata: chunk.candidates?.[0]?.groundingMetadata
@@ -270,6 +279,8 @@ async function startServer() {
           // Só troca se nada foi enviado ainda; senão a resposta sairia duplicada.
           if (wroteText || i === attempts.length - 1 || !isTransientAiError(error)) throw error;
           logger.warn({ model: attempt.model, search: attempt.search, err: (error as Error).message?.slice(0, 200) }, "Gemini: usando reserva");
+        } finally {
+          clearTimeout(deadline);
         }
       }
       if (!res.writableEnded) {
@@ -319,11 +330,13 @@ async function startServer() {
     let wroteText = false;
     try {
       for (const [i, model] of SUPPORT_MODELS.entries()) {
+        const slow = new AbortController();
+        const deadline = i < SUPPORT_MODELS.length - 1 ? setTimeout(() => slow.abort(), FIRST_TEXT_MS) : undefined;
         try {
-          const stream = await ai.models.generateContentStream({ model, ...request });
+          const stream = await ai.models.generateContentStream({ model, ...request, config: { ...request.config, abortSignal: slow.signal } });
           for await (const chunk of stream) {
             if (res.writableEnded) break;
-            if (chunk.text) { wroteText = true; res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`); }
+            if (chunk.text) { wroteText = true; clearTimeout(deadline); res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`); }
           }
           break;
         } catch (error) {
@@ -331,6 +344,8 @@ async function startServer() {
           const canFallback = !wroteText && i < SUPPORT_MODELS.length - 1 && isTransientAiError(error);
           if (!canFallback) throw error;
           logger.warn({ model, err: (error as Error).message?.slice(0, 200) }, "Support chat: modelo sobrecarregado, usando reserva");
+        } finally {
+          clearTimeout(deadline);
         }
       }
       if (!res.writableEnded) {

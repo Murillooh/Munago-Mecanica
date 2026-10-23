@@ -18,10 +18,15 @@ export function geminiAttempts(model: string, search: boolean) {
   return all.filter((a, i) => all.findIndex((b) => b.model === a.model && b.search === a.search) === i);
 }
 
+/** Prazo para o modelo começar a responder; sob carga o principal leva 20 s+ e a tela desistiria aos 30 s. */
+export const FIRST_TEXT_MS = 10_000;
+
 /** Erro passageiro do Gemini (sobrecarga/cota): vale tentar o modelo reserva. */
 export function isTransientAiError(error: unknown): boolean {
   const msg = String((error as { message?: unknown })?.message ?? '');
   // "Incomplete JSON segment": o Gemini derrubou o stream no meio (comum sob carga).
+  // AbortError: nós cancelamos porque o modelo não começou a responder no prazo (FIRST_TEXT_MS).
+  if ((error as { name?: unknown })?.name === 'AbortError') return true;
   return /\b(429|500|503)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|Incomplete JSON segment|fetch failed|ECONNRESET/i.test(msg);
 }
 const MAX_TURNS = 16;

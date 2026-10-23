@@ -31,6 +31,8 @@ describe('chat de suporte (Ana)', () => {
     expect(isTransientAiError(new Error('{"error":{"code":503,"status":"UNAVAILABLE"}}'))).toBe(true);
     expect(isTransientAiError(new Error('429 RESOURCE_EXHAUSTED'))).toBe(true);
     expect(isTransientAiError(new Error('Incomplete JSON segment at the end'))).toBe(true);
+    // Cancelado pelo prazo do 1º texto (modelo lento): também vale a reserva.
+    expect(isTransientAiError(Object.assign(new Error('This operation was aborted'), { name: 'AbortError' }))).toBe(true);
     expect(isTransientAiError(new Error('API key not valid'))).toBe(false);
     expect(isTransientAiError(undefined)).toBe(false);
   });
