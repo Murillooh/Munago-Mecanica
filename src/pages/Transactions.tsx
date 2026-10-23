@@ -5,10 +5,12 @@ import {
   FileText,
   FileSpreadsheet,
   Search,
-  History
+  History,
+  Scale,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApp, type Transaction } from '../context/AppContext';
+import { HeroStat, PageHero, heroBtn } from '../components/PageHero';
 import { parseDate } from '../components/dashboard/utils';
 
 const timeOf = (t: Transaction) => parseDate(t.timestamp)?.getTime() ?? 0;
@@ -141,33 +143,36 @@ export const Transactions = () => {
   return (
     // No desktop a página ocupa exatamente a altura da tela (descontando o py-6 do <main>) e só a planilha rola.
     <div className="w-full flex flex-col gap-5 lg:h-[calc(100dvh-3rem)]">
-      {/* Cabeçalho */}
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Movimentações</h1>
-          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Todas as entradas e saídas do estoque, por dia.</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-            title="Exportar a lista filtrada para Excel (.xlsx)"
-          >
-            <FileSpreadsheet size={15} className="text-emerald-600" aria-hidden="true" />
-            Excel
+      {/* Topo + resumo do que está filtrado */}
+      <PageHero
+        icon={History}
+        title="Movimentações"
+        subtitle="Todas as entradas e saídas do estoque, por dia."
+        actions={<>
+          <button type="button" onClick={handleExportExcel} className={heroBtn} title="Exportar a lista filtrada para Excel (.xlsx)">
+            <FileSpreadsheet size={14} aria-hidden="true" /> Excel
           </button>
-          <button
-            type="button"
-            onClick={handleExportPDF}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-            title="Exportar a lista filtrada em PDF"
-          >
-            <FileText size={15} className="text-rose-600" aria-hidden="true" />
-            PDF
+          <button type="button" onClick={handleExportPDF} className={heroBtn} title="Exportar a lista filtrada em PDF">
+            <FileText size={14} aria-hidden="true" /> PDF
           </button>
-        </div>
-      </div>
+        </>}
+        statsClassName="grid-cols-1 sm:grid-cols-3"
+      >
+        <HeroStat
+          icon={ArrowDownLeft} iconClass="bg-emerald-500" label="Entradas"
+          value={`+${fmtQty(stats.inQty)}`} hint={`${stats.inCount} registros`}
+          selected={typeFilter === 'in'} onClick={() => setTypeFilter(typeFilter === 'in' ? 'all' : 'in')}
+        />
+        <HeroStat
+          icon={ArrowUpRight} iconClass="bg-rose-500" label="Saídas"
+          value={`-${fmtQty(stats.outQty)}`} hint={`${stats.outCount} registros`}
+          selected={typeFilter === 'out'} onClick={() => setTypeFilter(typeFilter === 'out' ? 'all' : 'out')}
+        />
+        <HeroStat
+          icon={Scale} iconClass="bg-violet-500" label="Saldo"
+          value={`${stats.balance >= 0 ? '+' : ''}${fmtQty(stats.balance)}`} hint={`${fmtQty(stats.total)} registros no filtro`}
+        />
+      </PageHero>
 
       {/* Planilha */}
       <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs overflow-hidden">

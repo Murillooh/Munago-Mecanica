@@ -15,9 +15,11 @@ import {
   Bell,
   Database,
   Link2,
-  Unlink
+  Unlink,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { PageHero, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
 import { apiDelete, apiGet } from '../lib/api';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
@@ -211,25 +213,19 @@ export const SettingsView = () => {
 
   return (
     <div className="w-full space-y-4 pb-24 lg:pb-6">
-      {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Configurações</h1>
-          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Dados da oficina, aparência, alertas e backups.</p>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {isDirty && <span className="hidden sm:inline text-xs font-medium text-amber-600 dark:text-amber-400">Alterações não salvas</span>}
-          <button
-            type="submit"
-            form="settings-form"
-            disabled={isSaving || !isDirty}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 cursor-pointer"
-          >
-            {isSaving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+      {/* Topo */}
+      <PageHero
+        icon={SettingsIcon}
+        title="Configurações"
+        subtitle="Dados da oficina, recebimentos, aparência, alertas e backups."
+        actions={<>
+          {isDirty && <span className="rounded-full border border-amber-300/50 bg-amber-400/20 px-2.5 py-1 text-xs font-medium text-amber-100">Alterações não salvas</span>}
+          <button type="submit" form="settings-form" disabled={isSaving || !isDirty} className={heroBtnPrimary}>
+            {isSaving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
             {isSaving ? 'Salvando…' : 'Salvar'}
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       <form id="settings-form" onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <div className="space-y-4">

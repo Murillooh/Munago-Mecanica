@@ -48,6 +48,7 @@ import { TopConsumedParts } from '../components/dashboard/TopConsumedParts';
 import { CategoryDonut } from '../components/dashboard/CategoryDonut';
 import { StockCoverage } from '../components/dashboard/StockCoverage';
 import { Sparkline } from '../components/dashboard/Sparkline';
+import { HeroStat, PageHero, heroBtn, heroBtnPrimary } from '../components/PageHero';
 import { iconBadge, isBilledOS, osAmount, osBilledDate, startOfDayAgo, DAY_MS } from '../components/dashboard/utils';
 import { authFetch } from '../lib/api';
 
@@ -451,141 +452,76 @@ export const Dashboard = ({
   return (
     <div className="w-full space-y-5">
       {/* Topo: saudação, ações e indicadores em vidro sobre o degradê azul (estilo iOS) */}
-      <section aria-labelledby="dash-hello" className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 p-4 sm:p-6 text-white shadow-xl shadow-blue-900/20">
-        {/* Pontilhado sutil à direita */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-30"
-          style={{ backgroundImage: 'radial-gradient(rgb(255 255 255 / 0.35) 1px, transparent 1px)', backgroundSize: '18px 18px', maskImage: 'linear-gradient(to left, black, transparent)', WebkitMaskImage: 'linear-gradient(to left, black, transparent)' }}
-        />
-
-        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-blue-100/90">
-              <Calendar size={14} aria-hidden="true" />
-              <span className="first-letter:uppercase tabular-nums">
-                {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-              <span aria-hidden="true" className="text-blue-200/50">·</span>
-              <span className="inline-flex items-center gap-1.5 font-medium text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Sincronizado
-              </span>
-            </p>
-            <h1 id="dash-hello" className="mt-1.5 text-2xl sm:text-3xl font-bold tracking-tight">
-              Olá{profile?.name ? `, ${profile.name.trim().split(/\s+/)[0]}` : ''}
-            </h1>
-            <p className="mt-0.5 text-xs text-blue-100/80">{settings.storeName || 'Munago Mecânica'} · Monitoramento operacional</p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={handleExportPDF}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/15 cursor-pointer"
-            >
-              <Download size={14} aria-hidden="true" />
-              <span>Relatório PDF</span>
-            </button>
-            {!isViewer && (
-              <button
-                onClick={generateSummary}
-                disabled={isGeneratingSummary}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/15 disabled:opacity-70 cursor-pointer"
-              >
-                {isGeneratingSummary ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
-                <span>Diagnóstico Executivo</span>
-              </button>
-            )}
-            {canManageOS && (
-              <button
-                onClick={onNewOS}
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50 cursor-pointer"
-              >
-                <Plus size={15} aria-hidden="true" />
-                <span>Nova OS</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Indicadores em vidro */}
-        <div
-          id="widget-section-kpis"
-          className={`relative mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 rounded-3xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
-        >
-          {/* Patrimônio */}
-          <div className="flex flex-col justify-between rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md transition-colors hover:bg-white/15">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500 shadow-sm"><Package size={15} aria-hidden="true" /></span>
-              <span className="text-sm font-semibold">Patrimônio em estoque</span>
-            </div>
-            <p className="mt-3 text-3xl font-bold tracking-tight tabular-nums">{formatBRL(totalStockValue)}</p>
-            <p className="mt-1 text-xs text-blue-100/85">{totalItems} referências · média {formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}</p>
-          </div>
-
-          {/* Faturamento 30 dias */}
-          <div className="flex flex-col justify-between rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md transition-colors hover:bg-white/15">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 shadow-sm"><TrendingUp size={15} aria-hidden="true" /></span>
-              <span className="text-sm font-semibold">Faturamento 30 dias</span>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="whitespace-nowrap text-3xl font-bold tracking-tight tabular-nums">{formatBRL(revenue30.total)}</p>
-              <div className="w-14 min-w-0 shrink"><Sparkline id="spark-revenue" data={revenue30.daily} color="#ffffff" /></div>
-            </div>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-blue-100/85">
-              {revenue30.delta !== null && (
-                <span className={`inline-flex items-center gap-0.5 font-semibold ${revenue30.delta >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                  {revenue30.delta >= 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownLeft size={13} aria-hidden="true" />}
-                  {revenue30.delta >= 0 ? '+' : ''}{revenue30.delta}%
-                </span>
-              )}
-              {revenue30.count} OS concluídas
-            </p>
-          </div>
-
-          {/* Disponibilidade */}
-          <div className="flex flex-col justify-between rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md transition-colors hover:bg-white/15">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500 shadow-sm"><Boxes size={15} aria-hidden="true" /></span>
-              <span className="text-sm font-semibold">Disponibilidade</span>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="text-3xl font-bold tracking-tight tabular-nums">{healthyRate}%</p>
-              <div className="w-14 min-w-0 shrink" title="Saídas diárias · últimos 14 dias"><Sparkline id="spark-out" data={outDaily14} color="#c4b5fd" /></div>
-            </div>
-            <p className="mt-1 text-xs text-blue-100/85 tabular-nums">
-              {new Intl.NumberFormat('pt-BR').format(totalUnits)} un · {healthyItemsCount} acima do mínimo
-            </p>
-          </div>
-
-          {/* Risco de ruptura */}
-          <button
-            type="button"
-            onClick={onSeeAllLowStock}
-            className={`flex flex-col justify-between rounded-2xl border p-4 text-left backdrop-blur-md transition-colors cursor-pointer ${
-              lowStockProducts.length > 0
-                ? 'border-rose-400/60 bg-gradient-to-br from-rose-500/25 to-violet-600/30 hover:from-rose-500/35'
-                : 'border-white/20 bg-white/10 hover:bg-white/15'
-            }`}
-          >
-            <div className="flex w-full items-center gap-2">
-              <span className={`flex h-7 w-7 items-center justify-center rounded-lg shadow-sm ${lowStockProducts.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-                {lowStockProducts.length > 0 ? <AlertTriangle size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}
-              </span>
-              <span className="text-sm font-semibold">Risco de ruptura</span>
-              {lowStockProducts.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-rose-400 motion-safe:animate-pulse" aria-hidden="true" />}
-              <ChevronRight size={16} className="ml-auto text-blue-100/80" aria-hidden="true" />
-            </div>
-            <p className="mt-3 text-3xl font-bold tracking-tight tabular-nums">
-              {lowStockProducts.length} <span className="text-base font-normal text-blue-100/80">itens</span>
-            </p>
-            <p className="mt-1 text-xs text-blue-100/85">
-              {lowStockProducts.length > 0 ? 'Abaixo do mínimo: risco de parar OS' : 'Nenhuma ruptura agora'}
-            </p>
+      <PageHero
+        eyebrow={<>
+          <Calendar size={14} aria-hidden="true" />
+          <span className="first-letter:uppercase tabular-nums">
+            {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          <span aria-hidden="true" className="text-blue-200/50">·</span>
+          <span className="inline-flex items-center gap-1.5 font-medium text-emerald-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            Sincronizado
+          </span>
+        </>}
+        title={<>Olá{profile?.name ? `, ${profile.name.trim().split(/\s+/)[0]}` : ''}</>}
+        subtitle={`${settings.storeName || 'Munago Mecânica'} · Monitoramento operacional`}
+        actions={<>
+          <button onClick={handleExportPDF} className={heroBtn}>
+            <Download size={14} aria-hidden="true" />
+            <span>Relatório PDF</span>
           </button>
-        </div>
-      </section>
+          {!isViewer && (
+            <button onClick={generateSummary} disabled={isGeneratingSummary} className={heroBtn}>
+              {isGeneratingSummary ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
+              <span>Diagnóstico Executivo</span>
+            </button>
+          )}
+          {canManageOS && (
+            <button onClick={onNewOS} className={heroBtnPrimary}>
+              <Plus size={15} aria-hidden="true" />
+              <span>Nova OS</span>
+            </button>
+          )}
+        </>}
+        statsId="widget-section-kpis"
+        statsClassName={`grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 rounded-3xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
+      >
+        <HeroStat
+          icon={Package} iconClass="bg-blue-500" label="Patrimônio em estoque"
+          value={formatBRL(totalStockValue)}
+          hint={`${totalItems} referências · média ${formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}`}
+        />
+        <HeroStat
+          icon={TrendingUp} iconClass="bg-emerald-500" label="Faturamento 30 dias"
+          value={formatBRL(revenue30.total)}
+          aside={<Sparkline id="spark-revenue" data={revenue30.daily} color="#ffffff" />}
+          hint={<span className="flex items-center gap-1.5">
+            {revenue30.delta !== null && (
+              <span className={`inline-flex items-center gap-0.5 font-semibold ${revenue30.delta >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {revenue30.delta >= 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownLeft size={13} aria-hidden="true" />}
+                {revenue30.delta >= 0 ? '+' : ''}{revenue30.delta}%
+              </span>
+            )}
+            {revenue30.count} OS concluídas
+          </span>}
+        />
+        <HeroStat
+          icon={Boxes} iconClass="bg-violet-500" label="Disponibilidade"
+          value={`${healthyRate}%`}
+          aside={<Sparkline id="spark-out" data={outDaily14} color="#c4b5fd" />}
+          hint={`${new Intl.NumberFormat('pt-BR').format(totalUnits)} un · ${healthyItemsCount} acima do mínimo`}
+        />
+        <HeroStat
+          icon={lowStockProducts.length > 0 ? AlertTriangle : CheckCircle2}
+          iconClass={lowStockProducts.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}
+          label="Risco de ruptura"
+          alert={lowStockProducts.length > 0}
+          onClick={onSeeAllLowStock}
+          value={<>{lowStockProducts.length} <span className="text-base font-normal text-blue-100/80">itens</span></>}
+          hint={lowStockProducts.length > 0 ? 'Abaixo do mínimo: risco de parar OS' : 'Nenhuma ruptura agora'}
+        />
+      </PageHero>
 
       {/* ========================================================================= */}
       {/* WALL MONITOR AUTO-SCROLL CONTROL BAR (Ativo apenas com Modo Monitor ligado) */}

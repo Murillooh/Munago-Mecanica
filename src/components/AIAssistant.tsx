@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from "../context/AppContext";
+import { PageHero, heroBtnPrimary } from './PageHero';
 import { apiDelete, apiGet, apiPost, authFetch, hydrateDates, type AppTimestamp } from "../lib/api";
 import { parseDate } from './dashboard/utils';
 import {
@@ -320,37 +321,30 @@ const AIAssistant = () => {
   return (
     // Celular: desconta o menu inferior, as margens da página e as áreas seguras do iPhone.
     <div className="w-full flex flex-col gap-4 h-[calc(100dvh-10rem-env(safe-area-inset-bottom)-env(safe-area-inset-top))] lg:h-[calc(100dvh-3rem)]">
-      {/* Cabeçalho: no celular quebra em duas linhas (título em cima, controles embaixo) */}
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Assistente IA</h1>
-          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Analisa seu estoque e suas OS e pesquisa preços e fornecedores na web.</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="lg:hidden flex items-center gap-0.5 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200/70 dark:border-zinc-700" role="group" aria-label="Painel">
+      {/* Topo compacto (sem indicadores: a conversa precisa da altura) */}
+      <PageHero
+        icon={Sparkles}
+        title="Assistente IA"
+        subtitle="Analisa seu estoque e suas OS e pesquisa preços e fornecedores na web."
+        actions={<>
+          <div className="lg:hidden flex items-center gap-0.5 rounded-xl border border-white/25 bg-white/10 p-0.5" role="group" aria-label="Painel">
             {([['chat', 'Conversa', MessageSquare], ['history', 'Histórico', History]] as const).map(([v, label, Icon]) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => setMobilePane(v)}
                 aria-pressed={mobilePane === v}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${mobilePane === v ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500 dark:text-zinc-400'}`}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${mobilePane === v ? 'bg-white text-blue-700 shadow-xs' : 'text-blue-50'}`}
               >
                 <Icon size={13} aria-hidden="true" /> {label}
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={newConversation}
-            aria-label="Nova conversa"
-            title="Nova conversa"
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-          >
+          <button type="button" onClick={newConversation} aria-label="Nova conversa" title="Nova conversa" className={heroBtnPrimary}>
             <Plus size={15} aria-hidden="true" /> <span className="hidden sm:inline">Nova conversa</span>
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="flex-1 min-h-0 flex gap-4">
         {/* Histórico */}

@@ -4,9 +4,9 @@ import {
   AlertTriangle,
   Check,
   CheckCheck,
-  Loader2
-} from 'lucide-react';
+  Loader2, BellRing } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { HeroStat, PageHero, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
 import { parseDate } from '../components/dashboard/utils';
 
@@ -75,24 +75,35 @@ export const Notifications = () => {
 
   return (
     <div className="w-full space-y-5">
-      {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Gestão de Alertas</h1>
-          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Avisos de estoque baixo e notificações do sistema.</p>
-        </div>
-        {unread.length > 0 && (
-          <button
-            type="button"
-            onClick={markAllRead}
-            disabled={markingAll}
-            className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-60 cursor-pointer"
-          >
+      {/* Topo + filtro rápido */}
+      <PageHero
+        icon={Bell}
+        title="Alertas"
+        subtitle="Avisos de estoque baixo e notificações do sistema."
+        actions={unread.length > 0 && (
+          <button type="button" onClick={markAllRead} disabled={markingAll} className={heroBtnPrimary}>
             {markingAll ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <CheckCheck size={15} aria-hidden="true" />}
             Marcar todos como lidos
           </button>
         )}
-      </div>
+        statsClassName="grid-cols-1 sm:grid-cols-3"
+      >
+        <HeroStat
+          icon={BellRing} iconClass="bg-rose-500" label="Não lidos"
+          alert={unread.length > 0 && filter !== 'unread'} selected={filter === 'unread'}
+          onClick={() => changeFilter('unread')}
+          value={unread.length} hint={unread.length === 0 ? 'Nenhum alerta pendente' : 'pendentes de leitura'}
+        />
+        <HeroStat
+          icon={CheckCheck} iconClass="bg-emerald-500" label="Lidos"
+          value={sorted.length - unread.length} hint="já vistos pela equipe"
+        />
+        <HeroStat
+          icon={Bell} iconClass="bg-blue-500" label="Todos"
+          selected={filter === 'all'} onClick={() => changeFilter('all')}
+          value={sorted.length} hint="histórico de alertas"
+        />
+      </PageHero>
 
       <div className="bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs overflow-hidden">
         {/* Filtro + resumo */}

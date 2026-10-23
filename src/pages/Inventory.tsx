@@ -39,6 +39,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { HeroStat, PageHero, heroBtn, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
 import { MovementModal } from '../components/inventory/MovementModal';
 import CategoryManager from '../components/CategoryManager';
@@ -366,139 +367,56 @@ export const Inventory = () => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8 pb-32"
     >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Almoxarifado & Estoque</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Catálogo completo de peças e controle de movimentações físicas.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button 
-            onClick={handleExportPDF}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs"
-            title="Exportar Relatório Geral de Estoque em PDF"
-          >
-            <FileText size={14} className="text-zinc-500" />
-            <span>Relatório PDF</span>
+      <PageHero
+        icon={Package}
+        title="Almoxarifado"
+        subtitle="Catálogo completo de peças e controle de movimentações físicas."
+        actions={<>
+          <button onClick={handleExportPDF} className={heroBtn} title="Exportar Relatório Geral de Estoque em PDF">
+            <FileText size={14} aria-hidden="true" /> Relatório PDF
           </button>
-          
-          <div className="flex bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-lg overflow-hidden shadow-xs">
-            <button 
-              onClick={() => handleExportData('csv')}
-              className="flex items-center gap-1 text-zinc-700 dark:text-zinc-300 px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 border-r border-zinc-200/80 dark:border-zinc-800 transition-colors"
-            >
-              <Download size={13} className="text-zinc-500" />
-              CSV
-            </button>
-            <button 
-              onClick={() => handleExportData('xlsx')}
-              className="flex items-center gap-1 text-zinc-700 dark:text-zinc-300 px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-            >
-              <FileSpreadsheet size={13} className="text-zinc-500" />
-              Excel
-            </button>
-          </div>
-
-          <button 
-            onClick={() => setIsGoogleSheetsModalOpen(true)}
-            className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition-colors shadow-xs"
-          >
-            <FileSpreadsheet size={14} />
-            Sheets Sync
+          <button onClick={() => handleExportData('csv')} className={heroBtn}>
+            <Download size={14} aria-hidden="true" /> CSV
           </button>
-
-          <button 
-            onClick={() => setIsAiSummaryOpen(true)}
-            className="inline-flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-zinc-200 transition-colors shadow-xs"
-          >
-            <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
-            Análise IA
+          <button onClick={() => handleExportData('xlsx')} className={heroBtn}>
+            <FileSpreadsheet size={14} aria-hidden="true" /> Excel
           </button>
-
+          <button onClick={() => setIsGoogleSheetsModalOpen(true)} className={heroBtn}>
+            <FileSpreadsheet size={14} aria-hidden="true" /> Sheets Sync
+          </button>
+          <button onClick={() => setIsAiSummaryOpen(true)} className={heroBtn}>
+            <Sparkles size={14} aria-hidden="true" /> Análise IA
+          </button>
           {canManageInventory && (
-            <button 
-              onClick={() => { setSelectedProduct(null); setIsModalOpen(true); }}
-              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors shadow-xs"
-            >
-              <Plus size={14} />
-              Novo Produto
+            <button onClick={() => { setSelectedProduct(null); setIsModalOpen(true); }} className={heroBtnPrimary}>
+              <Plus size={14} aria-hidden="true" /> Novo Produto
             </button>
           )}
-        </div>
-      </div>
-
-      {/* Quick Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Total de SKUs</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Package size={14} />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-xl font-bold text-zinc-900 dark:text-white tabular-nums">{products.length}</span>
-            <span className="text-xs text-zinc-500">itens cadastrados</span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Patrimônio em Peças</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <DollarSign size={14} />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-xl font-bold text-zinc-900 dark:text-white tabular-nums truncate">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
-                products.reduce((acc, p) => acc + (p.price || 0) * (p.quantity || 0), 0)
-              )}
-            </span>
-          </div>
-        </div>
-
-        <div 
+        </>}
+        statsClassName="grid-cols-2 xl:grid-cols-4"
+      >
+        <HeroStat icon={Package} iconClass="bg-blue-500" label="Total de SKUs" value={products.length} hint="itens cadastrados" />
+        <HeroStat
+          icon={DollarSign} iconClass="bg-emerald-500" label="Patrimônio em peças"
+          value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
+            products.reduce((acc, p) => acc + (p.price || 0) * (p.quantity || 0), 0)
+          )}
+          hint="preço × quantidade"
+        />
+        <HeroStat
+          icon={AlertTriangle} iconClass="bg-rose-500" label="Estoque crítico"
+          alert={!inventoryLowStockFilter && products.some(p => p.quantity <= (p.minQuantity || 5))}
+          selected={inventoryLowStockFilter}
           onClick={() => setInventoryLowStockFilter(!inventoryLowStockFilter)}
-          className={`bg-white dark:bg-zinc-900 border p-3.5 rounded-xl shadow-xs cursor-pointer transition-all ${
-            inventoryLowStockFilter 
-              ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50/20 dark:bg-red-950/20' 
-              : 'border-zinc-200/80 dark:border-zinc-800 hover:border-red-300 dark:hover:border-red-900/60'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Estoque Crítico / Baixo</span>
-            <div className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center">
-              <AlertTriangle size={14} />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-red-600 dark:text-red-400 tabular-nums">
-                {products.filter(p => p.quantity <= (p.minQuantity || 5)).length}
-              </span>
-              <span className="text-xs text-zinc-500">abaixo do mínimo</span>
-            </div>
-            <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-              {inventoryLowStockFilter ? 'Ver todos' : 'Filtrar'}
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Volume Físico Total</span>
-            <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <Boxes size={14} />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-xl font-bold text-zinc-900 dark:text-white tabular-nums">
-              {products.reduce((acc, p) => acc + (p.quantity || 0), 0)}
-            </span>
-            <span className="text-xs text-zinc-500">unidades totais</span>
-          </div>
-        </div>
-      </div>
+          value={products.filter(p => p.quantity <= (p.minQuantity || 5)).length}
+          hint={inventoryLowStockFilter ? 'Filtrando · toque para ver todos' : 'abaixo do mínimo · toque para filtrar'}
+        />
+        <HeroStat
+          icon={Boxes} iconClass="bg-amber-500" label="Volume físico"
+          value={products.reduce((acc, p) => acc + (p.quantity || 0), 0)}
+          hint="unidades totais"
+        />
+      </PageHero>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 flex-1 flex-wrap">

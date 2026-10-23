@@ -23,6 +23,7 @@ import {
 import { useApp, ROLE_PRESETS, UserPermissions, UserProfile } from '../context/AppContext';
 import { apiGet, apiPost } from '../lib/api';
 import { SignupQueue } from '../components/SignupQueue';
+import { HeroStat, PageHero, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
 
 type Role = 'admin' | 'editor' | 'viewer';
@@ -335,23 +336,39 @@ export const Users = () => {
 
   return (
     <div className="w-full space-y-5 pb-24 lg:pb-6">
-      {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Equipe & Acessos</h1>
-          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Quem acessa o sistema e o que cada pessoa pode fazer.</p>
-        </div>
-        {canManageUsers && (
-          <button
-            type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 cursor-pointer"
-          >
-            <UserPlus size={16} aria-hidden="true" />
-            Novo usuário
+      {/* Topo + resumo da equipe (clica e filtra por função) */}
+      <PageHero
+        icon={UsersIcon}
+        title="Equipe e acessos"
+        subtitle="Quem acessa o sistema e o que cada pessoa pode fazer."
+        actions={canManageUsers && (
+          <button type="button" onClick={() => setIsAddModalOpen(true)} className={heroBtnPrimary}>
+            <UserPlus size={15} aria-hidden="true" /> Novo usuário
           </button>
         )}
-      </div>
+        statsClassName="grid-cols-2 xl:grid-cols-4"
+      >
+        <HeroStat
+          icon={UsersIcon} iconClass="bg-blue-500" label="Membros"
+          value={allUsers.length} hint="com acesso a esta oficina"
+          selected={roleFilter === 'all'} onClick={() => setRoleFilter('all')}
+        />
+        <HeroStat
+          icon={ShieldCheck} iconClass="bg-violet-500" label="Administradores"
+          value={allUsers.filter(u => roleOf(u.role) === 'admin').length} hint="acesso total"
+          selected={roleFilter === 'admin'} onClick={() => setRoleFilter(roleFilter === 'admin' ? 'all' : 'admin')}
+        />
+        <HeroStat
+          icon={Briefcase} iconClass="bg-emerald-500" label="Operadores"
+          value={allUsers.filter(u => roleOf(u.role) === 'editor').length} hint="estoque, OS e movimentações"
+          selected={roleFilter === 'editor'} onClick={() => setRoleFilter(roleFilter === 'editor' ? 'all' : 'editor')}
+        />
+        <HeroStat
+          icon={Clock} iconClass="bg-amber-500" label="Aguardando"
+          alert={pendingTotal > 0}
+          value={pendingTotal} hint={pendingTotal > 0 ? 'cadastros para aprovar' : 'ninguém esperando'}
+        />
+      </PageHero>
 
       {/* Quem criou conta e ainda não está em nenhuma mecânica */}
       {isAdmin && (profile?.workspace?.id ?? profile?.workspaceId) && (

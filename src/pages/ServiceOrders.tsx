@@ -22,6 +22,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 import { OSCharge } from '../components/OSCharge';
+import { HeroStat, PageHero, heroBtnPrimary } from '../components/PageHero';
 
 /** Serviço lançado na OS (preço vem do catálogo; o repasse é calculado e guardado pelo servidor). */
 type OSService = { serviceId: string; name: string; price: number; quantity: number };
@@ -69,6 +70,14 @@ const STATUS_META: Record<OSStatus, { label: string; chip: string; dot: string; 
 };
 
 type StatusFilter = 'all' | 'active' | OSStatus;
+
+/** Cor do ícone de cada etapa nos blocos do topo. */
+const STEP_ICON_BG: Record<OSStatus, string> = {
+  draft: 'bg-zinc-500',
+  in_progress: 'bg-amber-500',
+  completed: 'bg-sky-500',
+  paid: 'bg-emerald-500',
+};
 
 const formatEntry = (value?: string) => {
   if (!value) return 'Sem data';
@@ -325,52 +334,34 @@ export const ServiceOrders = () => {
 
   return (
     <div className="w-full space-y-8 pb-20">
-      {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Ordens de Serviço</h1>
-          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Orçamentos, manutenções em andamento e faturamento da oficina.</p>
-        </div>
-        {canManageOS && (
-          <button
-            type="button"
-            onClick={() => openOS(null)}
-            className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 cursor-pointer"
-          >
-            <Plus size={16} aria-hidden="true" />
-            Nova OS
+      {/* Topo + resumo por etapa (clica e filtra) */}
+      <PageHero
+        icon={FileText}
+        title="Ordens de Serviço"
+        subtitle="Orçamentos, manutenções em andamento e faturamento da oficina."
+        actions={canManageOS && (
+          <button type="button" onClick={() => openOS(null)} className={heroBtnPrimary}>
+            <Plus size={15} aria-hidden="true" /> Nova OS
           </button>
         )}
-      </div>
-
-      {/* Resumo por etapa: clica e filtra */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        statsClassName="grid-cols-2 xl:grid-cols-4"
+      >
         {statusStats.map(s => {
-          const meta = STATUS_META[s.value];
-          const Icon = meta.icon;
           const selected = statusFilter === s.value;
           return (
-            <button
+            <HeroStat
               key={s.value}
-              type="button"
+              icon={STATUS_META[s.value].icon}
+              iconClass={STEP_ICON_BG[s.value]}
+              label={STATUS_META[s.value].label}
+              value={s.count}
+              hint={brl.format(s.amount)}
+              selected={selected}
               onClick={() => setStatusFilter(selected ? 'all' : s.value)}
-              aria-pressed={selected}
-              className={`text-left p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border shadow-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
-                selected ? 'border-blue-500 ring-1 ring-blue-500/40' : 'border-zinc-200/70 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{meta.label}</span>
-                <span className={`p-1.5 rounded-lg border ${meta.badge}`}>
-                  <Icon size={14} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">{s.count}</p>
-              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">{brl.format(s.amount)}</p>
-            </button>
+            />
           );
         })}
-      </div>
+      </PageHero>
 
       {/* Busca + filtros */}
       <div className="flex flex-col lg:flex-row gap-3">
