@@ -700,7 +700,7 @@ export const Dashboard = ({
           className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
         >
           {/* BENTO 4: VISUALIZAÇÃO DE TENDÊNCIA DE ENTRADAS E SAÍDAS (RECHARTS) - col-span-12 xl:col-span-8 */}
-          <div className="col-span-12 xl:col-span-8 flex flex-col justify-between">
+          <div className="col-span-12 xl:col-span-8 flex flex-col">
             <ProductMovementTrendChart 
               transactions={transactions || []} 
               onSeeAllHistory={onSeeAllHistory}
@@ -708,104 +708,84 @@ export const Dashboard = ({
             />
           </div>
 
-          {/* BENTO 5: PÁTIO DE SERVIÇOS & OFICINA (TOWER CELL) - col-span-12 xl:col-span-4 */}
-          <div className="col-span-12 xl:col-span-4 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
+          {/* BENTO 5: PÁTIO DE ORDENS DE SERVIÇO */}
+          <div className="col-span-12 xl:col-span-4 flex flex-col p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg shadow-blue-500/30 ring-1 ring-white/30">
+                  <Car size={17} aria-hidden="true" />
+                </span>
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
-                    Pátio de Ordens de Serviço
-                  </h2>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Fluxo operacional da oficina
-                  </p>
-                </div>
-
-                {canManageOS && (
-                  <button
-                    onClick={onNewOS}
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                  >
-                    Todas ({serviceOrders?.length || 0}) <ChevronRight size={13} />
-                  </button>
-                )}
-              </div>
-
-              {/* Structured Pipeline Counters */}
-              <div className="grid grid-cols-3 gap-2 p-1.5 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-5 text-center">
-                <div className="py-2">
-                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-semibold uppercase">Triagem</span>
-                  <span className="text-base font-bold text-zinc-900 dark:text-white tabular-nums">
-                    {(serviceOrders || []).filter(os => os.status === 'draft').length}
-                  </span>
-                </div>
-                <div className="py-2 border-x border-zinc-200/80 dark:border-zinc-700/80">
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-semibold uppercase">Execução</span>
-                  <span className="text-base font-bold text-amber-600 dark:text-amber-400 tabular-nums">
-                    {inProgressOS.length}
-                  </span>
-                </div>
-                <div className="py-2">
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold uppercase">Concluídas</span>
-                  <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                    {completedOS.length}
-                  </span>
+                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Pátio de Ordens de Serviço</h2>
+                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">Fluxo operacional da oficina</p>
                 </div>
               </div>
+              {canManageOS && (
+                <button onClick={onNewOS} className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 cursor-pointer">
+                  Todas ({serviceOrders?.length || 0}) <ChevronRight size={13} aria-hidden="true" />
+                </button>
+              )}
+            </div>
 
-              {/* Active OS List */}
-              <div className="space-y-3">
-                {activeOS.length > 0 ? (
-                  activeOS.slice(0, 3).map((os) => (
-                    <div 
+            {/* Contadores do pátio em blocos coloridos */}
+            <div className="mb-4 grid grid-cols-3 gap-2 text-center">
+              {([
+                ['Triagem', (serviceOrders || []).filter(os => os.status === 'draft').length, 'from-zinc-500/15 to-zinc-500/5 border-zinc-500/20', 'text-zinc-700 dark:text-zinc-200'],
+                ['Execução', inProgressOS.length, 'from-amber-500/20 to-orange-500/5 border-amber-500/30', 'text-amber-600 dark:text-amber-400'],
+                ['Concluídas', completedOS.length, 'from-emerald-500/20 to-teal-500/5 border-emerald-500/30', 'text-emerald-600 dark:text-emerald-400'],
+              ] as const).map(([label, count, tile, tone]) => (
+                <div key={label} className={`rounded-xl border bg-gradient-to-br py-2.5 ${tile}`}>
+                  <span className={`block text-[10px] font-semibold uppercase tracking-wide ${tone}`}>{label}</span>
+                  <span className={`text-xl font-bold tabular-nums ${tone}`}>{count}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* OS em andamento: faixa colorida pela etapa */}
+            <div className="flex-1 space-y-2.5">
+              {activeOS.length > 0 ? (
+                activeOS.slice(0, 3).map((os) => {
+                  const running = os.status === 'in_progress';
+                  return (
+                    <button
                       key={os.id}
+                      type="button"
                       onClick={onNewOS}
-                      className="p-3.5 bg-zinc-50/70 dark:bg-zinc-800/40 rounded-xl border border-zinc-200/60 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors cursor-pointer group"
+                      className={`relative w-full overflow-hidden rounded-xl border border-zinc-200/60 bg-zinc-50/70 py-3 pl-4 pr-3.5 text-left transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-800/40 dark:hover:border-zinc-700 cursor-pointer`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-bold text-zinc-900 dark:text-white">
-                          OS #{os.id.substring(0, 6)}
-                        </span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                          os.status === 'in_progress' 
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' 
-                            : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
-                        }`}>
-                          {os.status === 'in_progress' ? 'Em Andamento' : 'Rascunho'}
+                      <span className={`absolute inset-y-0 left-0 w-1 ${running ? 'bg-gradient-to-b from-amber-400 to-orange-500' : 'bg-gradient-to-b from-zinc-300 to-zinc-500'}`} aria-hidden="true" />
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-zinc-900 dark:text-white">OS #{os.id.substring(0, 6)}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${running ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-300'}`}>
+                          {running ? 'Em andamento' : 'Orçamento'}
                         </span>
                       </div>
-
-                      <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-300 mt-2">
-                        <span className="truncate max-w-[170px] font-semibold">
-                          {os.customerName || 'Cliente sem nome'}
-                        </span>
-                        <span className="font-bold text-zinc-900 dark:text-white tabular-nums">
-                          {formatBRL(os.finalAmount || os.totalAmount || 0)}
-                        </span>
+                      <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate font-semibold text-zinc-700 dark:text-zinc-200">{os.customerName || 'Cliente sem nome'}</span>
+                        <span className="shrink-0 font-bold tabular-nums text-zinc-900 dark:text-white">{formatBRL(os.finalAmount || os.totalAmount || 0)}</span>
                       </div>
-
                       {(os.vehicleModel || os.licensePlate) && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-1.5">
-                          <Car size={12} className="text-zinc-400" />
-                          <span>{os.vehicleModel || 'Veículo'} {os.licensePlate ? `(${os.licensePlate})` : ''}</span>
+                        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-500">
+                          <Car size={12} className="text-zinc-400" aria-hidden="true" />
+                          <span className="truncate">{os.vehicleModel || 'Veículo'} {os.licensePlate ? `(${os.licensePlate})` : ''}</span>
                         </div>
                       )}
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-7 text-center text-xs text-zinc-500 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
-                    Nenhuma ordem em andamento no pátio.
-                  </div>
-                )}
-              </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="rounded-xl border border-dashed border-zinc-200 py-7 text-center text-xs text-zinc-500 dark:border-zinc-800">
+                  Nenhuma ordem em andamento no pátio.
+                </div>
+              )}
             </div>
 
             {canManageOS && (
               <button
                 onClick={onNewOS}
-                className="w-full mt-5 py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-600/25 transition hover:brightness-110 cursor-pointer"
               >
-                <Plus size={14} /> Abrir Painel de Ordens
+                <Plus size={14} aria-hidden="true" /> Abrir painel de ordens
               </button>
             )}
           </div>
