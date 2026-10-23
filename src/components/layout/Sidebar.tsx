@@ -14,12 +14,11 @@ import {
   Sparkles,
   Maximize2,
   ShieldCheck,
-  Building2,
-  ChevronsUpDown,
   type LucideIcon,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useApp } from '../../context/AppContext';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { toast } from 'sonner';
 
 interface NavItem {
@@ -104,7 +103,6 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
   const nameParts = (profile?.name || 'Usuário').trim().split(/\s+/);
   const initials = (nameParts[0][0] + (nameParts.length > 1 ? nameParts[nameParts.length - 1][0] : '')).toUpperCase();
   const activeWorkspaceId = profile?.workspace?.id ?? profile?.workspaceId ?? '';
-  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
 
   const go = (id: string) => {
     if (id === 'inventory') setInventoryLowStockFilter(false);
@@ -160,40 +158,16 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
         </button>
       </div>
 
-      {/* Admin geral: escolhe qual oficina está administrando (cartão; o select nativo fica por cima, invisível) */}
+      {/* Admin geral: escolhe qual oficina está administrando */}
       {isSuperAdmin && !isCollapsed && workspaces.length > 0 && (
         <div className="shrink-0 px-3 pt-3">
-          <div className="relative rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3 text-white shadow-lg shadow-blue-900/20 focus-within:ring-2 focus-within:ring-blue-400">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-100/80">Oficina ativa</p>
-            <div className="mt-1.5 flex items-center gap-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15">
-                <Building2 size={16} aria-hidden="true" />
-              </span>
-              <div className="min-w-0 flex-1 leading-tight">
-                <p className="truncate text-sm font-semibold">
-                  {activeWorkspace?.name ?? storeName}
-                  {activeWorkspace?.id === profile?.workspaceId && <span className="ml-1 text-[11px] font-normal text-blue-100/80">(minha)</span>}
-                </p>
-                <p className="truncate text-[11px] text-blue-100/80">
-                  {activeWorkspace?.userCount ?? 0} {activeWorkspace?.userCount === 1 ? 'usuário' : 'usuários'} · {workspaces.length} oficinas
-                </p>
-              </div>
-              <ChevronsUpDown size={16} className="shrink-0 text-blue-100/80" aria-hidden="true" />
-            </div>
-            <label htmlFor="workspace-switcher" className="sr-only">Trocar de oficina</label>
-            <select
-              id="workspace-switcher"
-              value={activeWorkspaceId}
-              onChange={(e) => switchWorkspace(e.target.value)}
-              className="absolute inset-0 h-full w-full cursor-pointer rounded-2xl opacity-0"
-            >
-              {workspaces.map(w => (
-                <option key={w.id} value={w.id}>
-                  {w.name}{w.id === profile?.workspaceId ? ' (minha)' : ''} · {w.userCount ?? 0} usuário(s)
-                </option>
-              ))}
-            </select>
-          </div>
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            activeId={activeWorkspaceId}
+            myId={profile?.workspaceId}
+            fallbackName={storeName}
+            onSwitch={switchWorkspace}
+          />
         </div>
       )}
 
