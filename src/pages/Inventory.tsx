@@ -54,10 +54,10 @@ const CATEGORY_TONES = [
   { chip: 'bg-sky-500/12 text-sky-700 dark:text-sky-300', icon: 'from-sky-400 to-blue-600' },
   { chip: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300', icon: 'from-emerald-400 to-teal-600' },
   { chip: 'bg-violet-500/12 text-violet-700 dark:text-violet-300', icon: 'from-fuchsia-400 to-violet-600' },
-  { chip: 'bg-amber-500/15 text-amber-700 dark:text-amber-300', icon: 'from-amber-300 to-orange-500' },
+  { chip: 'bg-blue-500/12 text-blue-700 dark:text-blue-300', icon: 'from-blue-400 to-indigo-600' },
   { chip: 'bg-pink-500/12 text-pink-700 dark:text-pink-300', icon: 'from-pink-400 to-rose-600' },
   { chip: 'bg-cyan-500/12 text-cyan-700 dark:text-cyan-300', icon: 'from-cyan-400 to-sky-600' },
-  { chip: 'bg-lime-500/15 text-lime-700 dark:text-lime-300', icon: 'from-lime-400 to-green-600' },
+  { chip: 'bg-teal-500/12 text-teal-700 dark:text-teal-300', icon: 'from-teal-400 to-cyan-600' },
   { chip: 'bg-indigo-500/12 text-indigo-700 dark:text-indigo-300', icon: 'from-indigo-400 to-blue-700' },
 ];
 const NO_CATEGORY_TONE = { chip: 'bg-zinc-500/12 text-zinc-600 dark:text-zinc-300', icon: 'from-zinc-400 to-zinc-600' };
@@ -436,7 +436,7 @@ export const Inventory = () => {
           hint={inventoryLowStockFilter ? 'Filtrando · toque para ver todos' : 'abaixo do mínimo · toque para filtrar'}
         />
         <HeroStat
-          icon={Boxes} iconClass="bg-amber-500" label="Volume físico"
+          icon={Boxes} iconClass="bg-sky-500" label="Volume físico"
           value={products.reduce((acc, p) => acc + (p.quantity || 0), 0)}
           hint="unidades totais"
         />
@@ -533,9 +533,9 @@ export const Inventory = () => {
                   exit={{ opacity: 0, scale: 0.98 }}
                   className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-xs transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 sm:p-3.5 motion-safe:hover:-translate-y-0.5"
                 >
-                  {/* Faixa de alerta no topo quando o estoque está zerado ou baixo */}
-                  {stock !== 'ok' && (
-                    <span className={`absolute inset-x-0 top-0 h-1 ${stock === 'out' ? 'bg-gradient-to-r from-rose-500 to-pink-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`} aria-hidden="true" />
+                  {/* Faixa de alerta no topo só quando zerado (o caso urgente); "baixo" fica na barra e no selo */}
+                  {stock === 'out' && (
+                    <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-500 to-pink-500" aria-hidden="true" />
                   )}
                   <div>
                     {/* Categoria (cor própria) + situação + ações */}
@@ -588,7 +588,7 @@ export const Inventory = () => {
                         <div className="min-w-0">
                           <span className="block text-[9px] font-medium uppercase tracking-wide text-zinc-400">Saldo</span>
                           <div className="flex items-baseline gap-1">
-                            <span className={`text-lg font-bold tabular-nums leading-none ${stock === 'out' ? 'text-rose-600 dark:text-rose-400' : stock === 'low' ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-900 dark:text-white'}`}>
+                            <span className={`text-lg font-bold tabular-nums leading-none ${stock === 'out' ? 'text-rose-600 dark:text-rose-400' : stock === 'low' ? 'text-pink-600 dark:text-pink-300' : 'text-zinc-900 dark:text-white'}`}>
                               {p.quantity}
                             </span>
                             <span className="text-[10px] text-zinc-400">/ mín {minQty}</span>
@@ -604,12 +604,12 @@ export const Inventory = () => {
                       <div className="mt-2 flex items-center gap-2">
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-900/10 dark:bg-white/10" role="img" aria-label={`Saldo ${p.quantity} de mínimo ${minQty}`}>
                           <div
-                            className={`h-full rounded-full ${stock === 'out' ? 'bg-rose-500' : stock === 'low' ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}
+                            className={`h-full rounded-full ${stock === 'out' ? 'bg-rose-500' : stock === 'low' ? 'bg-gradient-to-r from-pink-400 to-fuchsia-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}
                             style={{ width: `${coverage}%` }}
                           />
                         </div>
                         {stock !== 'ok' && (
-                          <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold uppercase ${stock === 'out' ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'}`}>
+                          <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold uppercase ${stock === 'out' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400' : 'bg-pink-500/15 text-pink-700 dark:text-pink-300'}`}>
                             {stock === 'out' ? 'Zerado' : 'Baixo'}
                           </span>
                         )}
