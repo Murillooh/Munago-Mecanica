@@ -4,6 +4,7 @@ import { macZoom } from '../lib/motion';
 import { ArrowUp, BatteryFull, ChevronLeft, MessageCircleQuestion, RotateCcw, Signal, Wifi } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
+import { AUTH_CHARACTER_URL } from './auth/authStyles';
 
 type Msg = { role: 'user' | 'model'; text: string; error?: boolean };
 
@@ -213,12 +214,16 @@ export const SupportChat: React.FC = () => {
                 <span className="block text-[10px] font-normal text-zinc-500 dark:text-zinc-400">Fale com a Ana</span>
               </span>
             )}
-            {/* Mini iPhone: moldura, ilha e tela com o ícone do chat */}
-            <span className="flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg shadow-blue-900/30 ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
-              <span className="relative flex flex-1 items-center justify-center rounded-[12px] bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
+            {/* Mini iPhone: moldura, ilha e o boneco das telas de login como papel de parede */}
+            <span className="relative flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg shadow-blue-900/30 ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
+              <span className="relative flex-1 overflow-hidden rounded-[12px] bg-gradient-to-br from-blue-500 to-indigo-600">
+                <img src={AUTH_CHARACTER_URL} alt="" className="absolute inset-x-0 top-1.5 h-full w-full object-cover object-top" referrerPolicy="no-referrer" />
                 <span className="absolute left-1/2 top-1 h-1 w-3.5 -translate-x-1/2 rounded-full bg-black" />
-                <MessageCircleQuestion size={20} aria-hidden="true" />
                 <span className="absolute bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-white/70" />
+              </span>
+              {/* Selo de notificação com o ícone do chat */}
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow ring-2 ring-white dark:ring-zinc-900">
+                <MessageCircleQuestion size={12} aria-hidden="true" />
               </span>
             </span>
           </motion.button>
