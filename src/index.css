@@ -16,7 +16,7 @@
 }
 
 .dark {
-  --background: #09090b;
+  --background: #020617; /* slate-950: escuro profundo, sem o preto puro que cansa a vista */
   --foreground: #f8fafc;
   color-scheme: dark;
 }
@@ -89,7 +89,7 @@
     radial-gradient(40rem 32rem at 95% 10%, rgb(168 85 247 / 0.32), transparent 62%),
     radial-gradient(46rem 36rem at 60% 105%, rgb(16 185 129 / 0.22), transparent 62%),
     radial-gradient(30rem 24rem at 35% 45%, rgb(244 114 182 / 0.12), transparent 60%),
-    #000;
+    #020617;
 }
 
 /* Superfícies: menu lateral, cartões e janelas (fundo branco/zinc com borda ou cantos grandes). */
@@ -141,3 +141,21 @@
   /* Toque estilo iPhone: o botão afunda de leve ao ser pressionado. */
   .ios-glass button:not(:disabled):active { scale: 0.97; }
 }
+
+/* ---- Acabamento (guia de design): foco visível, ícones padronizados, contraste dos textos ---- */
+
+/* Quem navega pelo teclado (Tab) sempre vê onde está. Campos de texto já têm o próprio anel de foco. */
+.ios-glass :is(a, button, summary, [role="option"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Ícones com o mesmo traço, mais fino (como os da Apple); o item ativo do menu fica mais marcado. */
+.ios-glass svg.lucide { stroke-width: 1.75; }
+.ios-glass [aria-current="page"] svg.lucide { stroke-width: 2.25; }
+
+/* Textos secundários acima do contraste mínimo de leitura (4,5:1):
+   cinza-400 sobre branco dava ~2,6:1 e cinza-500 sobre o escuro ~3,9:1. Sobem um tom. */
+.ios-glass .text-zinc-400 { color: var(--color-zinc-500); }
+.dark .ios-glass .text-zinc-500 { color: var(--color-zinc-400); }
+.dark .ios-glass .text-zinc-400 { color: var(--color-zinc-400); }
