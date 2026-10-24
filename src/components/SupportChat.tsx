@@ -203,9 +203,24 @@ export const SupportChat: React.FC = () => {
             onClick={() => setOpen(true)}
             aria-label="Abrir chat de ajuda com a Ana"
             title="Precisa de ajuda? Fale com a Ana"
-            className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-600/30 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 cursor-pointer"
+            style={{ transformOrigin: 'bottom right' }}
+            className="group fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6 z-[60] rounded-[15px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 cursor-pointer"
           >
-            <MessageCircleQuestion size={26} aria-hidden="true" />
+            {/* Balão de mensagem acima do celular, até a primeira conversa */}
+            {messages.length === 0 && (
+              <span className="absolute bottom-full right-0 mb-2.5 whitespace-nowrap rounded-[1.1rem] rounded-br-[0.35rem] bg-white px-3 py-2 text-left text-xs font-medium text-zinc-800 shadow-lg shadow-black/15 ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-white/10" aria-hidden="true">
+                Oi! Precisa de ajuda?
+                <span className="block text-[10px] font-normal text-zinc-500 dark:text-zinc-400">Fale com a Ana</span>
+              </span>
+            )}
+            {/* Mini iPhone: moldura, ilha e tela com o ícone do chat */}
+            <span className="flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg shadow-blue-900/30 ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
+              <span className="relative flex flex-1 items-center justify-center rounded-[12px] bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
+                <span className="absolute left-1/2 top-1 h-1 w-3.5 -translate-x-1/2 rounded-full bg-black" />
+                <MessageCircleQuestion size={20} aria-hidden="true" />
+                <span className="absolute bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-white/70" />
+              </span>
+            </span>
           </motion.button>
         )}
       </AnimatePresence>
