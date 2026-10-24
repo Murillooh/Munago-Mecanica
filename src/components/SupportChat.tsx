@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { macZoom } from '../lib/motion';
-import { ArrowUp, BatteryFull, ChevronLeft, MessageCircleQuestion, RotateCcw, Signal, Wifi } from 'lucide-react';
+import { ArrowLeft, BatteryFull, CheckCheck, MessageCircleQuestion, RotateCcw, SendHorizontal, Signal, Wifi } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
 import { AUTH_CHARACTER_URL } from './auth/authStyles';
@@ -74,7 +74,7 @@ const AnaAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => (
     aria-hidden="true"
   >
     A
-    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-zinc-50 bg-emerald-500 dark:border-zinc-900" />}
+    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#008069] bg-emerald-400 dark:border-[#1f2c34]" />}
   </span>
 );
 
@@ -244,39 +244,49 @@ export const SupportChat: React.FC = () => {
             // No celular ocupa a tela; do sm para cima vira um iPhone (moldura, ilha, barra de status).
             className="fixed z-[70] inset-0 flex sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(720px,calc(100dvh-3rem))] sm:w-[360px] sm:rounded-[3.25rem] sm:bg-zinc-900 sm:p-[11px] sm:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.55),inset_0_0_0_1.5px_rgba(255,255,255,0.14),0_0_0_1px_rgba(0,0,0,0.6)]"
           >
-            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] dark:bg-black sm:rounded-[2.6rem] sm:pt-0 sm:pb-0">
-              {/* Barra de status + Dynamic Island (só na moldura; no celular real o sistema já mostra) */}
-              <div className="relative hidden h-11 shrink-0 items-center justify-between px-7 text-[13px] font-semibold text-zinc-900 dark:text-white sm:flex" aria-hidden="true">
-                <span className="tabular-nums">{clock}</span>
-                <span className="absolute left-1/2 top-2.5 h-[26px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
-                <span className="flex items-center gap-1">
-                  <Signal size={14} strokeWidth={2.5} />
-                  <Wifi size={14} strokeWidth={2.5} />
-                  <BatteryFull size={20} strokeWidth={2} />
-                </span>
+            {/* Tela no estilo WhatsApp: cabeçalho verde, papel de parede bege/escuro, balões com "rabinho" */}
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#efeae2] pb-[env(safe-area-inset-bottom)] dark:bg-[#0b141a] sm:rounded-[2.6rem] sm:pb-0">
+              <div className="bg-[#008069] pt-[env(safe-area-inset-top)] text-white dark:bg-[#1f2c34] sm:pt-0">
+                {/* Barra de status + Dynamic Island (só na moldura; no celular real o sistema já mostra) */}
+                <div className="relative hidden h-11 items-center justify-between px-7 text-[13px] font-semibold sm:flex" aria-hidden="true">
+                  <span className="tabular-nums">{clock}</span>
+                  <span className="absolute left-1/2 top-2.5 h-[26px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
+                  <span className="flex items-center gap-1">
+                    <Signal size={14} strokeWidth={2.5} />
+                    <Wifi size={14} strokeWidth={2.5} />
+                    <BatteryFull size={20} strokeWidth={2} />
+                  </span>
+                </div>
+
+                <header className="flex items-center gap-2 px-1.5 pb-2 pt-1">
+                  <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="rounded-full p-1.5 transition-colors hover:bg-white/10 cursor-pointer">
+                    <ArrowLeft size={22} aria-hidden="true" />
+                  </button>
+                  <AnaAvatar size="md" />
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <p className="text-[15px] font-semibold">Ana</p>
+                    <p className="truncate text-[11px] text-white/80">{busy ? 'digitando…' : 'online'}</p>
+                  </div>
+                  {messages.length > 0 && (
+                    <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="rounded-full p-2 transition-colors hover:bg-white/10 cursor-pointer">
+                      <RotateCcw size={18} aria-hidden="true" />
+                    </button>
+                  )}
+                </header>
               </div>
 
-              {/* Cabeçalho estilo Mensagens */}
-              <header className="relative flex shrink-0 flex-col items-center border-b border-zinc-200/80 bg-zinc-50/80 px-3 pb-2 pt-1 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/80">
-                <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="absolute left-1.5 top-1/2 flex -translate-y-1/2 items-center rounded-lg px-1 py-2 text-[15px] text-blue-500 transition-opacity hover:opacity-70 cursor-pointer">
-                  <ChevronLeft size={24} aria-hidden="true" />
-                  <span className="-ml-1">Fechar</span>
-                </button>
-                {messages.length > 0 && (
-                  <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-blue-500 transition-opacity hover:opacity-70 cursor-pointer">
-                    <RotateCcw size={18} aria-hidden="true" />
-                  </button>
-                )}
-                <AnaAvatar size="md" />
-                <p className="mt-1 text-[11px] font-medium text-zinc-900 dark:text-white">Ana</p>
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Assistente virtual · responde na hora</p>
-              </header>
-
               {/* Conversa */}
-              <div ref={listRef} className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3" aria-live="polite">
-                <p className="pb-1 text-center text-[11px] font-medium text-zinc-400">Hoje {clock}</p>
+              <div
+                ref={listRef}
+                className="flex-1 space-y-1 overflow-y-auto px-3 py-3 [background-image:radial-gradient(rgba(0,0,0,0.05)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)]"
+                aria-live="polite"
+              >
+                <p className="mx-auto mb-1 w-fit rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-[#54656f] shadow-sm dark:bg-[#182229] dark:text-[#8696a0]">Hoje</p>
+                <p className="mx-auto mb-2 max-w-[90%] rounded-md bg-white/90 px-3 py-1.5 text-center text-[11px] leading-snug text-[#54656f] shadow-sm dark:bg-[#182229] dark:text-[#8696a0]">
+                  A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.
+                </p>
                 <div className="flex">
-                  <div className="max-w-[78%] rounded-[1.15rem] rounded-bl-[0.35rem] bg-zinc-200/80 px-3 py-2 text-[14px] leading-snug text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+                  <div className="max-w-[80%] rounded-lg rounded-tl-none bg-white px-2.5 py-1.5 text-[14px] leading-snug text-[#111b21] shadow-sm dark:bg-[#202c33] dark:text-[#e9edef]">
                     {greeting}
                   </div>
                 </div>
@@ -284,11 +294,14 @@ export const SupportChat: React.FC = () => {
                 {messages.map((m, i) =>
                   m.role === 'user' ? (
                     <div key={i} className="flex justify-end">
-                      <div className="max-w-[78%] whitespace-pre-wrap rounded-[1.15rem] rounded-br-[0.35rem] bg-blue-500 px-3 py-2 text-[14px] leading-snug text-white">{m.text}</div>
+                      <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-tr-none bg-[#d9fdd3] px-2.5 py-1.5 text-[14px] leading-snug text-[#111b21] shadow-sm dark:bg-[#005c4b] dark:text-[#e9edef]">
+                        {m.text}
+                        <CheckCheck size={14} className="-mb-0.5 ml-1.5 inline text-[#53bdeb]" aria-label="Lida" />
+                      </div>
                     </div>
                   ) : (
                     <div key={i} className="flex">
-                      <div className={`max-w-[78%] rounded-[1.15rem] rounded-bl-[0.35rem] px-3 py-2 text-[14px] leading-snug ${m.error ? 'border border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300' : 'bg-zinc-200/80 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'}`}>
+                      <div className={`max-w-[80%] rounded-lg rounded-tl-none px-2.5 py-1.5 text-[14px] leading-snug shadow-sm ${m.error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-[#111b21] dark:bg-[#202c33] dark:text-[#e9edef]'}`}>
                         {m.text ? renderRich(m.text) : <TypingDots />}
                         {m.error && (
                           <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
@@ -301,13 +314,13 @@ export const SupportChat: React.FC = () => {
                 )}
 
                 {showSuggestions && (
-                  <div className="flex flex-col items-end gap-1.5 pt-2">
+                  <div className="flex flex-col items-center gap-1.5 pt-3">
                     {suggestions.map((s) => (
                       <button
                         key={s}
                         type="button"
                         onClick={() => send(s)}
-                        className="max-w-[85%] rounded-[1.15rem] border border-blue-500/40 px-3 py-1.5 text-right text-[13px] font-medium text-blue-600 transition-colors hover:bg-blue-500/10 dark:text-blue-400 cursor-pointer"
+                        className="w-full max-w-[85%] rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-[#008069] shadow-sm transition-colors hover:bg-[#f5f6f6] dark:bg-[#202c33] dark:text-[#00a884] dark:hover:bg-[#2a3942] cursor-pointer"
                       >
                         {s}
                       </button>
@@ -319,31 +332,32 @@ export const SupportChat: React.FC = () => {
               {/* Caixa de mensagem */}
               <form
                 onSubmit={(e) => { e.preventDefault(); void send(input); }}
-                className="shrink-0 bg-zinc-50/80 px-3 pb-2 pt-2 backdrop-blur-xl dark:bg-zinc-900/80"
+                className="shrink-0 px-2 pb-2 pt-1"
               >
-                <div className="flex items-end gap-1.5 rounded-[1.25rem] border border-zinc-300 bg-white py-1 pl-3.5 pr-1 focus-within:border-blue-500 dark:border-zinc-700 dark:bg-black">
-                  <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
-                  <textarea
-                    id="support-input"
-                    ref={inputRef}
-                    rows={1}
-                    value={input}
-                    maxLength={2000}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
-                    placeholder="Mensagem"
-                    className="max-h-28 min-h-[1.5rem] flex-1 resize-none self-center bg-transparent py-1 text-[14px] text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white"
-                  />
+                <div className="flex items-end gap-1.5">
+                  <div className="flex min-h-[2.75rem] flex-1 items-center rounded-[1.4rem] bg-white px-4 py-1.5 shadow-sm dark:bg-[#202c33]">
+                    <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
+                    <textarea
+                      id="support-input"
+                      ref={inputRef}
+                      rows={1}
+                      value={input}
+                      maxLength={2000}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
+                      placeholder="Mensagem"
+                      className="max-h-28 min-h-[1.5rem] flex-1 resize-none bg-transparent py-0.5 text-[15px] text-[#111b21] outline-none placeholder:text-[#667781] dark:text-[#e9edef] dark:placeholder:text-[#8696a0]"
+                    />
+                  </div>
                   <button
                     type="submit"
                     disabled={busy || !input.trim()}
                     aria-label="Enviar"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white transition-opacity hover:bg-blue-600 disabled:opacity-30 cursor-pointer"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white shadow-sm transition-opacity hover:bg-[#008f72] disabled:opacity-50 cursor-pointer"
                   >
-                    <ArrowUp size={16} strokeWidth={2.75} aria-hidden="true" />
+                    <SendHorizontal size={19} aria-hidden="true" />
                   </button>
                 </div>
-                <p className="mt-1.5 text-center text-[10px] text-zinc-400">A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.</p>
                 {/* Barra de gestos do iPhone */}
                 <span className="mx-auto mt-2 hidden h-[5px] w-28 rounded-full bg-zinc-900 dark:bg-white sm:block" aria-hidden="true" />
               </form>
