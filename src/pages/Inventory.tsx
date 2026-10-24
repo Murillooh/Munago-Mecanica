@@ -49,18 +49,9 @@ import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { InventoryAISummary } from '../components/InventoryAISummary';
 import { apiGet } from '../lib/api';
 
-/** Cor fixa por categoria (mesma categoria, mesma cor): chip e ícone em degradê. Classes por extenso para o Tailwind. */
-const CATEGORY_TONES = [
-  { chip: 'bg-sky-500/12 text-sky-700 dark:text-sky-300', icon: 'from-sky-400 to-blue-600' },
-  { chip: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300', icon: 'from-emerald-400 to-teal-600' },
-  { chip: 'bg-violet-500/12 text-violet-700 dark:text-violet-300', icon: 'from-fuchsia-400 to-violet-600' },
-  { chip: 'bg-blue-500/12 text-blue-700 dark:text-blue-300', icon: 'from-blue-400 to-indigo-600' },
-  { chip: 'bg-pink-500/12 text-pink-700 dark:text-pink-300', icon: 'from-pink-400 to-rose-600' },
-  { chip: 'bg-cyan-500/12 text-cyan-700 dark:text-cyan-300', icon: 'from-cyan-400 to-sky-600' },
-  { chip: 'bg-teal-500/12 text-teal-700 dark:text-teal-300', icon: 'from-teal-400 to-cyan-600' },
-  { chip: 'bg-indigo-500/12 text-indigo-700 dark:text-indigo-300', icon: 'from-indigo-400 to-blue-700' },
-];
-const NO_CATEGORY_TONE = { chip: 'bg-zinc-500/12 text-zinc-600 dark:text-zinc-300', icon: 'from-zinc-400 to-zinc-600' };
+/** Cor fixa por categoria (mesma categoria, mesma cor), usada só no ponto ao lado do nome. Classes por extenso para o Tailwind. */
+const CATEGORY_TONES = ['bg-sky-500', 'bg-emerald-500', 'bg-violet-500', 'bg-blue-500', 'bg-pink-500', 'bg-cyan-500', 'bg-teal-500', 'bg-indigo-500'];
+const NO_CATEGORY_TONE = 'bg-zinc-400';
 /** Cor pela posição da categoria na lista ordenada: categorias diferentes ganham cores diferentes (até 8). */
 const categoryTone = (name: string | undefined, sortedCategories: string[]) => {
   const i = name ? sortedCategories.indexOf(name) : -1;
@@ -523,7 +514,6 @@ export const Inventory = () => {
               // Mesma regra de "baixo" de antes (≤ mínimo); zerado ganha destaque próprio.
               const stock: 'out' | 'low' | 'ok' = p.quantity <= 0 ? 'out' : p.quantity <= minQty ? 'low' : 'ok';
               const coverage = Math.max(4, Math.min(100, (p.quantity / (minQty * 2)) * 100));
-              const tone = categoryTone(p.category, categoryOrder);
               return (
                 <motion.div
                   layout
@@ -531,106 +521,90 @@ export const Inventory = () => {
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-xs transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 sm:p-3.5 motion-safe:hover:-translate-y-0.5"
+                  className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
                 >
-                  {/* Faixa de alerta no topo só quando zerado (o caso urgente); "baixo" fica na barra e no selo */}
-                  {stock === 'out' && (
-                    <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-500 to-pink-500" aria-hidden="true" />
-                  )}
-                  <div>
-                    {/* Categoria (cor própria) + situação + ações */}
-                    <div className="mb-2.5 flex items-center justify-between gap-1">
-                      <span className={`max-w-[120px] truncate rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${tone.chip}`} title={p.category || 'Sem categoria'}>
-                        {p.category || 'Sem categoria'}
-                      </span>
-                      {canManageInventory && (
-                        <div className="flex items-center gap-0.5 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 [@media(hover:none)]:opacity-100">
-                          <button
-                            onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
-                            className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400"
-                            title="Editar peça"
-                            aria-label={`Editar ${p.name}`}
-                          >
-                            <Edit2 size={13} aria-hidden="true" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteProductConfirm(p.id)}
-                            className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400"
-                            title="Excluir"
-                            aria-label={`Excluir ${p.name}`}
-                          >
-                            <Trash2 size={13} aria-hidden="true" />
-                          </button>
-                        </div>
+                  {/* SKU + ações */}
+                  <div className="flex h-6 items-center justify-between gap-2">
+                    <span className="truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">{p.sku || 'Sem SKU'}</span>
+                    {canManageInventory && (
+                      <div className="-mr-1.5 flex items-center transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                        <button
+                          onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
+                          className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                          title="Editar peça"
+                          aria-label={`Editar ${p.name}`}
+                        >
+                          <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteProductConfirm(p.id)}
+                          className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                          title="Excluir"
+                          aria-label={`Excluir ${p.name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nome, categoria e foto (quando houver) */}
+                  <div className="mt-1 flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 tracking-tight text-zinc-900 dark:text-white" title={p.name}>
+                        {p.name}
+                      </h3>
+                      <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${categoryTone(p.category, categoryOrder)}`} aria-hidden="true" />
+                        <span className="truncate" title={p.category || 'Sem categoria'}>{p.category || 'Sem categoria'}</span>
+                      </p>
+                    </div>
+                    {p.imageUrl && (
+                      <img src={p.imageUrl} alt={p.name} className="h-10 w-10 shrink-0 rounded-lg border border-zinc-200 object-cover dark:border-zinc-700" referrerPolicy="no-referrer" />
+                    )}
+                  </div>
+
+                  {/* Saldo × mínimo e custo */}
+                  <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                    <div className="flex items-end justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Saldo</p>
+                        <p className="mt-0.5 flex items-baseline gap-1.5">
+                          <span className={`text-xl font-semibold tabular-nums leading-none ${stock === 'ok' ? 'text-zinc-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>{p.quantity}</span>
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400">/ mín {minQty}</span>
+                        </p>
+                      </div>
+                      <div className="min-w-0 text-right">
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Custo médio</p>
+                        <p className="mt-0.5 truncate text-sm font-medium tabular-nums text-zinc-900 dark:text-zinc-100" title={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex h-5 items-center gap-2">
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800" role="img" aria-label={`Saldo ${p.quantity} de mínimo ${minQty}`}>
+                        <div className={`h-full rounded-full ${stock === 'ok' ? 'bg-blue-600 dark:bg-blue-500' : 'bg-rose-500'}`} style={{ width: `${coverage}%` }} />
+                      </div>
+                      {stock !== 'ok' && (
+                        <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${stock === 'out' ? 'bg-rose-600 text-white ring-rose-600' : 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30'}`}>
+                          {stock === 'out' ? 'Zerado' : 'Baixo'}
+                        </span>
                       )}
-                    </div>
-
-                    {/* Foto ou ícone + nome */}
-                    <div className="mb-3 flex items-center gap-2.5">
-                      <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ${p.imageUrl ? 'border border-zinc-200 dark:border-zinc-700' : `bg-gradient-to-br text-white ring-1 ring-white/20 ${tone.icon}`}`}>
-                        {p.imageUrl ? (
-                          <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <Package size={19} aria-hidden="true" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <span className="block truncate font-mono text-[10px] leading-none text-zinc-400">{p.sku || 'S/ SKU'}</span>
-                        <h3 className="mt-1 line-clamp-2 text-xs font-semibold leading-tight text-zinc-900 transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400" title={p.name}>
-                          {p.name}
-                        </h3>
-                      </div>
-                    </div>
-
-                    {/* Saldo × mínimo (barra) e custo */}
-                    <div className="rounded-xl bg-zinc-900/[0.03] p-2.5 dark:bg-white/[0.04]">
-                      <div className="flex items-end justify-between gap-2">
-                        <div className="min-w-0">
-                          <span className="block text-[9px] font-medium uppercase tracking-wide text-zinc-400">Saldo</span>
-                          <div className="flex items-baseline gap-1">
-                            <span className={`text-lg font-bold tabular-nums leading-none ${stock === 'out' ? 'text-rose-600 dark:text-rose-400' : stock === 'low' ? 'text-pink-600 dark:text-pink-300' : 'text-zinc-900 dark:text-white'}`}>
-                              {p.quantity}
-                            </span>
-                            <span className="text-[10px] text-zinc-400">/ mín {minQty}</span>
-                          </div>
-                        </div>
-                        <div className="min-w-0 text-right">
-                          <span className="block text-[9px] font-medium uppercase tracking-wide text-zinc-400">Custo médio</span>
-                          <span className="block truncate text-xs font-semibold tabular-nums text-zinc-800 dark:text-zinc-200" title={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}>
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-900/10 dark:bg-white/10" role="img" aria-label={`Saldo ${p.quantity} de mínimo ${minQty}`}>
-                          <div
-                            className={`h-full rounded-full ${stock === 'out' ? 'bg-rose-500' : stock === 'low' ? 'bg-gradient-to-r from-pink-400 to-fuchsia-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}
-                            style={{ width: `${coverage}%` }}
-                          />
-                        </div>
-                        {stock !== 'ok' && (
-                          <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold uppercase ${stock === 'out' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400' : 'bg-pink-500/15 text-pink-700 dark:text-pink-300'}`}>
-                            {stock === 'out' ? 'Zerado' : 'Baixo'}
-                          </span>
-                        )}
-                      </div>
                     </div>
                   </div>
 
                   {/* Entrada e saída */}
                   {canPerformTransactions && (
-                    <div className="mt-3 flex gap-1.5">
+                    <div className="mt-auto grid grid-cols-2 gap-2 pt-4">
                       <button
                         onClick={() => { setSelectedProduct(p); setMovementType('in'); setIsMovementModalOpen(true); }}
-                        className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-500/10 px-1.5 py-1.5 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/20 dark:text-emerald-300"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                       >
-                        <ArrowDownLeft size={12} aria-hidden="true" /> Entrar
+                        <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" /> Entrar
                       </button>
                       <button
                         onClick={() => { setSelectedProduct(p); setMovementType('out'); setIsMovementModalOpen(true); }}
-                        className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-rose-500/10 px-1.5 py-1.5 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-500/20 dark:text-rose-300"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
                       >
-                        <ArrowUpRight size={12} aria-hidden="true" /> Sair
+                        <ArrowUpRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" aria-hidden="true" /> Sair
                       </button>
                     </div>
                   )}
