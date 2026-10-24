@@ -70,11 +70,11 @@ const TypingDots = () => (
 
 const AnaAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => (
   <span
-    className={`relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white ${size === 'md' ? 'h-10 w-10 text-sm' : 'h-7 w-7 text-[11px]'}`}
+    className={`relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white ${size === 'md' ? 'h-10 w-10 text-sm ring-2 ring-white/40' : 'h-7 w-7 text-[11px]'}`}
     aria-hidden="true"
   >
     A
-    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#008069] bg-emerald-400 dark:border-[#1f2c34]" />}
+    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-blue-600 bg-emerald-400" />}
   </span>
 );
 
@@ -244,9 +244,9 @@ export const SupportChat: React.FC = () => {
             // No celular ocupa a tela; do sm para cima vira um iPhone (moldura, ilha, barra de status).
             className="fixed z-[70] inset-0 flex sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(720px,calc(100dvh-3rem))] sm:w-[360px] sm:rounded-[3.25rem] sm:bg-zinc-900 sm:p-[11px] sm:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.55),inset_0_0_0_1.5px_rgba(255,255,255,0.14),0_0_0_1px_rgba(0,0,0,0.6)]"
           >
-            {/* Tela no estilo WhatsApp: cabeçalho verde, papel de parede bege/escuro, balões com "rabinho" */}
-            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#efeae2] pb-[env(safe-area-inset-bottom)] dark:bg-[#0b141a] sm:rounded-[2.6rem] sm:pb-0">
-              <div className="bg-[#008069] pt-[env(safe-area-inset-top)] text-white dark:bg-[#1f2c34] sm:pt-0">
+            {/* Tela no estilo WhatsApp com as cores do sistema: cabeçalho azul, papel de parede azulado, balões com "rabinho" */}
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#eef2fb] pb-[env(safe-area-inset-bottom)] dark:bg-[#0b1220] sm:rounded-[2.6rem] sm:pb-0">
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 pt-[env(safe-area-inset-top)] text-white sm:pt-0">
                 {/* Barra de status + Dynamic Island (só na moldura; no celular real o sistema já mostra) */}
                 <div className="relative hidden h-11 items-center justify-between px-7 text-[13px] font-semibold sm:flex" aria-hidden="true">
                   <span className="tabular-nums">{clock}</span>
@@ -278,15 +278,15 @@ export const SupportChat: React.FC = () => {
               {/* Conversa */}
               <div
                 ref={listRef}
-                className="flex-1 space-y-1 overflow-y-auto px-3 py-3 [background-image:radial-gradient(rgba(0,0,0,0.05)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)]"
+                className="flex-1 space-y-1 overflow-y-auto px-3 py-3 [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
                 aria-live="polite"
               >
-                <p className="mx-auto mb-1 w-fit rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-[#54656f] shadow-sm dark:bg-[#182229] dark:text-[#8696a0]">Hoje</p>
-                <p className="mx-auto mb-2 max-w-[90%] rounded-md bg-white/90 px-3 py-1.5 text-center text-[11px] leading-snug text-[#54656f] shadow-sm dark:bg-[#182229] dark:text-[#8696a0]">
+                <p className="mx-auto mb-1 w-fit rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">Hoje</p>
+                <p className="mx-auto mb-2 max-w-[90%] rounded-md bg-white/90 px-3 py-1.5 text-center text-[11px] leading-snug text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                   A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.
                 </p>
                 <div className="flex">
-                  <div className="max-w-[80%] rounded-lg rounded-tl-none bg-white px-2.5 py-1.5 text-[14px] leading-snug text-[#111b21] shadow-sm dark:bg-[#202c33] dark:text-[#e9edef]">
+                  <div className="max-w-[80%] rounded-lg rounded-tl-none bg-white px-2.5 py-1.5 text-[14px] leading-snug text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100">
                     {greeting}
                   </div>
                 </div>
@@ -294,14 +294,14 @@ export const SupportChat: React.FC = () => {
                 {messages.map((m, i) =>
                   m.role === 'user' ? (
                     <div key={i} className="flex justify-end">
-                      <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-tr-none bg-[#d9fdd3] px-2.5 py-1.5 text-[14px] leading-snug text-[#111b21] shadow-sm dark:bg-[#005c4b] dark:text-[#e9edef]">
+                      <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-tr-none bg-blue-600 px-2.5 py-1.5 text-[14px] leading-snug text-white shadow-sm">
                         {m.text}
-                        <CheckCheck size={14} className="-mb-0.5 ml-1.5 inline text-[#53bdeb]" aria-label="Lida" />
+                        <CheckCheck size={14} className="-mb-0.5 ml-1.5 inline text-sky-200" aria-label="Lida" />
                       </div>
                     </div>
                   ) : (
                     <div key={i} className="flex">
-                      <div className={`max-w-[80%] rounded-lg rounded-tl-none px-2.5 py-1.5 text-[14px] leading-snug shadow-sm ${m.error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-[#111b21] dark:bg-[#202c33] dark:text-[#e9edef]'}`}>
+                      <div className={`max-w-[80%] rounded-lg rounded-tl-none px-2.5 py-1.5 text-[14px] leading-snug shadow-sm ${m.error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>
                         {m.text ? renderRich(m.text) : <TypingDots />}
                         {m.error && (
                           <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
@@ -320,7 +320,7 @@ export const SupportChat: React.FC = () => {
                         key={s}
                         type="button"
                         onClick={() => send(s)}
-                        className="w-full max-w-[85%] rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-[#008069] shadow-sm transition-colors hover:bg-[#f5f6f6] dark:bg-[#202c33] dark:text-[#00a884] dark:hover:bg-[#2a3942] cursor-pointer"
+                        className="w-full max-w-[85%] rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-blue-600 shadow-sm transition-colors hover:bg-blue-50 dark:bg-slate-800 dark:text-blue-400 dark:hover:bg-slate-700 cursor-pointer"
                       >
                         {s}
                       </button>
@@ -335,7 +335,7 @@ export const SupportChat: React.FC = () => {
                 className="shrink-0 px-2 pb-2 pt-1"
               >
                 <div className="flex items-end gap-1.5">
-                  <div className="flex min-h-[2.75rem] flex-1 items-center rounded-[1.4rem] bg-white px-4 py-1.5 shadow-sm dark:bg-[#202c33]">
+                  <div className="flex min-h-[2.75rem] flex-1 items-center rounded-[1.4rem] bg-white px-4 py-1.5 shadow-sm dark:bg-slate-800">
                     <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
                     <textarea
                       id="support-input"
@@ -346,14 +346,14 @@ export const SupportChat: React.FC = () => {
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
                       placeholder="Mensagem"
-                      className="max-h-28 min-h-[1.5rem] flex-1 resize-none bg-transparent py-0.5 text-[15px] text-[#111b21] outline-none placeholder:text-[#667781] dark:text-[#e9edef] dark:placeholder:text-[#8696a0]"
+                      className="max-h-28 min-h-[1.5rem] flex-1 resize-none bg-transparent py-0.5 text-[15px] text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={busy || !input.trim()}
                     aria-label="Enviar"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white shadow-sm transition-opacity hover:bg-[#008f72] disabled:opacity-50 cursor-pointer"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-600/30 transition-opacity hover:brightness-110 disabled:opacity-50 cursor-pointer"
                   >
                     <SendHorizontal size={19} aria-hidden="true" />
                   </button>
