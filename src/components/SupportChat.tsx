@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { macZoom } from '../lib/motion';
-import { MessageCircleQuestion, RotateCcw, Send, X } from 'lucide-react';
+import { ArrowUp, BatteryFull, ChevronLeft, MessageCircleQuestion, RotateCcw, Signal, Wifi } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
 
@@ -73,7 +73,7 @@ const AnaAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => (
     aria-hidden="true"
   >
     A
-    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900" />}
+    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-zinc-50 bg-emerald-500 dark:border-zinc-900" />}
   </span>
 );
 
@@ -188,6 +188,7 @@ export const SupportChat: React.FC = () => {
   };
 
   const showSuggestions = messages.length === 0;
+  const clock = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   return (
     <>
@@ -220,99 +221,113 @@ export const SupportChat: React.FC = () => {
             exit={{ opacity: 0, scale: 0.1 }}
             transition={macZoom}
             style={{ transformOrigin: 'bottom right' }}
-            className="fixed z-[70] flex flex-col overflow-hidden bg-white shadow-2xl dark:bg-zinc-900 inset-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(600px,calc(100dvh-3rem))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-zinc-200 sm:pt-0 sm:pb-0 dark:sm:border-zinc-800"
+            // No celular ocupa a tela; do sm para cima vira um iPhone (moldura, ilha, barra de status).
+            className="fixed z-[70] inset-0 flex sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(720px,calc(100dvh-3rem))] sm:w-[360px] sm:rounded-[3.25rem] sm:bg-zinc-900 sm:p-[11px] sm:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.55),inset_0_0_0_1.5px_rgba(255,255,255,0.14),0_0_0_1px_rgba(0,0,0,0.6)]"
           >
-            {/* Cabeçalho */}
-            <header className="flex items-center gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-              <AnaAvatar size="md" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">Ana</p>
-                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">Assistente virtual · responde na hora</p>
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] dark:bg-black sm:rounded-[2.6rem] sm:pt-0 sm:pb-0">
+              {/* Barra de status + Dynamic Island (só na moldura; no celular real o sistema já mostra) */}
+              <div className="relative hidden h-11 shrink-0 items-center justify-between px-7 text-[13px] font-semibold text-zinc-900 dark:text-white sm:flex" aria-hidden="true">
+                <span className="tabular-nums">{clock}</span>
+                <span className="absolute left-1/2 top-2.5 h-[26px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
+                <span className="flex items-center gap-1">
+                  <Signal size={14} strokeWidth={2.5} />
+                  <Wifi size={14} strokeWidth={2.5} />
+                  <BatteryFull size={20} strokeWidth={2} />
+                </span>
               </div>
-              {messages.length > 0 && (
-                <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer">
-                  <RotateCcw size={16} aria-hidden="true" />
+
+              {/* Cabeçalho estilo Mensagens */}
+              <header className="relative flex shrink-0 flex-col items-center border-b border-zinc-200/80 bg-zinc-50/80 px-3 pb-2 pt-1 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/80">
+                <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="absolute left-1.5 top-1/2 flex -translate-y-1/2 items-center rounded-lg px-1 py-2 text-[15px] text-blue-500 transition-opacity hover:opacity-70 cursor-pointer">
+                  <ChevronLeft size={24} aria-hidden="true" />
+                  <span className="-ml-1">Fechar</span>
                 </button>
-              )}
-              <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer">
-                <X size={18} aria-hidden="true" />
-              </button>
-            </header>
+                {messages.length > 0 && (
+                  <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-blue-500 transition-opacity hover:opacity-70 cursor-pointer">
+                    <RotateCcw size={18} aria-hidden="true" />
+                  </button>
+                )}
+                <AnaAvatar size="md" />
+                <p className="mt-1 text-[11px] font-medium text-zinc-900 dark:text-white">Ana</p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Assistente virtual · responde na hora</p>
+              </header>
 
-            {/* Conversa */}
-            <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
-              <div className="flex items-end gap-2">
-                <AnaAvatar />
-                <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-zinc-100 px-3.5 py-2.5 text-sm leading-relaxed text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
-                  {greeting}
-                </div>
-              </div>
-
-              {messages.map((m, i) =>
-                m.role === 'user' ? (
-                  <div key={i} className="flex justify-end">
-                    <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-blue-600 px-3.5 py-2.5 text-sm leading-relaxed text-white">{m.text}</div>
+              {/* Conversa */}
+              <div ref={listRef} className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3" aria-live="polite">
+                <p className="pb-1 text-center text-[11px] font-medium text-zinc-400">Hoje {clock}</p>
+                <div className="flex">
+                  <div className="max-w-[78%] rounded-[1.15rem] rounded-bl-[0.35rem] bg-zinc-200/80 px-3 py-2 text-[14px] leading-snug text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+                    {greeting}
                   </div>
-                ) : (
-                  <div key={i} className="flex items-end gap-2">
-                    <AnaAvatar />
-                    <div className={`max-w-[85%] rounded-2xl rounded-bl-md px-3.5 py-2.5 text-sm leading-relaxed ${m.error ? 'border border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300' : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'}`}>
-                      {m.text ? renderRich(m.text) : <TypingDots />}
-                      {m.error && (
-                        <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
-                          Tentar de novo
-                        </button>
-                      )}
+                </div>
+
+                {messages.map((m, i) =>
+                  m.role === 'user' ? (
+                    <div key={i} className="flex justify-end">
+                      <div className="max-w-[78%] whitespace-pre-wrap rounded-[1.15rem] rounded-br-[0.35rem] bg-blue-500 px-3 py-2 text-[14px] leading-snug text-white">{m.text}</div>
                     </div>
+                  ) : (
+                    <div key={i} className="flex">
+                      <div className={`max-w-[78%] rounded-[1.15rem] rounded-bl-[0.35rem] px-3 py-2 text-[14px] leading-snug ${m.error ? 'border border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300' : 'bg-zinc-200/80 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'}`}>
+                        {m.text ? renderRich(m.text) : <TypingDots />}
+                        {m.error && (
+                          <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
+                            Tentar de novo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                )}
+
+                {showSuggestions && (
+                  <div className="flex flex-col items-end gap-1.5 pt-2">
+                    {suggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => send(s)}
+                        className="max-w-[85%] rounded-[1.15rem] border border-blue-500/40 px-3 py-1.5 text-right text-[13px] font-medium text-blue-600 transition-colors hover:bg-blue-500/10 dark:text-blue-400 cursor-pointer"
+                      >
+                        {s}
+                      </button>
+                    ))}
                   </div>
-                ),
-              )}
-
-              {showSuggestions && (
-                <div className="flex flex-wrap gap-2 pl-9">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => send(s)}
-                      className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-left text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-950/60 cursor-pointer"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Caixa de mensagem */}
-            <form
-              onSubmit={(e) => { e.preventDefault(); void send(input); }}
-              className="border-t border-zinc-200 p-3 dark:border-zinc-800"
-            >
-              <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20 dark:border-zinc-700 dark:bg-zinc-800/60">
-                <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
-                <textarea
-                  id="support-input"
-                  ref={inputRef}
-                  rows={1}
-                  value={input}
-                  maxLength={2000}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
-                  placeholder="Escreva sua dúvida…"
-                  className="max-h-32 min-h-[1.5rem] flex-1 resize-none bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white"
-                />
-                <button
-                  type="submit"
-                  disabled={busy || !input.trim()}
-                  aria-label="Enviar"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-40 cursor-pointer"
-                >
-                  <Send size={16} aria-hidden="true" />
-                </button>
+                )}
               </div>
-              <p className="mt-1.5 text-center text-[11px] text-zinc-400">A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.</p>
-            </form>
+
+              {/* Caixa de mensagem */}
+              <form
+                onSubmit={(e) => { e.preventDefault(); void send(input); }}
+                className="shrink-0 bg-zinc-50/80 px-3 pb-2 pt-2 backdrop-blur-xl dark:bg-zinc-900/80"
+              >
+                <div className="flex items-end gap-1.5 rounded-[1.25rem] border border-zinc-300 bg-white py-1 pl-3.5 pr-1 focus-within:border-blue-500 dark:border-zinc-700 dark:bg-black">
+                  <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
+                  <textarea
+                    id="support-input"
+                    ref={inputRef}
+                    rows={1}
+                    value={input}
+                    maxLength={2000}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
+                    placeholder="Mensagem"
+                    className="max-h-28 min-h-[1.5rem] flex-1 resize-none self-center bg-transparent py-1 text-[14px] text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy || !input.trim()}
+                    aria-label="Enviar"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white transition-opacity hover:bg-blue-600 disabled:opacity-30 cursor-pointer"
+                  >
+                    <ArrowUp size={16} strokeWidth={2.75} aria-hidden="true" />
+                  </button>
+                </div>
+                <p className="mt-1.5 text-center text-[10px] text-zinc-400">A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.</p>
+                {/* Barra de gestos do iPhone */}
+                <span className="mx-auto mt-2 hidden h-[5px] w-28 rounded-full bg-zinc-900 dark:bg-white sm:block" aria-hidden="true" />
+              </form>
+            </div>
           </motion.section>
         )}
       </AnimatePresence>
