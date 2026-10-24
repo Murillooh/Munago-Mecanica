@@ -37,7 +37,8 @@ import {
   ShieldAlert,
   Wrench,
   Save,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Camera
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { HeroStat, PageHero, heroBtn, heroBtnPrimary } from '../components/PageHero';
@@ -48,6 +49,25 @@ import CategoryManager from '../components/CategoryManager';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { InventoryAISummary } from '../components/InventoryAISummary';
 import { apiGet } from '../lib/api';
+
+/**
+ * Foto do celular vira JPEG pequeno em data URL (o servidor aceita até 500 mil caracteres no campo).
+ * Reduz o lado maior para 800px e baixa a qualidade até caber.
+ */
+async function photoToDataUrl(file: File, maxSide = 800, maxChars = 450_000): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  for (let q = 0.85; q >= 0.4; q -= 0.15) {
+    const url = canvas.toDataURL('image/jpeg', q);
+    if (url.length <= maxChars) return url;
+  }
+  throw new Error('Imagem grande demais');
+}
 
 /** Cor fixa por categoria (mesma categoria, mesma cor), usada só no ponto ao lado do nome. Classes por extenso para o Tailwind. */
 const CATEGORY_TONES = ['bg-sky-500', 'bg-emerald-500', 'bg-violet-500', 'bg-blue-500', 'bg-pink-500', 'bg-cyan-500', 'bg-teal-500', 'bg-indigo-500'];
@@ -523,6 +543,25 @@ export const Inventory = () => {
                   exit={{ opacity: 0, scale: 0.98 }}
                   className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
                 >
+                  {/* Foto da peça (identificação rápida no balcão); sem foto, quem pode editar já cai no cadastro */}
+                  <div className="-mx-1 -mt-1 mb-3 flex aspect-[16/10] items-center justify-center overflow-hidden rounded-lg bg-zinc-50 ring-1 ring-inset ring-zinc-100 dark:bg-zinc-800/60 dark:ring-zinc-800">
+                    {p.imageUrl ? (
+                      <img src={p.imageUrl} alt={p.name} loading="lazy" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                    ) : canManageInventory ? (
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
+                        className="flex h-full w-full flex-col items-center justify-center gap-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                        aria-label={`Adicionar foto de ${p.name}`}
+                      >
+                        <Camera className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+                        <span className="text-[11px] font-medium">Adicionar foto</span>
+                      </button>
+                    ) : (
+                      <ImageIcon className="h-6 w-6 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} aria-label="Sem foto" />
+                    )}
+                  </div>
+
                   {/* SKU + ações */}
                   <div className="flex h-6 items-center justify-between gap-2">
                     <span className="truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">{p.sku || 'Sem SKU'}</span>
@@ -548,9 +587,9 @@ export const Inventory = () => {
                     )}
                   </div>
 
-                  {/* Nome, categoria e foto (quando houver) */}
-                  <div className="mt-1 flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
+                  {/* Nome e categoria */}
+                  <div className="mt-1">
+                    <div className="min-w-0">
                       <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 tracking-tight text-zinc-900 dark:text-white" title={p.name}>
                         {p.name}
                       </h3>
@@ -559,9 +598,6 @@ export const Inventory = () => {
                         <span className="truncate" title={p.category || 'Sem categoria'}>{p.category || 'Sem categoria'}</span>
                       </p>
                     </div>
-                    {p.imageUrl && (
-                      <img src={p.imageUrl} alt={p.name} className="h-10 w-10 shrink-0 rounded-lg border border-zinc-200 object-cover dark:border-zinc-700" referrerPolicy="no-referrer" />
-                    )}
                   </div>
 
                   {/* Saldo × mínimo e custo */}
@@ -1133,13 +1169,29 @@ export const Inventory = () => {
                     <div className="flex-1 space-y-1.5">
                       <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                         <ImageIcon size={13} className="text-zinc-400" />
-                        URL da Imagem / Foto
+                        Foto da peça
                       </label>
-                      <input 
-                        name="imageUrl" 
+                      <label className="mb-1.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus-within:ring-2 focus-within:ring-blue-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                        <Camera className="h-4 w-4 text-zinc-500" aria-hidden="true" />
+                        Tirar foto ou escolher do aparelho
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = '';
+                            if (!file) return;
+                            try { setFormImageUrl(await photoToDataUrl(file)); }
+                            catch { toast.error('Não consegui ler essa imagem. Tente outra foto.'); }
+                          }}
+                        />
+                      </label>
+                      <input
+                        name="imageUrl"
                         value={formImageUrl} 
                         onChange={(e) => setFormImageUrl(e.target.value)}
-                        placeholder="https://exemplo.com/foto-produto.jpg" 
+                        placeholder="ou cole o link de uma imagem"
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-xs sm:text-sm font-medium text-zinc-900 dark:text-white outline-none focus:border-blue-600 transition-colors" 
                       />
                     </div>
