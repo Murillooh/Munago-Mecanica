@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { macZoom } from '../lib/motion';
-import { ArrowLeft, BatteryFull, CheckCheck, MessageCircleQuestion, RotateCcw, SendHorizontal, Signal, Wifi } from 'lucide-react';
+import { ArrowLeft, BatteryFull, CheckCheck, History, MessageCircleQuestion, RotateCcw, SendHorizontal, Signal, Trash2, Wifi } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
 
@@ -46,6 +46,14 @@ const Bubble: React.FC<{ mine?: boolean; first: boolean; time?: string; error?: 
 );
 
 const STORAGE_KEY = 'munago_support_chat';
+const CONV_KEY = 'munago_support_chat_id';
+const HISTORY_MAX = 20;
+
+/** Conversa guardada no histórico (localStorage, por usuário, só neste aparelho). */
+type Conv = { id: string; at: number; title: string; messages: Msg[] };
+const newId = () => String(Date.now());
+const shortDate = (at: number) =>
+  new Date(at).toDateString() === new Date().toDateString() ? hhmm(at) : new Date(at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
 /** Sugestões de pergunta conforme a tela em que a pessoa está. */
 const SUGGESTIONS: Record<string, string[]> = {
@@ -126,6 +134,12 @@ export const SupportChat: React.FC = () => {
   const [messages, setMessages] = useState<Msg[]>(() => {
     try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]') as Msg[]; } catch { return []; }
   });
+  const [convId, setConvId] = useState(() => {
+    try { return sessionStorage.getItem(CONV_KEY) || newId(); } catch { return newId(); }
+  });
+  const [history, setHistory] = useState<Conv[]>([]);
+  const [view, setView] = useState<'chat' | 'history'>('chat');
+  const historyKey = profile ? `munago_support_history_${profile.uid}` : '';
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -134,6 +148,31 @@ export const SupportChat: React.FC = () => {
   useEffect(() => {
     try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-40))); } catch { /* armazenamento indisponível */ }
   }, [messages]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(CONV_KEY, convId); } catch { /* armazenamento indisponível */ }
+  }, [convId]);
+
+  useEffect(() => {
+    if (!historyKey) return;
+    try { setHistory(JSON.parse(localStorage.getItem(historyKey) || '[]') as Conv[]); } catch { setHistory([]); }
+  }, [historyKey]);
+
+  // Salva a conversa atual no histórico a cada resposta concluída (precisa vir depois do carregamento acima).
+  useEffect(() => {
+    if (busy || !historyKey) return;
+    const kept = messages.filter((m) => !m.error && m.text);
+    const title = kept.find((m) => m.role === 'user')?.text;
+    if (!title) return;
+    setHistory((prev) => {
+      const next = [
+        { id: convId, at: kept[kept.length - 1].at ?? Date.now(), title: title.slice(0, 80), messages: kept.slice(-40) },
+        ...prev.filter((c) => c.id !== convId),
+      ].slice(0, HISTORY_MAX);
+      try { localStorage.setItem(historyKey, JSON.stringify(next)); } catch { /* armazenamento indisponível */ }
+      return next;
+    });
+  }, [messages, busy, convId, historyKey]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -228,6 +267,23 @@ export const SupportChat: React.FC = () => {
     abortRef.current?.abort();
     setMessages([]);
     setBusy(false);
+    setConvId(newId());
+    setView('chat');
+  };
+
+  const openConv = (c: Conv) => {
+    abortRef.current?.abort();
+    setMessages(c.messages);
+    setBusy(false);
+    setConvId(c.id);
+    setView('chat');
+  };
+
+  const removeConv = (id: string) => {
+    const next = history.filter((c) => c.id !== id);
+    setHistory(next);
+    try { localStorage.setItem(historyKey, JSON.stringify(next)); } catch { /* armazenamento indisponível */ }
+    if (id === convId) { abortRef.current?.abort(); setMessages([]); setBusy(false); setConvId(newId()); }
   };
 
   const showSuggestions = messages.length === 0;
@@ -301,7 +357,7 @@ export const SupportChat: React.FC = () => {
                 </div>
 
                 <header className="flex items-center gap-2 px-1.5 pb-2 pt-1">
-                  <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="rounded-full p-1.5 transition-colors hover:bg-white/10 cursor-pointer">
+                  <button type="button" onClick={() => (view === 'history' ? setView('chat') : setOpen(false))} aria-label={view === 'history' ? 'Voltar para a conversa' : 'Fechar chat'} className="rounded-full p-1.5 transition-colors hover:bg-white/10 cursor-pointer">
                     <ArrowLeft size={22} aria-hidden="true" />
                   </button>
                   <AnaAvatar size="md" />
@@ -309,7 +365,12 @@ export const SupportChat: React.FC = () => {
                     <p className="truncate text-[15px] font-semibold">Ana <span className="font-normal text-white/80">· Assistente IA</span></p>
                     <p className="truncate text-[11px] text-white/80">{busy ? 'digitando…' : 'online'}</p>
                   </div>
-                  {messages.length > 0 && (
+                  {view === 'chat' && history.length > 0 && (
+                    <button type="button" onClick={() => setView('history')} title="Conversas anteriores" aria-label="Conversas anteriores" className="rounded-full p-2 transition-colors hover:bg-white/10 cursor-pointer">
+                      <History size={18} aria-hidden="true" />
+                    </button>
+                  )}
+                  {view === 'chat' && messages.length > 0 && (
                     <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="rounded-full p-2 transition-colors hover:bg-white/10 cursor-pointer">
                       <RotateCcw size={18} aria-hidden="true" />
                     </button>
@@ -317,6 +378,46 @@ export const SupportChat: React.FC = () => {
                 </header>
               </div>
 
+              {view === 'history' ? (
+                <div className="flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Conversas anteriores</h2>
+                    <button type="button" onClick={reset} className="rounded-full px-2 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-800 cursor-pointer">
+                      Nova conversa
+                    </button>
+                  </div>
+                  {history.length === 0 ? (
+                    <p className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">Nenhuma conversa guardada ainda.</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm dark:divide-slate-700/60 dark:bg-slate-800">
+                      {history.map((c) => {
+                        const last = c.messages[c.messages.length - 1];
+                        return (
+                          <li key={c.id} className="flex items-center">
+                            <button type="button" onClick={() => openConv(c)} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer">
+                              <AnaAvatar />
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-baseline justify-between gap-2">
+                                  <span className="truncate text-[14px] font-medium text-slate-900 dark:text-slate-100">{c.title}</span>
+                                  <span className="shrink-0 text-[11px] text-slate-400">{c.id === convId ? 'atual' : shortDate(c.at)}</span>
+                                </span>
+                                <span className="block truncate text-[12px] text-slate-500 dark:text-slate-400">
+                                  {last.role === 'user' ? 'Você: ' : ''}{dropGreeting(last.text).replace(/\*\*/g, '')}
+                                </span>
+                              </span>
+                            </button>
+                            <button type="button" onClick={() => removeConv(c.id)} title="Apagar conversa" aria-label={`Apagar conversa: ${c.title}`} className="mr-1.5 rounded-full p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 cursor-pointer">
+                              <Trash2 size={15} aria-hidden="true" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  <p className="mt-3 px-2 text-center text-[11px] text-slate-400">Guardadas só neste aparelho, até {HISTORY_MAX} conversas.</p>
+                </div>
+              ) : (
+              <>
               {/* Conversa */}
               <div
                 ref={listRef}
@@ -406,6 +507,8 @@ export const SupportChat: React.FC = () => {
                 {/* Barra de gestos do iPhone */}
                 <span className="mx-auto mt-2 hidden h-[5px] w-28 rounded-full bg-zinc-900 dark:bg-white sm:block" aria-hidden="true" />
               </form>
+              </>
+              )}
             </div>
           </motion.section>
         )}
