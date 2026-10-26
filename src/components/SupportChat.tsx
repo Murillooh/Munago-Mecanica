@@ -4,6 +4,7 @@ import { macZoom } from '../lib/motion';
 import { ArrowLeft, BatteryFull, CheckCheck, History, MessageCircleQuestion, RotateCcw, SendHorizontal, Signal, Trash2, Wifi } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
+import { renderRich } from '../lib/richText';
 
 /** `at`: horário (ms) mostrado no balão, como no WhatsApp. */
 type Msg = { role: 'user' | 'model'; text: string; error?: boolean; at?: number };
@@ -67,43 +68,6 @@ const SUGGESTIONS: Record<string, string[]> = {
   ai: ['Qual a diferença entre você e o Assistente IA?'],
 };
 const DEFAULT_SUGGESTIONS = ['Como abro uma ordem de serviço?', 'Como registro a entrada de peças?', 'Como instalo o app no celular?'];
-
-/** Markdown mínimo e seguro (negrito, listas, quebras de linha), montado como elementos React. */
-function renderRich(text: string) {
-  const inline = (s: string, key: string) =>
-    s.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-      part.startsWith('**') && part.endsWith('**')
-        ? <strong key={`${key}-${i}`} className="font-semibold">{part.slice(2, -2)}</strong>
-        : <React.Fragment key={`${key}-${i}`}>{part}</React.Fragment>,
-    );
-  const blocks: React.ReactNode[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
-  const flush = () => {
-    if (!list) return;
-    const Tag = list.ordered ? 'ol' : 'ul';
-    blocks.push(
-      <Tag key={`l${blocks.length}`} className={`my-1.5 space-y-1 pl-5 ${list.ordered ? 'list-decimal' : 'list-disc'}`}>
-        {list.items.map((it, i) => <li key={i}>{inline(it, `li${blocks.length}-${i}`)}</li>)}
-      </Tag>,
-    );
-    list = null;
-  };
-  text.split('\n').forEach((raw, idx) => {
-    const line = raw.trimEnd();
-    const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
-    const ul = line.match(/^\s*[-*•]\s+(.*)$/);
-    if (ol || ul) {
-      const ordered = Boolean(ol);
-      if (!list || list.ordered !== ordered) { flush(); list = { ordered, items: [] }; }
-      list.items.push((ol ?? ul)![1]);
-      return;
-    }
-    flush();
-    if (line.trim()) blocks.push(<p key={`p${idx}`} className="my-1 first:mt-0 last:mb-0">{inline(line, `p${idx}`)}</p>);
-  });
-  flush();
-  return blocks;
-}
 
 const TypingDots = () => (
   <span className="inline-flex items-center gap-1" aria-label="Ana está digitando">

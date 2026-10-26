@@ -52,6 +52,7 @@ import { Sparkline } from '../components/dashboard/Sparkline';
 import { HeroStat, PageHero, heroBtn, heroBtnPrimary } from '../components/PageHero';
 import { iconBadge, isBilledOS, osAmount, osBilledDate, startOfDayAgo, DAY_MS } from '../components/dashboard/utils';
 import { authFetch } from '../lib/api';
+import { renderRich } from '../lib/richText';
 
 interface DashboardProps {
   onSeeAllLowStock: () => void;
@@ -1024,11 +1025,11 @@ export const Dashboard = ({
       {/* AI Diagnostic Slide-out Drawer / Modal */}
       <AnimatePresence>
         {isDiagnosticOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 bg-zinc-900/60 backdrop-blur-xs">
             <motion.div
               {...macZoomProps()}
               transition={macZoom}
-              className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden"
+              className="flex max-h-full w-full max-w-4xl flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden"
             >
               <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -1052,7 +1053,7 @@ export const Dashboard = ({
                 </button>
               </div>
 
-              <div className="p-6 max-h-[60vh] overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-y-auto p-6 sm:px-8">
                 {isGeneratingSummary ? (
                   <div className="py-12 text-center space-y-3">
                     <Loader2 size={24} className="animate-spin mx-auto text-blue-600" />
@@ -1064,8 +1065,8 @@ export const Dashboard = ({
                     </p>
                   </div>
                 ) : summary ? (
-                  <div className="space-y-4 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed font-sans whitespace-pre-line">
-                    {summary}
+                  <div className="max-w-none text-sm sm:text-[15px] text-zinc-700 dark:text-zinc-300 leading-relaxed [&_p:not(.font-semibold)]:my-1.5 [&_p.font-semibold]:mt-6 [&_p.font-semibold]:text-base [&_p.font-semibold]:text-zinc-900 dark:[&_p.font-semibold]:text-white [&_p.font-semibold:first-child]:mt-0 [&_li]:my-2">
+                    {renderRich(summary)}
                   </div>
                 ) : (
                   <p className="text-sm text-zinc-500 text-center py-8">
