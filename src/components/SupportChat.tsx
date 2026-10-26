@@ -6,7 +6,42 @@ import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
 import { AUTH_CHARACTER_URL } from './auth/authStyles';
 
-type Msg = { role: 'user' | 'model'; text: string; error?: boolean };
+/** `at`: horário (ms) mostrado no balão, como no WhatsApp. */
+type Msg = { role: 'user' | 'model'; text: string; error?: boolean; at?: number };
+
+const hhmm = (at?: number) => (at ? new Date(at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+
+/** Resposta longa vira vários balões, um por parágrafo (separados por linha em branco). */
+const splitBubbles = (text: string) => text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+
+/**
+ * Balão no estilo WhatsApp: só o primeiro de uma sequência do mesmo lado tem a "pontinha";
+ * horário (e tiques, nas suas) no canto inferior direito, dentro do balão.
+ */
+const Bubble: React.FC<{ mine?: boolean; first: boolean; time?: string; error?: boolean; children: React.ReactNode }> = ({ mine, first, time, error, children }) => (
+  <div className={`flex ${mine ? 'justify-end' : ''} ${first ? 'mt-2' : 'mt-0.5'}`}>
+    <div
+      // O último parágrafo fica "inline" para o horário poder dividir a linha com ele.
+      className={`relative max-w-[82%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[14px] leading-snug shadow-sm [&>p:has(+[data-spacer])]:inline ${
+        mine
+          ? `bg-blue-600 text-white ${first ? 'rounded-tr-none' : ''}`
+          : `${error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'} ${first ? 'rounded-tl-none' : ''}`
+      }`}
+    >
+      {children}
+      {time && (
+        <>
+          {/* Espaço reservado no fim do texto: o horário cabe na última linha ou desce sozinho */}
+          <span data-spacer className={`inline-block h-3 ${mine ? 'w-16' : 'w-11'}`} aria-hidden="true" />
+          <span className={`absolute bottom-1 right-2 inline-flex items-center gap-1 text-[10px] leading-none ${mine ? 'text-blue-100' : 'text-slate-400'}`}>
+            {time}
+            {mine && <CheckCheck size={13} className="text-sky-200" aria-label="Lida" />}
+          </span>
+        </>
+      )}
+    </div>
+  </div>
+);
 
 const STORAGE_KEY = 'munago_support_chat';
 
@@ -92,6 +127,7 @@ export const SupportChat: React.FC = () => {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-40))); } catch { /* armazenamento indisponível */ }
@@ -117,9 +153,11 @@ export const SupportChat: React.FC = () => {
 
   const send = async (text: string) => {
     const question = text.trim();
-    if (!question || busy) return;
+    // Ref além do estado: dois cliques rápidos chegam antes do re-render e mandariam a pergunta duas vezes.
+    if (!question || busy || sendingRef.current) return;
+    sendingRef.current = true;
     setInput('');
-    const history: Msg[] = [...messages.filter((m) => !m.error), { role: 'user', text: question }];
+    const history: Msg[] = [...messages.filter((m) => !m.error), { role: 'user', text: question, at: Date.now() }];
     setMessages([...history, { role: 'model', text: '' }]);
     setBusy(true);
 
@@ -166,11 +204,13 @@ export const SupportChat: React.FC = () => {
         }
       }
       if (!answer.trim()) throw new Error('Fiquei sem resposta agora. Pode perguntar de novo?');
+      update({ at: Date.now() });
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       update({ text: err instanceof Error ? err.message : 'Algo deu errado. Tente de novo.', error: true });
     } finally {
       setBusy(false);
+      sendingRef.current = false;
       abortRef.current = null;
     }
   };
@@ -278,40 +318,43 @@ export const SupportChat: React.FC = () => {
               {/* Conversa */}
               <div
                 ref={listRef}
-                className="flex-1 space-y-1 overflow-y-auto px-3 py-3 [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
+                className="flex-1 overflow-y-auto px-3 py-3 [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
                 aria-live="polite"
               >
                 <p className="mx-auto mb-1 w-fit rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">Hoje</p>
                 <p className="mx-auto mb-2 max-w-[90%] rounded-md bg-white/90 px-3 py-1.5 text-center text-[11px] leading-snug text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                   A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.
                 </p>
-                <div className="flex">
-                  <div className="max-w-[80%] rounded-lg rounded-tl-none bg-white px-2.5 py-1.5 text-[14px] leading-snug text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100">
-                    {greeting}
-                  </div>
-                </div>
+                <Bubble first>{greeting}</Bubble>
 
-                {messages.map((m, i) =>
-                  m.role === 'user' ? (
-                    <div key={i} className="flex justify-end">
-                      <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-tr-none bg-blue-600 px-2.5 py-1.5 text-[14px] leading-snug text-white shadow-sm">
+                {messages.map((m, i) => {
+                  // A saudação conta como mensagem da Ana: a primeira resposta continua a sequência dela.
+                  const first = (i === 0 ? 'model' : messages[i - 1].role) !== m.role;
+                  if (m.role === 'user') {
+                    return (
+                      <Bubble key={i} mine first={first} time={hhmm(m.at)}>
+                        <span className="whitespace-pre-wrap">{m.text}</span>
+                      </Bubble>
+                    );
+                  }
+                  if (!m.text) return <Bubble key={i} first={first}><TypingDots /></Bubble>;
+                  if (m.error) {
+                    return (
+                      <Bubble key={i} first={first} error>
                         {m.text}
-                        <CheckCheck size={14} className="-mb-0.5 ml-1.5 inline text-sky-200" aria-label="Lida" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div key={i} className="flex">
-                      <div className={`max-w-[80%] rounded-lg rounded-tl-none px-2.5 py-1.5 text-[14px] leading-snug shadow-sm ${m.error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>
-                        {m.text ? renderRich(m.text) : <TypingDots />}
-                        {m.error && (
-                          <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
-                            Tentar de novo
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ),
-                )}
+                        <button type="button" onClick={retry} className="mt-1.5 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
+                          Tentar de novo
+                        </button>
+                      </Bubble>
+                    );
+                  }
+                  const parts = splitBubbles(m.text);
+                  return parts.map((part, j) => (
+                    <Bubble key={`${i}-${j}`} first={first && j === 0} time={j === parts.length - 1 ? hhmm(m.at) : undefined}>
+                      {renderRich(part)}
+                    </Bubble>
+                  ));
+                })}
 
                 {showSuggestions && (
                   <div className="flex flex-col items-center gap-1.5 pt-3">
