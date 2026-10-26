@@ -11,8 +11,11 @@ type Msg = { role: 'user' | 'model'; text: string; error?: boolean; at?: number 
 
 const hhmm = (at?: number) => (at ? new Date(at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 
+/** A saudação já abre a conversa: tira o "Oi, Fulano!" que a IA às vezes repete no começo da resposta. */
+const dropGreeting = (text: string) => text.replace(/^\s*(oi|olá|ola)(?!\p{L})[^.!?\n]{0,40}[!.,]\s*/iu, '') || text;
+
 /** Resposta longa vira vários balões, um por parágrafo (separados por linha em branco). */
-const splitBubbles = (text: string) => text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+const splitBubbles = (text: string) => dropGreeting(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
 
 /**
  * Balão no estilo WhatsApp: só o primeiro de uma sequência do mesmo lado tem a "pontinha";
@@ -318,7 +321,7 @@ export const SupportChat: React.FC = () => {
               {/* Conversa */}
               <div
                 ref={listRef}
-                className="flex-1 overflow-y-auto px-3 py-3 [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
+                className="flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
                 aria-live="polite"
               >
                 <p className="mx-auto mb-1 w-fit rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">Hoje</p>
