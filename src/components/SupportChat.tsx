@@ -105,44 +105,12 @@ const TypingDots = () => (
   </span>
 );
 
-/** A personagem Ana: atendente da oficina com headset e uniforme azul (busto, quadro 64×64). */
-const AnaArt: React.FC<{ className?: string }> = ({ className }) => (
-  <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-    {/* Cabelo de trás e rabo de cavalo */}
-    <path d="M17 30C15 13 49 13 47 30v10c0 4-30 4-30 0Z" fill="#3b2416" />
-    <path d="M45 20c11 2 12 18 6 26 0-8-2-13-6-16Z" fill="#3b2416" />
-    {/* Pescoço, uniforme e gola */}
-    <rect x="28" y="38" width="8" height="10" rx="3" fill="#e2a47c" />
-    <path d="M7 64c0-13 10-19 25-19s25 6 25 19Z" fill="#1e3a8a" />
-    <path d="M25 45.5 32 53l7-7.5c-2-.4-4.5-.5-7-.5s-5 .1-7 .5Z" fill="#e0f2fe" />
-    <circle cx="44" cy="55" r="2.6" fill="#38bdf8" />
-    {/* Rosto */}
-    <circle cx="20" cy="31" r="2.6" fill="#eeb68f" />
-    <circle cx="44" cy="31" r="2.6" fill="#eeb68f" />
-    <ellipse cx="32" cy="29.5" rx="12" ry="13" fill="#f5c6a0" />
-    <path d="M20 28c0-11 8-14 14-14 8 1 11 7 10 14-4-5-11-7-17-4-3 1-5 2.5-7 4Z" fill="#3b2416" />
-    <path d="M24.5 26.2q2.5-1.4 5 0M34.5 26.2q2.5-1.4 5 0" stroke="#3b2416" strokeWidth="1.2" strokeLinecap="round" fill="none" />
-    <ellipse cx="27" cy="30.5" rx="1.6" ry="2" fill="#1f2937" />
-    <ellipse cx="37" cy="30.5" rx="1.6" ry="2" fill="#1f2937" />
-    <circle cx="27.6" cy="29.8" r=".55" fill="#fff" />
-    <circle cx="37.6" cy="29.8" r=".55" fill="#fff" />
-    <ellipse cx="24.2" cy="34.5" rx="2.2" ry="1.3" fill="#f472b6" opacity=".35" />
-    <ellipse cx="39.8" cy="34.5" rx="2.2" ry="1.3" fill="#f472b6" opacity=".35" />
-    <path d="M28.5 36.2q3.5 3.2 7 0" stroke="#9a3412" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-    {/* Headset */}
-    <path d="M19 30C18 12 46 12 45 30" stroke="#0f172a" strokeWidth="2.4" fill="none" />
-    <rect x="16.5" y="26.5" width="5" height="8.5" rx="2.5" fill="#0f172a" />
-    <rect x="42.5" y="26.5" width="5" height="8.5" rx="2.5" fill="#0f172a" />
-    <path d="M19 34c0 5.5 3.5 6.5 7.5 6" stroke="#0f172a" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-    <circle cx="27.6" cy="39.9" r="1.6" fill="#38bdf8" />
-  </svg>
-);
+/** Retrato da Ana (imagem 3D gerada por IA, em public/). */
+const ANA_IMG = '/ana.webp';
 
 const AnaAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => (
   <span className={`relative flex shrink-0 ${size === 'md' ? 'h-10 w-10' : 'h-7 w-7'}`} aria-hidden="true">
-    <span className={`flex flex-1 overflow-hidden rounded-full bg-gradient-to-br from-sky-200 to-blue-300 ${size === 'md' ? 'ring-2 ring-white/40' : ''}`}>
-      <AnaArt className="mt-[12%] h-full w-full" />
-    </span>
+    <img src={ANA_IMG} alt="" className={`h-full w-full rounded-full bg-sky-200 object-cover ${size === 'md' ? 'ring-2 ring-white/40' : ''}`} />
     {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-blue-600 bg-emerald-400" />}
   </span>
 );
@@ -291,7 +259,7 @@ export const SupportChat: React.FC = () => {
             {/* Mini iPhone: moldura, ilha e a Ana como papel de parede */}
             <span className="relative flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg shadow-blue-900/30 ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
               <span className="relative flex-1 overflow-hidden rounded-[12px] bg-gradient-to-br from-blue-500 to-indigo-600">
-                <AnaArt className="absolute inset-x-0 bottom-0 w-full scale-[1.35] origin-bottom" />
+                <img src={ANA_IMG} alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_20%]" />
                 <span className="absolute left-1/2 top-1 h-1 w-3.5 -translate-x-1/2 rounded-full bg-black" />
                 <span className="absolute bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-white/70" />
               </span>
