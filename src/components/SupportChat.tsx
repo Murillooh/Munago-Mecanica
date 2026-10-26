@@ -306,7 +306,7 @@ export const SupportChat: React.FC = () => {
                   </button>
                   <AnaAvatar size="md" />
                   <div className="min-w-0 flex-1 leading-tight">
-                    <p className="text-[15px] font-semibold">Ana</p>
+                    <p className="truncate text-[15px] font-semibold">Ana <span className="font-normal text-white/80">· Assistente IA</span></p>
                     <p className="truncate text-[11px] text-white/80">{busy ? 'digitando…' : 'online'}</p>
                   </div>
                   {messages.length > 0 && (
