@@ -1,59 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { macZoom } from '../lib/motion';
-import { ArrowLeft, BatteryFull, CheckCheck, History, MessageCircleQuestion, RotateCcw, SendHorizontal, Signal, Trash2, Wifi } from 'lucide-react';
+import { ArrowLeft, BatteryFull, CheckCheck, MessageCircleQuestion, RotateCcw, SendHorizontal, Signal, Wifi } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
+import { AUTH_CHARACTER_URL } from './auth/authStyles';
 
-/** `at`: horário (ms) mostrado no balão, como no WhatsApp. */
-type Msg = { role: 'user' | 'model'; text: string; error?: boolean; at?: number };
-
-const hhmm = (at?: number) => (at ? new Date(at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
-
-/** A saudação já abre a conversa: tira o "Oi, Fulano!" que a IA às vezes repete no começo da resposta. */
-const dropGreeting = (text: string) => text.replace(/^\s*(oi|olá|ola)(?!\p{L})[^.!?\n]{0,40}[!.,]\s*/iu, '') || text;
-
-/** Resposta longa vira vários balões, um por parágrafo (separados por linha em branco). */
-const splitBubbles = (text: string) => dropGreeting(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-
-/**
- * Balão no estilo WhatsApp: só o primeiro de uma sequência do mesmo lado tem a "pontinha";
- * horário (e tiques, nas suas) no canto inferior direito, dentro do balão.
- */
-const Bubble: React.FC<{ mine?: boolean; first: boolean; time?: string; error?: boolean; children: React.ReactNode }> = ({ mine, first, time, error, children }) => (
-  <div className={`flex ${mine ? 'justify-end' : ''} ${first ? 'mt-2' : 'mt-0.5'}`}>
-    <div
-      // O último parágrafo fica "inline" para o horário poder dividir a linha com ele.
-      className={`relative max-w-[82%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[14px] leading-snug shadow-sm [&>p:has(+[data-spacer])]:inline ${
-        mine
-          ? `bg-blue-600 text-white ${first ? 'rounded-tr-none' : ''}`
-          : `${error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'} ${first ? 'rounded-tl-none' : ''}`
-      }`}
-    >
-      {children}
-      {time && (
-        <>
-          {/* Espaço reservado no fim do texto: o horário cabe na última linha ou desce sozinho */}
-          <span data-spacer className={`inline-block h-3 ${mine ? 'w-16' : 'w-11'}`} aria-hidden="true" />
-          <span className={`absolute bottom-1 right-2 inline-flex items-center gap-1 text-[10px] leading-none ${mine ? 'text-blue-100' : 'text-slate-400'}`}>
-            {time}
-            {mine && <CheckCheck size={13} className="text-sky-200" aria-label="Lida" />}
-          </span>
-        </>
-      )}
-    </div>
-  </div>
-);
+type Msg = { role: 'user' | 'model'; text: string; error?: boolean };
 
 const STORAGE_KEY = 'munago_support_chat';
-const CONV_KEY = 'munago_support_chat_id';
-const HISTORY_MAX = 20;
-
-/** Conversa guardada no histórico (localStorage, por usuário, só neste aparelho). */
-type Conv = { id: string; at: number; title: string; messages: Msg[] };
-const newId = () => String(Date.now());
-const shortDate = (at: number) =>
-  new Date(at).toDateString() === new Date().toDateString() ? hhmm(at) : new Date(at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
 /** Sugestões de pergunta conforme a tela em que a pessoa está. */
 const SUGGESTIONS: Record<string, string[]> = {
@@ -113,12 +68,12 @@ const TypingDots = () => (
   </span>
 );
 
-/** Retrato da Ana (imagem 3D gerada por IA, em public/). */
-const ANA_IMG = '/ana.webp';
-
 const AnaAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => (
-  <span className={`relative flex shrink-0 ${size === 'md' ? 'h-10 w-10' : 'h-7 w-7'}`} aria-hidden="true">
-    <img src={ANA_IMG} alt="" className={`h-full w-full rounded-full bg-sky-200 object-cover ${size === 'md' ? 'ring-2 ring-white/40' : ''}`} />
+  <span
+    className={`relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white ${size === 'md' ? 'h-10 w-10 text-sm ring-2 ring-white/40' : 'h-7 w-7 text-[11px]'}`}
+    aria-hidden="true"
+  >
+    A
     {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-blue-600 bg-emerald-400" />}
   </span>
 );
@@ -134,45 +89,13 @@ export const SupportChat: React.FC = () => {
   const [messages, setMessages] = useState<Msg[]>(() => {
     try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]') as Msg[]; } catch { return []; }
   });
-  const [convId, setConvId] = useState(() => {
-    try { return sessionStorage.getItem(CONV_KEY) || newId(); } catch { return newId(); }
-  });
-  const [history, setHistory] = useState<Conv[]>([]);
-  const [view, setView] = useState<'chat' | 'history'>('chat');
-  const historyKey = profile ? `munago_support_history_${profile.uid}` : '';
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const sendingRef = useRef(false);
 
   useEffect(() => {
     try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-40))); } catch { /* armazenamento indisponível */ }
   }, [messages]);
-
-  useEffect(() => {
-    try { sessionStorage.setItem(CONV_KEY, convId); } catch { /* armazenamento indisponível */ }
-  }, [convId]);
-
-  useEffect(() => {
-    if (!historyKey) return;
-    try { setHistory(JSON.parse(localStorage.getItem(historyKey) || '[]') as Conv[]); } catch { setHistory([]); }
-  }, [historyKey]);
-
-  // Salva a conversa atual no histórico a cada resposta concluída (precisa vir depois do carregamento acima).
-  useEffect(() => {
-    if (busy || !historyKey) return;
-    const kept = messages.filter((m) => !m.error && m.text);
-    const title = kept.find((m) => m.role === 'user')?.text;
-    if (!title) return;
-    setHistory((prev) => {
-      const next = [
-        { id: convId, at: kept[kept.length - 1].at ?? Date.now(), title: title.slice(0, 80), messages: kept.slice(-40) },
-        ...prev.filter((c) => c.id !== convId),
-      ].slice(0, HISTORY_MAX);
-      try { localStorage.setItem(historyKey, JSON.stringify(next)); } catch { /* armazenamento indisponível */ }
-      return next;
-    });
-  }, [messages, busy, convId, historyKey]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -194,11 +117,9 @@ export const SupportChat: React.FC = () => {
 
   const send = async (text: string) => {
     const question = text.trim();
-    // Ref além do estado: dois cliques rápidos chegam antes do re-render e mandariam a pergunta duas vezes.
-    if (!question || busy || sendingRef.current) return;
-    sendingRef.current = true;
+    if (!question || busy) return;
     setInput('');
-    const history: Msg[] = [...messages.filter((m) => !m.error), { role: 'user', text: question, at: Date.now() }];
+    const history: Msg[] = [...messages.filter((m) => !m.error), { role: 'user', text: question }];
     setMessages([...history, { role: 'model', text: '' }]);
     setBusy(true);
 
@@ -245,13 +166,11 @@ export const SupportChat: React.FC = () => {
         }
       }
       if (!answer.trim()) throw new Error('Fiquei sem resposta agora. Pode perguntar de novo?');
-      update({ at: Date.now() });
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       update({ text: err instanceof Error ? err.message : 'Algo deu errado. Tente de novo.', error: true });
     } finally {
       setBusy(false);
-      sendingRef.current = false;
       abortRef.current = null;
     }
   };
@@ -267,23 +186,6 @@ export const SupportChat: React.FC = () => {
     abortRef.current?.abort();
     setMessages([]);
     setBusy(false);
-    setConvId(newId());
-    setView('chat');
-  };
-
-  const openConv = (c: Conv) => {
-    abortRef.current?.abort();
-    setMessages(c.messages);
-    setBusy(false);
-    setConvId(c.id);
-    setView('chat');
-  };
-
-  const removeConv = (id: string) => {
-    const next = history.filter((c) => c.id !== id);
-    setHistory(next);
-    try { localStorage.setItem(historyKey, JSON.stringify(next)); } catch { /* armazenamento indisponível */ }
-    if (id === convId) { abortRef.current?.abort(); setMessages([]); setBusy(false); setConvId(newId()); }
   };
 
   const showSuggestions = messages.length === 0;
@@ -312,10 +214,10 @@ export const SupportChat: React.FC = () => {
                 <span className="block text-[10px] font-normal text-zinc-500 dark:text-zinc-400">Fale com a Ana</span>
               </span>
             )}
-            {/* Mini iPhone: moldura, ilha e a Ana como papel de parede */}
+            {/* Mini iPhone: moldura, ilha e o boneco das telas de login como papel de parede */}
             <span className="relative flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg shadow-blue-900/30 ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
               <span className="relative flex-1 overflow-hidden rounded-[12px] bg-gradient-to-br from-blue-500 to-indigo-600">
-                <img src={ANA_IMG} alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_20%]" />
+                <img src={AUTH_CHARACTER_URL} alt="" className="absolute inset-x-0 top-1.5 h-full w-full object-cover object-top" referrerPolicy="no-referrer" />
                 <span className="absolute left-1/2 top-1 h-1 w-3.5 -translate-x-1/2 rounded-full bg-black" />
                 <span className="absolute bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-white/70" />
               </span>
@@ -357,20 +259,15 @@ export const SupportChat: React.FC = () => {
                 </div>
 
                 <header className="flex items-center gap-2 px-1.5 pb-2 pt-1">
-                  <button type="button" onClick={() => (view === 'history' ? setView('chat') : setOpen(false))} aria-label={view === 'history' ? 'Voltar para a conversa' : 'Fechar chat'} className="rounded-full p-1.5 transition-colors hover:bg-white/10 cursor-pointer">
+                  <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="rounded-full p-1.5 transition-colors hover:bg-white/10 cursor-pointer">
                     <ArrowLeft size={22} aria-hidden="true" />
                   </button>
                   <AnaAvatar size="md" />
                   <div className="min-w-0 flex-1 leading-tight">
-                    <p className="truncate text-[15px] font-semibold">Ana <span className="font-normal text-white/80">· Assistente IA</span></p>
+                    <p className="text-[15px] font-semibold">Ana</p>
                     <p className="truncate text-[11px] text-white/80">{busy ? 'digitando…' : 'online'}</p>
                   </div>
-                  {view === 'chat' && history.length > 0 && (
-                    <button type="button" onClick={() => setView('history')} title="Conversas anteriores" aria-label="Conversas anteriores" className="rounded-full p-2 transition-colors hover:bg-white/10 cursor-pointer">
-                      <History size={18} aria-hidden="true" />
-                    </button>
-                  )}
-                  {view === 'chat' && messages.length > 0 && (
+                  {messages.length > 0 && (
                     <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="rounded-full p-2 transition-colors hover:bg-white/10 cursor-pointer">
                       <RotateCcw size={18} aria-hidden="true" />
                     </button>
@@ -378,86 +275,43 @@ export const SupportChat: React.FC = () => {
                 </header>
               </div>
 
-              {view === 'history' ? (
-                <div className="flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Conversas anteriores</h2>
-                    <button type="button" onClick={reset} className="rounded-full px-2 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-800 cursor-pointer">
-                      Nova conversa
-                    </button>
-                  </div>
-                  {history.length === 0 ? (
-                    <p className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">Nenhuma conversa guardada ainda.</p>
-                  ) : (
-                    <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm dark:divide-slate-700/60 dark:bg-slate-800">
-                      {history.map((c) => {
-                        const last = c.messages[c.messages.length - 1];
-                        return (
-                          <li key={c.id} className="flex items-center">
-                            <button type="button" onClick={() => openConv(c)} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer">
-                              <AnaAvatar />
-                              <span className="min-w-0 flex-1">
-                                <span className="flex items-baseline justify-between gap-2">
-                                  <span className="truncate text-[14px] font-medium text-slate-900 dark:text-slate-100">{c.title}</span>
-                                  <span className="shrink-0 text-[11px] text-slate-400">{c.id === convId ? 'atual' : shortDate(c.at)}</span>
-                                </span>
-                                <span className="block truncate text-[12px] text-slate-500 dark:text-slate-400">
-                                  {last.role === 'user' ? 'Você: ' : ''}{dropGreeting(last.text).replace(/\*\*/g, '')}
-                                </span>
-                              </span>
-                            </button>
-                            <button type="button" onClick={() => removeConv(c.id)} title="Apagar conversa" aria-label={`Apagar conversa: ${c.title}`} className="mr-1.5 rounded-full p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 cursor-pointer">
-                              <Trash2 size={15} aria-hidden="true" />
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  <p className="mt-3 px-2 text-center text-[11px] text-slate-400">Guardadas só neste aparelho, até {HISTORY_MAX} conversas.</p>
-                </div>
-              ) : (
-              <>
               {/* Conversa */}
               <div
                 ref={listRef}
-                className="flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
+                className="flex-1 space-y-1 overflow-y-auto px-3 py-3 [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
                 aria-live="polite"
               >
                 <p className="mx-auto mb-1 w-fit rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">Hoje</p>
                 <p className="mx-auto mb-2 max-w-[90%] rounded-md bg-white/90 px-3 py-1.5 text-center text-[11px] leading-snug text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                   A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.
                 </p>
-                <Bubble first>{greeting}</Bubble>
+                <div className="flex">
+                  <div className="max-w-[80%] rounded-lg rounded-tl-none bg-white px-2.5 py-1.5 text-[14px] leading-snug text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100">
+                    {greeting}
+                  </div>
+                </div>
 
-                {messages.map((m, i) => {
-                  // A saudação conta como mensagem da Ana: a primeira resposta continua a sequência dela.
-                  const first = (i === 0 ? 'model' : messages[i - 1].role) !== m.role;
-                  if (m.role === 'user') {
-                    return (
-                      <Bubble key={i} mine first={first} time={hhmm(m.at)}>
-                        <span className="whitespace-pre-wrap">{m.text}</span>
-                      </Bubble>
-                    );
-                  }
-                  if (!m.text) return <Bubble key={i} first={first}><TypingDots /></Bubble>;
-                  if (m.error) {
-                    return (
-                      <Bubble key={i} first={first} error>
+                {messages.map((m, i) =>
+                  m.role === 'user' ? (
+                    <div key={i} className="flex justify-end">
+                      <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-tr-none bg-blue-600 px-2.5 py-1.5 text-[14px] leading-snug text-white shadow-sm">
                         {m.text}
-                        <button type="button" onClick={retry} className="mt-1.5 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
-                          Tentar de novo
-                        </button>
-                      </Bubble>
-                    );
-                  }
-                  const parts = splitBubbles(m.text);
-                  return parts.map((part, j) => (
-                    <Bubble key={`${i}-${j}`} first={first && j === 0} time={j === parts.length - 1 ? hhmm(m.at) : undefined}>
-                      {renderRich(part)}
-                    </Bubble>
-                  ));
-                })}
+                        <CheckCheck size={14} className="-mb-0.5 ml-1.5 inline text-sky-200" aria-label="Lida" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={i} className="flex">
+                      <div className={`max-w-[80%] rounded-lg rounded-tl-none px-2.5 py-1.5 text-[14px] leading-snug shadow-sm ${m.error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>
+                        {m.text ? renderRich(m.text) : <TypingDots />}
+                        {m.error && (
+                          <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
+                            Tentar de novo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                )}
 
                 {showSuggestions && (
                   <div className="flex flex-col items-center gap-1.5 pt-3">
@@ -507,8 +361,6 @@ export const SupportChat: React.FC = () => {
                 {/* Barra de gestos do iPhone */}
                 <span className="mx-auto mt-2 hidden h-[5px] w-28 rounded-full bg-zinc-900 dark:bg-white sm:block" aria-hidden="true" />
               </form>
-              </>
-              )}
             </div>
           </motion.section>
         )}
