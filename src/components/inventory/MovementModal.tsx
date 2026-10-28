@@ -1,6 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { macZoom, macZoomProps } from '../../lib/motion';
 import { ArrowDownLeft, ArrowUpRight, Minus, Plus, X, AlertTriangle, Loader2 } from 'lucide-react';
 
 type MovementType = 'in' | 'out';
@@ -98,8 +97,10 @@ export const MovementModal: React.FC<Props> = ({ open, type, product, allowNegat
             role="dialog"
             aria-modal="true"
             aria-labelledby={`${uid}-title`}
-            {...macZoomProps()}
-            transition={macZoom}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             className="w-full max-w-md overflow-hidden border border-zinc-200 bg-white shadow-2xl sm:rounded-2xl dark:border-zinc-800 dark:bg-zinc-900"
           >
             <header className="flex items-start justify-between gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">

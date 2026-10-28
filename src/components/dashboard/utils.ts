@@ -40,15 +40,13 @@ export const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181
 export const OTHER_LIGHT = '#a1a1aa';
 export const OTHER_DARK = '#52525b';
 
-// h-full + flex-1: cartões na mesma linha do grid ficam sempre com a mesma altura.
-export const cardClass = 'h-full flex-1 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors';
+export const cardClass = 'p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors';
 
-// Ícones de cabeçalho no estilo iOS: degradê com brilho colorido (mesmo visual dos blocos do topo).
 export const iconBadge = {
-  blue: 'bg-gradient-to-br from-sky-400 to-blue-600 text-white border-white/30 shadow-lg shadow-blue-500/30',
-  emerald: 'bg-gradient-to-br from-emerald-400 to-teal-600 text-white border-white/30 shadow-lg shadow-emerald-500/30',
-  amber: 'bg-gradient-to-br from-amber-300 to-orange-500 text-white border-white/30 shadow-lg shadow-amber-500/30',
-  red: 'bg-gradient-to-br from-rose-400 to-pink-600 text-white border-white/30 shadow-lg shadow-rose-500/30',
-  indigo: 'bg-gradient-to-br from-indigo-400 to-blue-700 text-white border-white/30 shadow-lg shadow-indigo-500/30',
-  violet: 'bg-gradient-to-br from-fuchsia-400 to-violet-600 text-white border-white/30 shadow-lg shadow-violet-500/30',
+  blue: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/40',
+  emerald: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-900/40',
+  amber: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200/50 dark:border-amber-900/40',
+  red: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40',
+  indigo: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-200/50 dark:border-indigo-900/40',
+  violet: 'bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 border-violet-200/50 dark:border-violet-900/40',
 } as const;

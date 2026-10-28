@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { macZoom, macZoomProps } from '../lib/motion';
 import { 
   X, 
   Search, 
@@ -37,11 +36,9 @@ import {
   ShieldAlert,
   Wrench,
   Save,
-  Image as ImageIcon,
-  Camera
+  Image as ImageIcon
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { HeroStat, PageHero, heroBtn, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
 import { MovementModal } from '../components/inventory/MovementModal';
 import CategoryManager from '../components/CategoryManager';
@@ -49,34 +46,6 @@ import CategoryManager from '../components/CategoryManager';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { InventoryAISummary } from '../components/InventoryAISummary';
 import { apiGet } from '../lib/api';
-
-/**
- * Foto do celular vira JPEG pequeno em data URL (o servidor aceita até 500 mil caracteres no campo).
- * Reduz o lado maior para 800px e baixa a qualidade até caber.
- */
-async function photoToDataUrl(file: File, maxSide = 800, maxChars = 450_000): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  for (let q = 0.85; q >= 0.4; q -= 0.15) {
-    const url = canvas.toDataURL('image/jpeg', q);
-    if (url.length <= maxChars) return url;
-  }
-  throw new Error('Imagem grande demais');
-}
-
-/** Cor fixa por categoria (mesma categoria, mesma cor), usada só no ponto ao lado do nome. Classes por extenso para o Tailwind. */
-const CATEGORY_TONES = ['bg-sky-500', 'bg-emerald-500', 'bg-violet-500', 'bg-blue-500', 'bg-pink-500', 'bg-cyan-500', 'bg-teal-500', 'bg-indigo-500'];
-const NO_CATEGORY_TONE = 'bg-zinc-400';
-/** Cor pela posição da categoria na lista ordenada: categorias diferentes ganham cores diferentes (até 8). */
-const categoryTone = (name: string | undefined, sortedCategories: string[]) => {
-  const i = name ? sortedCategories.indexOf(name) : -1;
-  return i < 0 ? NO_CATEGORY_TONE : CATEGORY_TONES[i % CATEGORY_TONES.length];
-};
 
 export const Inventory = () => {
   const { 
@@ -149,12 +118,6 @@ export const Inventory = () => {
       })
       .catch(() => {});
   }, []);
-
-  // Ordem fixa das categorias existentes: define a cor de cada uma nos cartões.
-  const categoryOrder = useMemo(
-    () => [...new Set<string>((products || []).map(p => p.category).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    [products],
-  );
 
   const filteredProducts = useMemo(() => {
     return (products || []).filter(p => {
@@ -398,60 +361,144 @@ export const Inventory = () => {
   };
 
   return (
-    // Sem animação própria: a troca de aba (App) já anima a entrada da tela.
-    <motion.div
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       className="space-y-8 pb-32"
     >
-      <PageHero
-        icon={Package}
-        title="Almoxarifado"
-        subtitle="Catálogo completo de peças e controle de movimentações físicas."
-        actions={<>
-          <button onClick={handleExportPDF} className={heroBtn} title="Exportar Relatório Geral de Estoque em PDF">
-            <FileText size={14} aria-hidden="true" /> Relatório PDF
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Almoxarifado & Estoque</h1>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Catálogo completo de peças e controle de movimentações físicas.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button 
+            onClick={handleExportPDF}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs"
+            title="Exportar Relatório Geral de Estoque em PDF"
+          >
+            <FileText size={14} className="text-zinc-500" />
+            <span>Relatório PDF</span>
           </button>
-          <button onClick={() => handleExportData('csv')} className={heroBtn}>
-            <Download size={14} aria-hidden="true" /> CSV
+          
+          <div className="flex bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-lg overflow-hidden shadow-xs">
+            <button 
+              onClick={() => handleExportData('csv')}
+              className="flex items-center gap-1 text-zinc-700 dark:text-zinc-300 px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 border-r border-zinc-200/80 dark:border-zinc-800 transition-colors"
+            >
+              <Download size={13} className="text-zinc-500" />
+              CSV
+            </button>
+            <button 
+              onClick={() => handleExportData('xlsx')}
+              className="flex items-center gap-1 text-zinc-700 dark:text-zinc-300 px-2.5 py-2 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <FileSpreadsheet size={13} className="text-zinc-500" />
+              Excel
+            </button>
+          </div>
+
+          <button 
+            onClick={() => setIsGoogleSheetsModalOpen(true)}
+            className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition-colors shadow-xs"
+          >
+            <FileSpreadsheet size={14} />
+            Sheets Sync
           </button>
-          <button onClick={() => handleExportData('xlsx')} className={heroBtn}>
-            <FileSpreadsheet size={14} aria-hidden="true" /> Excel
+
+          <button 
+            onClick={() => setIsAiSummaryOpen(true)}
+            className="inline-flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-zinc-200 transition-colors shadow-xs"
+          >
+            <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
+            Análise IA
           </button>
-          <button onClick={() => setIsGoogleSheetsModalOpen(true)} className={heroBtn}>
-            <FileSpreadsheet size={14} aria-hidden="true" /> Sheets Sync
-          </button>
-          <button onClick={() => setIsAiSummaryOpen(true)} className={heroBtn}>
-            <Sparkles size={14} aria-hidden="true" /> Análise IA
-          </button>
+
           {canManageInventory && (
-            <button onClick={() => { setSelectedProduct(null); setIsModalOpen(true); }} className={heroBtnPrimary}>
-              <Plus size={14} aria-hidden="true" /> Novo Produto
+            <button 
+              onClick={() => { setSelectedProduct(null); setIsModalOpen(true); }}
+              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors shadow-xs"
+            >
+              <Plus size={14} />
+              Novo Produto
             </button>
           )}
-        </>}
-        statsClassName="grid-cols-2 xl:grid-cols-4"
-      >
-        <HeroStat icon={Package} iconClass="bg-blue-500" label="Total de SKUs" value={products.length} hint="itens cadastrados" />
-        <HeroStat
-          icon={DollarSign} iconClass="bg-emerald-500" label="Patrimônio em peças"
-          value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
-            products.reduce((acc, p) => acc + (p.price || 0) * (p.quantity || 0), 0)
-          )}
-          hint="preço × quantidade"
-        />
-        <HeroStat
-          icon={AlertTriangle} iconClass="bg-rose-500" label="Estoque crítico"
-          alert={!inventoryLowStockFilter && products.some(p => p.quantity <= (p.minQuantity || 5))}
-          selected={inventoryLowStockFilter}
+        </div>
+      </div>
+
+      {/* Quick Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Total de SKUs</span>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <Package size={14} />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-xl font-bold text-zinc-900 dark:text-white tabular-nums">{products.length}</span>
+            <span className="text-xs text-zinc-500">itens cadastrados</span>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Patrimônio em Peças</span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <DollarSign size={14} />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-xl font-bold text-zinc-900 dark:text-white tabular-nums truncate">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(
+                products.reduce((acc, p) => acc + (p.price || 0) * (p.quantity || 0), 0)
+              )}
+            </span>
+          </div>
+        </div>
+
+        <div 
           onClick={() => setInventoryLowStockFilter(!inventoryLowStockFilter)}
-          value={products.filter(p => p.quantity <= (p.minQuantity || 5)).length}
-          hint={inventoryLowStockFilter ? 'Filtrando · toque para ver todos' : 'abaixo do mínimo · toque para filtrar'}
-        />
-        <HeroStat
-          icon={Boxes} iconClass="bg-sky-500" label="Volume físico"
-          value={products.reduce((acc, p) => acc + (p.quantity || 0), 0)}
-          hint="unidades totais"
-        />
-      </PageHero>
+          className={`bg-white dark:bg-zinc-900 border p-3.5 rounded-xl shadow-xs cursor-pointer transition-all ${
+            inventoryLowStockFilter 
+              ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50/20 dark:bg-red-950/20' 
+              : 'border-zinc-200/80 dark:border-zinc-800 hover:border-red-300 dark:hover:border-red-900/60'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Estoque Crítico / Baixo</span>
+            <div className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center">
+              <AlertTriangle size={14} />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-red-600 dark:text-red-400 tabular-nums">
+                {products.filter(p => p.quantity <= (p.minQuantity || 5)).length}
+              </span>
+              <span className="text-xs text-zinc-500">abaixo do mínimo</span>
+            </div>
+            <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+              {inventoryLowStockFilter ? 'Ver todos' : 'Filtrar'}
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Volume Físico Total</span>
+            <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <Boxes size={14} />
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-xl font-bold text-zinc-900 dark:text-white tabular-nums">
+              {products.reduce((acc, p) => acc + (p.quantity || 0), 0)}
+            </span>
+            <span className="text-xs text-zinc-500">unidades totais</span>
+          </div>
+        </div>
+      </div>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 flex-1 flex-wrap">
@@ -530,10 +577,7 @@ export const Inventory = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4">
           <AnimatePresence>
             {filteredProducts.map((p) => {
-              const minQty = p.minQuantity || 5;
-              // Mesma regra de "baixo" de antes (≤ mínimo); zerado ganha destaque próprio.
-              const stock: 'out' | 'low' | 'ok' = p.quantity <= 0 ? 'out' : p.quantity <= minQty ? 'low' : 'ok';
-              const coverage = Math.max(4, Math.min(100, (p.quantity / (minQty * 2)) * 100));
+              const isLow = p.quantity <= (p.minQuantity || 5);
               return (
                 <motion.div
                   layout
@@ -541,106 +585,90 @@ export const Inventory = () => {
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
-                  className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3 sm:p-3.5 rounded-xl shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between group relative"
                 >
-                  {/* Foto da peça (identificação rápida no balcão); sem foto, quem pode editar já cai no cadastro */}
-                  <div className="-mx-1 -mt-1 mb-3 flex aspect-[16/10] items-center justify-center overflow-hidden rounded-lg bg-zinc-50 ring-1 ring-inset ring-zinc-100 dark:bg-zinc-800/60 dark:ring-zinc-800">
-                    {p.imageUrl ? (
-                      <img src={p.imageUrl} alt={p.name} loading="lazy" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                    ) : canManageInventory ? (
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
-                        className="flex h-full w-full flex-col items-center justify-center gap-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-                        aria-label={`Adicionar foto de ${p.name}`}
-                      >
-                        <Camera className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
-                        <span className="text-[11px] font-medium">Adicionar foto</span>
-                      </button>
-                    ) : (
-                      <ImageIcon className="h-6 w-6 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} aria-label="Sem foto" />
-                    )}
-                  </div>
+                  <div>
+                    {/* Top Tag & Actions */}
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded truncate max-w-[110px] ${
+                        isLow ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                      }`}>
+                        {p.category || 'Sem Categoria'}
+                      </span>
 
-                  {/* SKU + ações */}
-                  <div className="flex h-6 items-center justify-between gap-2">
-                    <span className="truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">{p.sku || 'Sem SKU'}</span>
-                    {canManageInventory && (
-                      <div className="-mr-1.5 flex items-center transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 [@media(hover:none)]:opacity-100">
-                        <button
-                          onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
-                          className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-                          title="Editar peça"
-                          aria-label={`Editar ${p.name}`}
-                        >
-                          <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteProductConfirm(p.id)}
-                          className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
-                          title="Excluir"
-                          aria-label={`Excluir ${p.name}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Nome e categoria */}
-                  <div className="mt-1">
-                    <div className="min-w-0">
-                      <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 tracking-tight text-zinc-900 dark:text-white" title={p.name}>
-                        {p.name}
-                      </h3>
-                      <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${categoryTone(p.category, categoryOrder)}`} aria-hidden="true" />
-                        <span className="truncate" title={p.category || 'Sem categoria'}>{p.category || 'Sem categoria'}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Saldo × mínimo e custo */}
-                  <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-                    <div className="flex items-end justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Saldo</p>
-                        <p className="mt-0.5 flex items-baseline gap-1.5">
-                          <span className={`text-xl font-semibold tabular-nums leading-none ${stock === 'ok' ? 'text-zinc-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>{p.quantity}</span>
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400">/ mín {minQty}</span>
-                        </p>
-                      </div>
-                      <div className="min-w-0 text-right">
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Custo médio</p>
-                        <p className="mt-0.5 truncate text-sm font-medium tabular-nums text-zinc-900 dark:text-zinc-100" title={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}</p>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex h-5 items-center gap-2">
-                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800" role="img" aria-label={`Saldo ${p.quantity} de mínimo ${minQty}`}>
-                        <div className={`h-full rounded-full ${stock === 'ok' ? 'bg-blue-600 dark:bg-blue-500' : 'bg-rose-500'}`} style={{ width: `${coverage}%` }} />
-                      </div>
-                      {stock !== 'ok' && (
-                        <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${stock === 'out' ? 'bg-rose-600 text-white ring-rose-600' : 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30'}`}>
-                          {stock === 'out' ? 'Zerado' : 'Baixo'}
-                        </span>
+                      {canManageInventory && (
+                        <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
+                            className="p-1 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 rounded transition-colors"
+                            title="Editar Peça"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button 
+                            onClick={() => setDeleteProductConfirm(p.id)}
+                            className="p-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       )}
                     </div>
+
+                    {/* Image & Product Info */}
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="w-11 h-11 rounded-lg border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50 dark:bg-zinc-800 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                        {p.imageUrl ? (
+                          <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <Package size={18} className="text-zinc-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] font-mono text-zinc-400 block truncate leading-none">
+                          {p.sku || 'S/ SKU'}
+                        </span>
+                        <h3 className="text-xs font-semibold text-zinc-900 dark:text-white line-clamp-2 mt-1 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={p.name}>
+                          {p.name}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {/* Stock & Cost Row */}
+                    <div className="grid grid-cols-2 gap-2 py-2 border-t border-zinc-100 dark:border-zinc-800/80 text-xs">
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wide font-medium text-zinc-400 block">Saldo</span>
+                        <div className="flex items-baseline gap-0.5">
+                          <span className={`text-base font-bold tabular-nums ${isLow ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-white'}`}>
+                            {p.quantity}
+                          </span>
+                          <span className="text-[9px] font-medium text-zinc-400">UN</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] uppercase tracking-wide font-medium text-zinc-400 block">Custo Médio</span>
+                        <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 tabular-nums block truncate" title={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}>
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Entrada e saída */}
+                  {/* Actions */}
                   {canPerformTransactions && (
-                    <div className="mt-auto grid grid-cols-2 gap-2 pt-4">
-                      <button
+                    <div className="flex gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                      <button 
                         onClick={() => { setSelectedProduct(p); setMovementType('in'); setIsMovementModalOpen(true); }}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex-1 py-1 px-1.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-md font-semibold text-[11px] transition-colors flex items-center justify-center gap-1"
                       >
-                        <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" /> Entrar
+                        <ArrowDownLeft size={12} /> Entrar
                       </button>
-                      <button
+                      <button 
                         onClick={() => { setSelectedProduct(p); setMovementType('out'); setIsMovementModalOpen(true); }}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex-1 py-1 px-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400 rounded-md font-semibold text-[11px] transition-colors flex items-center justify-center gap-1"
                       >
-                        <ArrowUpRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" aria-hidden="true" /> Sair
+                        <ArrowUpRight size={12} /> Sair
                       </button>
                     </div>
                   )}
@@ -770,8 +798,9 @@ export const Inventory = () => {
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div 
-              {...macZoomProps()}
-              transition={macZoom}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               className="relative bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden z-10"
             >
               <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/90 flex items-center justify-between">
@@ -885,8 +914,9 @@ export const Inventory = () => {
               className="fixed inset-0"
             />
             <motion.div 
-              {...macZoomProps()}
-              transition={macZoom}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               className="relative bg-white dark:bg-zinc-900 w-full max-w-2xl lg:max-w-5xl rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] z-10"
             >
               {/* Modal Header */}
@@ -1169,29 +1199,13 @@ export const Inventory = () => {
                     <div className="flex-1 space-y-1.5">
                       <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                         <ImageIcon size={13} className="text-zinc-400" />
-                        Foto da peça
+                        URL da Imagem / Foto
                       </label>
-                      <label className="mb-1.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 focus-within:ring-2 focus-within:ring-blue-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
-                        <Camera className="h-4 w-4 text-zinc-500" aria-hidden="true" />
-                        Tirar foto ou escolher do aparelho
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            e.target.value = '';
-                            if (!file) return;
-                            try { setFormImageUrl(await photoToDataUrl(file)); }
-                            catch { toast.error('Não consegui ler essa imagem. Tente outra foto.'); }
-                          }}
-                        />
-                      </label>
-                      <input
-                        name="imageUrl"
+                      <input 
+                        name="imageUrl" 
                         value={formImageUrl} 
                         onChange={(e) => setFormImageUrl(e.target.value)}
-                        placeholder="ou cole o link de uma imagem"
+                        placeholder="https://exemplo.com/foto-produto.jpg" 
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-xs sm:text-sm font-medium text-zinc-900 dark:text-white outline-none focus:border-blue-600 transition-colors" 
                       />
                     </div>
@@ -1287,8 +1301,9 @@ export const Inventory = () => {
         {deleteProductConfirm && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-zinc-950/70 backdrop-blur-sm">
             <motion.div 
-              {...macZoomProps()}
-              transition={macZoom}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               className="bg-white dark:bg-zinc-900 p-6 sm:p-7 rounded-2xl shadow-2xl max-w-sm w-full text-center border border-zinc-200/80 dark:border-zinc-800"
             >
               <div className="w-12 h-12 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center mx-auto mb-4 border border-red-200/60 dark:border-red-900/50">

@@ -4,8 +4,6 @@ import { toast } from 'sonner';
 import { apiDelete, apiGet, apiPatch, setActiveWorkspace } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { SignupQueue } from '../components/SignupQueue';
-import { HeroStat, PageHero, heroBtn } from '../components/PageHero';
-import { macZoomStyle } from '../lib/motion';
 
 interface WorkspaceUser {
   id: string;
@@ -48,6 +46,16 @@ function timeAgo(iso: string | null) {
   const d = Math.round(h / 24);
   return d < 30 ? `Há ${d} dia${d > 1 ? 's' : ''}` : new Date(iso).toLocaleDateString('pt-BR');
 }
+
+const Kpi = ({ icon: Icon, label, value, hint }: { icon: React.ElementType; label: string; value: string; hint?: string }) => (
+  <div className="rounded-xl border border-zinc-200/80 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+      <Icon size={14} aria-hidden="true" /> {label}
+    </div>
+    <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 tabular-nums dark:text-white">{value}</p>
+    {hint && <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">{hint}</p>}
+  </div>
+);
 
 /** Painel exclusivo do admin geral: todas as oficinas, seus números e usuários. */
 export const AdminPanel = () => {
@@ -128,24 +136,22 @@ export const AdminPanel = () => {
 
   return (
     <div className="w-full space-y-5 pb-24 lg:pb-6">
-      <PageHero
-        icon={ShieldCheck}
-        title="Painel geral"
-        subtitle="Todas as oficinas do sistema. Visível só para o administrador geral."
-        actions={
-          <button type="button" onClick={load} disabled={loading} className={heroBtn}>
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Atualizar
-          </button>
-        }
-        statsClassName="grid-cols-2 xl:grid-cols-4"
-      >
-        {data && (<>
-          <HeroStat icon={Building2} iconClass="bg-blue-500" label="Oficinas" value={data.totals.workspaces} hint="cadastradas no sistema" />
-          <HeroStat icon={Users} iconClass="bg-violet-500" label="Usuários" value={data.totals.users} hint="em todas as oficinas" />
-          <HeroStat icon={FileText} iconClass="bg-amber-500" label="Ordens de serviço" value={data.totals.serviceOrders} hint={`${data.totals.products} produtos cadastrados`} />
-          <HeroStat icon={Wallet} iconClass="bg-emerald-500" label="Faturado (30 dias)" value={brl(data.totals.revenue30d)} hint={`Total: ${brl(data.totals.revenue)}`} />
-        </>)}
-      </PageHero>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 pb-5 dark:border-zinc-800/80">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+            <ShieldCheck size={22} className="text-blue-600" aria-hidden="true" /> Painel geral
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Todas as oficinas do sistema. Visível só para o administrador geral.</p>
+        </div>
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 cursor-pointer"
+        >
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Atualizar
+        </button>
+      </div>
 
       {!data && loading ? (
         <div className="flex min-h-[40vh] items-center justify-center" role="status">
@@ -154,6 +160,13 @@ export const AdminPanel = () => {
         </div>
       ) : data && (
         <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Kpi icon={Building2} label="Oficinas" value={String(data.totals.workspaces)} />
+            <Kpi icon={Users} label="Usuários" value={String(data.totals.users)} />
+            <Kpi icon={FileText} label="Ordens de serviço" value={String(data.totals.serviceOrders)} hint={`${data.totals.products} produtos cadastrados`} />
+            <Kpi icon={Wallet} label="Faturado (30 dias)" value={brl(data.totals.revenue30d)} hint={`Total: ${brl(data.totals.revenue)}`} />
+          </div>
+
           <SignupQueue mode="super" workspaces={data.workspaces.map(w => ({ id: w.id, name: w.name }))} onDone={load} />
 
           <div className="relative max-w-sm">
@@ -316,8 +329,8 @@ export const AdminPanel = () => {
       )}
 
       {toDelete && (
-        <div className="ios-fade fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-ws-title">
-          <div style={macZoomStyle()} className="ios-pop w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-ws-title">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-950/40">
               <Trash2 size={20} aria-hidden="true" />
             </div>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { macZoom, macZoomProps } from '../lib/motion';
 import { 
   Package, 
   History, 
@@ -49,7 +48,6 @@ import { TopConsumedParts } from '../components/dashboard/TopConsumedParts';
 import { CategoryDonut } from '../components/dashboard/CategoryDonut';
 import { StockCoverage } from '../components/dashboard/StockCoverage';
 import { Sparkline } from '../components/dashboard/Sparkline';
-import { HeroStat, PageHero, heroBtn, heroBtnPrimary } from '../components/PageHero';
 import { iconBadge, isBilledOS, osAmount, osBilledDate, startOfDayAgo, DAY_MS } from '../components/dashboard/utils';
 import { authFetch } from '../lib/api';
 
@@ -452,77 +450,69 @@ export const Dashboard = ({
 
   return (
     <div className="w-full space-y-5">
-      {/* Topo: saudação, ações e indicadores em vidro sobre o degradê azul (estilo iOS) */}
-      <PageHero
-        titleAside={<>
-          <Calendar size={14} aria-hidden="true" />
-          <span className="first-letter:uppercase tabular-nums">
-            {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-          <span aria-hidden="true" className="text-blue-200/50">·</span>
-          <span className="inline-flex items-center gap-1.5 font-medium text-emerald-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Sincronizado
-          </span>
-        </>}
-        title={<>Olá{profile?.name ? `, ${profile.name.trim().split(/\s+/)[0]}` : ''}</>}
-        subtitle={`${settings.storeName || 'Munago Mecânica'} · Monitoramento operacional`}
-        actions={<>
-          <button onClick={handleExportPDF} className={heroBtn}>
-            <Download size={14} aria-hidden="true" />
+      {/* Top Operational Command Bar with Generous Spacing */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 pb-6 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div>
+          <div className="flex items-center gap-2.5 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">{settings.storeName || 'Munago Mecânica'}</span>
+            <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">/</span>
+            <span className="text-zinc-900 dark:text-zinc-200 font-medium">Monitoramento Operacional</span>
+            <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">·</span>
+            <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Sincronizado
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-4 mt-2 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
+              Painel de Monitoramento
+            </h1>
+            <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
+              {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Export PDF Button */}
+          <button
+            onClick={handleExportPDF}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-xs"
+          >
+            <Download size={14} className="text-zinc-500" />
             <span>Relatório PDF</span>
           </button>
+
+          {/* AI Diagnostic Button */}
           {!isViewer && (
-            <button onClick={generateSummary} disabled={isGeneratingSummary} className={heroBtn}>
-              {isGeneratingSummary ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
+            <button
+              onClick={generateSummary}
+              disabled={isGeneratingSummary}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200/80 dark:hover:bg-zinc-700/80 rounded-lg transition-colors border border-zinc-200/70 dark:border-zinc-700 shadow-xs"
+            >
+              {isGeneratingSummary ? (
+                <Loader2 size={14} className="animate-spin text-blue-600" />
+              ) : (
+                <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
+              )}
               <span>Diagnóstico Executivo</span>
             </button>
           )}
+
+          {/* New Service Order Primary CTA */}
           {canManageOS && (
-            <button onClick={onNewOS} className={heroBtnPrimary}>
-              <Plus size={15} aria-hidden="true" />
+            <button
+              onClick={onNewOS}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
+            >
+              <Plus size={15} />
               <span>Nova OS</span>
             </button>
           )}
-        </>}
-        statsId="widget-section-kpis"
-        statsClassName={`grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 rounded-3xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
-      >
-        <HeroStat
-          icon={Package} iconClass="bg-blue-500" label="Patrimônio em estoque"
-          value={formatBRL(totalStockValue)}
-          hint={`${totalItems} referências · média ${formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}`}
-        />
-        <HeroStat
-          icon={TrendingUp} iconClass="bg-emerald-500" label="Faturamento 30 dias"
-          value={formatBRL(revenue30.total)}
-          aside={<Sparkline id="spark-revenue" data={revenue30.daily} color="#ffffff" />}
-          hint={<span className="flex items-center gap-1.5">
-            {revenue30.delta !== null && (
-              <span className={`inline-flex items-center gap-0.5 font-semibold ${revenue30.delta >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                {revenue30.delta >= 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownLeft size={13} aria-hidden="true" />}
-                {revenue30.delta >= 0 ? '+' : ''}{revenue30.delta}%
-              </span>
-            )}
-            {revenue30.count} OS concluídas
-          </span>}
-        />
-        <HeroStat
-          icon={Boxes} iconClass="bg-violet-500" label="Disponibilidade"
-          value={`${healthyRate}%`}
-          aside={<Sparkline id="spark-out" data={outDaily14} color="#c4b5fd" />}
-          hint={`${new Intl.NumberFormat('pt-BR').format(totalUnits)} un · ${healthyItemsCount} acima do mínimo`}
-        />
-        <HeroStat
-          icon={lowStockProducts.length > 0 ? AlertTriangle : CheckCircle2}
-          iconClass={lowStockProducts.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}
-          label="Risco de ruptura"
-          alert={lowStockProducts.length > 0}
-          onClick={onSeeAllLowStock}
-          value={<>{lowStockProducts.length} <span className="text-base font-normal text-blue-100/80">itens</span></>}
-          hint={lowStockProducts.length > 0 ? 'Abaixo do mínimo: risco de parar OS' : 'Nenhuma ruptura agora'}
-        />
-      </PageHero>
+        </div>
+      </div>
 
       {/* ========================================================================= */}
       {/* WALL MONITOR AUTO-SCROLL CONTROL BAR (Ativo apenas com Modo Monitor ligado) */}
@@ -694,6 +684,121 @@ export const Dashboard = ({
       <div className="space-y-4">
 
         {/* ----------------------------------------------------------------------- */}
+        {/* SEÇÃO 1: INDICADORES GERAIS & RUPTURA (BENTO 1, 2, 3)                   */}
+        {/* ----------------------------------------------------------------------- */}
+        <div
+          id="widget-section-kpis"
+          className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-kpis')}`}
+        >
+          {/* KPI 1: PATRIMÔNIO VALORADO */}
+          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Patrimônio em Estoque</span>
+                <span className={`p-1.5 rounded-xl border ${iconBadge.blue}`}>
+                  <Package size={16} aria-hidden="true" />
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
+                {formatBRL(totalStockValue)}
+              </p>
+              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">{totalItems} referências cadastradas</p>
+            </div>
+            <div className="pt-4 mt-5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+              <span className="text-zinc-500">Valor médio / item</span>
+              <span className="font-semibold text-zinc-800 dark:text-zinc-200 tabular-nums">
+                {formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}
+              </span>
+            </div>
+          </div>
+
+          {/* KPI 2: FATURAMENTO DE OS (30 DIAS) */}
+          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Faturamento 30 dias</span>
+                <span className={`p-1.5 rounded-xl border ${iconBadge.emerald}`}>
+                  <TrendingUp size={16} aria-hidden="true" />
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
+                {formatBRL(revenue30.total)}
+              </p>
+              <div className="mt-1.5 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                {revenue30.delta !== null && (
+                  <span className={`inline-flex items-center gap-0.5 font-semibold ${revenue30.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {revenue30.delta >= 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownLeft size={13} aria-hidden="true" />}
+                    {revenue30.delta >= 0 ? '+' : ''}{revenue30.delta}%
+                  </span>
+                )}
+                <span>{revenue30.count} OS concluídas</span>
+              </div>
+            </div>
+            <div className="pt-3 mt-3">
+              <Sparkline id="spark-revenue" data={revenue30.daily} color={darkMode ? '#3987e5' : '#2a78d6'} />
+            </div>
+          </div>
+
+          {/* KPI 3: DISPONIBILIDADE & VOLUME */}
+          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Disponibilidade</span>
+                <span className={`p-1.5 rounded-xl border ${iconBadge.indigo}`}>
+                  <Boxes size={16} aria-hidden="true" />
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
+                {healthyRate}%
+              </p>
+              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+                {new Intl.NumberFormat('pt-BR').format(totalUnits)} un · {healthyItemsCount} itens acima do mínimo
+              </p>
+            </div>
+            <div className="pt-3 mt-3 space-y-2">
+              <Sparkline id="spark-out" data={outDaily14} color={darkMode ? '#d95926' : '#eb6834'} />
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Saídas diárias · últimos 14 dias</p>
+            </div>
+          </div>
+
+          {/* KPI 4: MONITOR DE RUPTURA */}
+          <button
+            type="button"
+            onClick={onSeeAllLowStock}
+            className={`text-left p-6 rounded-2xl border shadow-xs transition-colors cursor-pointer flex flex-col justify-between ${
+              lowStockProducts.length > 0
+                ? 'bg-red-50/60 dark:bg-red-950/20 border-red-200/90 dark:border-red-900/60 hover:border-red-300 dark:hover:border-red-800'
+                : 'bg-white dark:bg-zinc-900/90 border-zinc-200/70 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700'
+            }`}
+          >
+            <div className="w-full">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Risco de Ruptura</span>
+                <span className={`p-2 rounded-xl border ${lowStockProducts.length > 0 ? iconBadge.red : iconBadge.emerald}`}>
+                  {lowStockProducts.length > 0 ? <AlertTriangle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
+                </span>
+              </div>
+              <p className={`mt-2 text-2xl font-bold tracking-tight tabular-nums ${
+                lowStockProducts.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-white'
+              }`}>
+                {lowStockProducts.length} <span className="text-lg font-normal text-zinc-500">itens</span>
+              </p>
+              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                {lowStockProducts.length > 0
+                  ? 'Abaixo do estoque mínimo: risco de parar OS'
+                  : 'Nenhuma ruptura no catálogo agora'}
+              </p>
+            </div>
+            <div className="w-full pt-4 mt-5 border-t border-zinc-200/70 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+              <span className="text-zinc-500">Ação requerida</span>
+              <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                Ver itens <ChevronRight size={13} aria-hidden="true" />
+              </span>
+            </div>
+          </button>
+        </div>
+
+        {/* ----------------------------------------------------------------------- */}
         {/* SEÇÃO 2: BALANÇO LOGÍSTICO & PÁTIO DE OS (BENTO 4, 5)                  */}
         {/* ----------------------------------------------------------------------- */}
         <div 
@@ -701,7 +806,7 @@ export const Dashboard = ({
           className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
         >
           {/* BENTO 4: VISUALIZAÇÃO DE TENDÊNCIA DE ENTRADAS E SAÍDAS (RECHARTS) - col-span-12 xl:col-span-8 */}
-          <div className="col-span-12 xl:col-span-8 flex flex-col">
+          <div className="col-span-12 xl:col-span-8 flex flex-col justify-between">
             <ProductMovementTrendChart 
               transactions={transactions || []} 
               onSeeAllHistory={onSeeAllHistory}
@@ -709,84 +814,104 @@ export const Dashboard = ({
             />
           </div>
 
-          {/* BENTO 5: PÁTIO DE ORDENS DE SERVIÇO */}
-          <div className="col-span-12 xl:col-span-4 flex flex-col p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg shadow-blue-500/30 ring-1 ring-white/30">
-                  <Car size={17} aria-hidden="true" />
-                </span>
+          {/* BENTO 5: PÁTIO DE SERVIÇOS & OFICINA (TOWER CELL) - col-span-12 xl:col-span-4 */}
+          <div className="col-span-12 xl:col-span-4 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Pátio de Ordens de Serviço</h2>
-                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">Fluxo operacional da oficina</p>
+                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
+                    Pátio de Ordens de Serviço
+                  </h2>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Fluxo operacional da oficina
+                  </p>
+                </div>
+
+                {canManageOS && (
+                  <button
+                    onClick={onNewOS}
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    Todas ({serviceOrders?.length || 0}) <ChevronRight size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Structured Pipeline Counters */}
+              <div className="grid grid-cols-3 gap-2 p-1.5 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-5 text-center">
+                <div className="py-2">
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-semibold uppercase">Triagem</span>
+                  <span className="text-base font-bold text-zinc-900 dark:text-white tabular-nums">
+                    {(serviceOrders || []).filter(os => os.status === 'draft').length}
+                  </span>
+                </div>
+                <div className="py-2 border-x border-zinc-200/80 dark:border-zinc-700/80">
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-semibold uppercase">Execução</span>
+                  <span className="text-base font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                    {inProgressOS.length}
+                  </span>
+                </div>
+                <div className="py-2">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold uppercase">Concluídas</span>
+                  <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                    {completedOS.length}
+                  </span>
                 </div>
               </div>
-              {canManageOS && (
-                <button onClick={onNewOS} className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 cursor-pointer">
-                  Todas ({serviceOrders?.length || 0}) <ChevronRight size={13} aria-hidden="true" />
-                </button>
-              )}
-            </div>
 
-            {/* Contadores do pátio em blocos coloridos */}
-            <div className="mb-4 grid grid-cols-3 gap-2 text-center">
-              {([
-                ['Triagem', (serviceOrders || []).filter(os => os.status === 'draft').length, 'from-zinc-500/15 to-zinc-500/5 border-zinc-500/20', 'text-zinc-700 dark:text-zinc-200'],
-                ['Execução', inProgressOS.length, 'from-amber-500/20 to-orange-500/5 border-amber-500/30', 'text-amber-600 dark:text-amber-400'],
-                ['Concluídas', completedOS.length, 'from-emerald-500/20 to-teal-500/5 border-emerald-500/30', 'text-emerald-600 dark:text-emerald-400'],
-              ] as const).map(([label, count, tile, tone]) => (
-                <div key={label} className={`rounded-xl border bg-gradient-to-br py-2.5 ${tile}`}>
-                  <span className={`block text-[10px] font-semibold uppercase tracking-wide ${tone}`}>{label}</span>
-                  <span className={`text-xl font-bold tabular-nums ${tone}`}>{count}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* OS em andamento: faixa colorida pela etapa */}
-            <div className="flex-1 space-y-2.5">
-              {activeOS.length > 0 ? (
-                activeOS.slice(0, 3).map((os) => {
-                  const running = os.status === 'in_progress';
-                  return (
-                    <button
+              {/* Active OS List */}
+              <div className="space-y-3">
+                {activeOS.length > 0 ? (
+                  activeOS.slice(0, 3).map((os) => (
+                    <div 
                       key={os.id}
-                      type="button"
                       onClick={onNewOS}
-                      className={`relative w-full overflow-hidden rounded-xl border border-zinc-200/60 bg-zinc-50/70 py-3 pl-4 pr-3.5 text-left transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-800/40 dark:hover:border-zinc-700 cursor-pointer`}
+                      className="p-3.5 bg-zinc-50/70 dark:bg-zinc-800/40 rounded-xl border border-zinc-200/60 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors cursor-pointer group"
                     >
-                      <span className={`absolute inset-y-0 left-0 w-1 ${running ? 'bg-gradient-to-b from-amber-400 to-orange-500' : 'bg-gradient-to-b from-zinc-300 to-zinc-500'}`} aria-hidden="true" />
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs font-bold text-zinc-900 dark:text-white">OS #{os.id.substring(0, 6)}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${running ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-300'}`}>
-                          {running ? 'Em andamento' : 'Orçamento'}
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold text-zinc-900 dark:text-white">
+                          OS #{os.id.substring(0, 6)}
+                        </span>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                          os.status === 'in_progress' 
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' 
+                            : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                        }`}>
+                          {os.status === 'in_progress' ? 'Em Andamento' : 'Rascunho'}
                         </span>
                       </div>
-                      <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
-                        <span className="truncate font-semibold text-zinc-700 dark:text-zinc-200">{os.customerName || 'Cliente sem nome'}</span>
-                        <span className="shrink-0 font-bold tabular-nums text-zinc-900 dark:text-white">{formatBRL(os.finalAmount || os.totalAmount || 0)}</span>
+
+                      <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-300 mt-2">
+                        <span className="truncate max-w-[170px] font-semibold">
+                          {os.customerName || 'Cliente sem nome'}
+                        </span>
+                        <span className="font-bold text-zinc-900 dark:text-white tabular-nums">
+                          {formatBRL(os.finalAmount || os.totalAmount || 0)}
+                        </span>
                       </div>
+
                       {(os.vehicleModel || os.licensePlate) && (
-                        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-500">
-                          <Car size={12} className="text-zinc-400" aria-hidden="true" />
-                          <span className="truncate">{os.vehicleModel || 'Veículo'} {os.licensePlate ? `(${os.licensePlate})` : ''}</span>
+                        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-1.5">
+                          <Car size={12} className="text-zinc-400" />
+                          <span>{os.vehicleModel || 'Veículo'} {os.licensePlate ? `(${os.licensePlate})` : ''}</span>
                         </div>
                       )}
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="rounded-xl border border-dashed border-zinc-200 py-7 text-center text-xs text-zinc-500 dark:border-zinc-800">
-                  Nenhuma ordem em andamento no pátio.
-                </div>
-              )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-7 text-center text-xs text-zinc-500 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                    Nenhuma ordem em andamento no pátio.
+                  </div>
+                )}
+              </div>
             </div>
 
             {canManageOS && (
               <button
                 onClick={onNewOS}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-600/25 transition hover:brightness-110 cursor-pointer"
+                className="w-full mt-5 py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-2"
               >
-                <Plus size={14} aria-hidden="true" /> Abrir painel de ordens
+                <Plus size={14} /> Abrir Painel de Ordens
               </button>
             )}
           </div>
@@ -1026,8 +1151,9 @@ export const Dashboard = ({
         {isDiagnosticOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs">
             <motion.div
-              {...macZoomProps()}
-              transition={macZoom}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden"
             >
               <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">

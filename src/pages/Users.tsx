@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { macZoom, macZoomProps } from '../lib/motion';
 import {
   ShieldCheck,
   Search,
@@ -24,7 +23,6 @@ import {
 import { useApp, ROLE_PRESETS, UserPermissions, UserProfile } from '../context/AppContext';
 import { apiGet, apiPost } from '../lib/api';
 import { SignupQueue } from '../components/SignupQueue';
-import { HeroStat, PageHero, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
 
 type Role = 'admin' | 'editor' | 'viewer';
@@ -181,8 +179,10 @@ const Dialog: React.FC<{ title: string; subtitle?: string; onClose: () => void; 
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelId}
-        {...macZoomProps()}
-        transition={macZoom}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 16 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         className="flex max-h-[100dvh] sm:max-h-[min(820px,calc(100dvh-3rem))] w-full max-w-2xl flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl"
       >
         <header className="flex items-start justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
@@ -335,39 +335,23 @@ export const Users = () => {
 
   return (
     <div className="w-full space-y-5 pb-24 lg:pb-6">
-      {/* Topo + resumo da equipe (clica e filtra por função) */}
-      <PageHero
-        icon={UsersIcon}
-        title="Equipe e acessos"
-        subtitle="Quem acessa o sistema e o que cada pessoa pode fazer."
-        actions={canManageUsers && (
-          <button type="button" onClick={() => setIsAddModalOpen(true)} className={heroBtnPrimary}>
-            <UserPlus size={15} aria-hidden="true" /> Novo usuário
+      {/* Cabeçalho */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Equipe & Acessos</h1>
+          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Quem acessa o sistema e o que cada pessoa pode fazer.</p>
+        </div>
+        {canManageUsers && (
+          <button
+            type="button"
+            onClick={() => setIsAddModalOpen(true)}
+            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 cursor-pointer"
+          >
+            <UserPlus size={16} aria-hidden="true" />
+            Novo usuário
           </button>
         )}
-        statsClassName="grid-cols-2 xl:grid-cols-4"
-      >
-        <HeroStat
-          icon={UsersIcon} iconClass="bg-blue-500" label="Membros"
-          value={allUsers.length} hint="com acesso a esta oficina"
-          selected={roleFilter === 'all'} onClick={() => setRoleFilter('all')}
-        />
-        <HeroStat
-          icon={ShieldCheck} iconClass="bg-violet-500" label="Administradores"
-          value={allUsers.filter(u => roleOf(u.role) === 'admin').length} hint="acesso total"
-          selected={roleFilter === 'admin'} onClick={() => setRoleFilter(roleFilter === 'admin' ? 'all' : 'admin')}
-        />
-        <HeroStat
-          icon={Briefcase} iconClass="bg-emerald-500" label="Operadores"
-          value={allUsers.filter(u => roleOf(u.role) === 'editor').length} hint="estoque, OS e movimentações"
-          selected={roleFilter === 'editor'} onClick={() => setRoleFilter(roleFilter === 'editor' ? 'all' : 'editor')}
-        />
-        <HeroStat
-          icon={Clock} iconClass="bg-amber-500" label="Aguardando"
-          alert={pendingTotal > 0}
-          value={pendingTotal} hint={pendingTotal > 0 ? 'cadastros para aprovar' : 'ninguém esperando'}
-        />
-      </PageHero>
+      </div>
 
       {/* Quem criou conta e ainda não está em nenhuma mecânica */}
       {isAdmin && (profile?.workspace?.id ?? profile?.workspaceId) && (
@@ -748,8 +732,10 @@ export const Users = () => {
               role="alertdialog"
               aria-modal="true"
               aria-labelledby="delete-user-title"
-              {...macZoomProps()}
-              transition={macZoom}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
               className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6"
             >
               <span className="inline-flex p-2.5 rounded-xl border bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40">

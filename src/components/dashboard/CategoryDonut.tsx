@@ -57,7 +57,7 @@ export const CategoryDonut: React.FC<{ products: Product[]; darkMode: boolean }>
 
   return (
     <div className={cardClass}>
-      <div className="flex flex-1 flex-col">
+      <div>
         <div className="flex items-center gap-2.5 mb-4">
           <span className={`p-1.5 rounded-xl border ${iconBadge.violet}`}>
             <PieChartIcon size={16} aria-hidden="true" />
@@ -70,7 +70,7 @@ export const CategoryDonut: React.FC<{ products: Product[]; darkMode: boolean }>
 
         {hasValue ? (
           <>
-            <div className="relative min-h-[160px] w-full flex-1" role="img" aria-label={`Valor do estoque por categoria, total ${formatBRL(total)}`}>
+            <div className="relative h-[160px] w-full" role="img" aria-label={`Valor do estoque por categoria, total ${formatBRL(total)}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie

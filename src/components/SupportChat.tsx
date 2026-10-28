@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { macZoom } from '../lib/motion';
-import { ArrowLeft, BatteryFull, CheckCheck, MessageCircleQuestion, RotateCcw, SendHorizontal, Signal, Wifi } from 'lucide-react';
+import { MessageCircleQuestion, RotateCcw, Send, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
-import { AUTH_CHARACTER_URL } from './auth/authStyles';
 
 type Msg = { role: 'user' | 'model'; text: string; error?: boolean };
 
@@ -70,11 +68,11 @@ const TypingDots = () => (
 
 const AnaAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => (
   <span
-    className={`relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white ${size === 'md' ? 'h-10 w-10 text-sm ring-2 ring-white/40' : 'h-7 w-7 text-[11px]'}`}
+    className={`relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white ${size === 'md' ? 'h-10 w-10 text-sm' : 'h-7 w-7 text-[11px]'}`}
     aria-hidden="true"
   >
     A
-    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-blue-600 bg-emerald-400" />}
+    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900" />}
   </span>
 );
 
@@ -189,7 +187,6 @@ export const SupportChat: React.FC = () => {
   };
 
   const showSuggestions = messages.length === 0;
-  const clock = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   return (
     <>
@@ -204,28 +201,9 @@ export const SupportChat: React.FC = () => {
             onClick={() => setOpen(true)}
             aria-label="Abrir chat de ajuda com a Ana"
             title="Precisa de ajuda? Fale com a Ana"
-            style={{ transformOrigin: 'bottom right' }}
-            className="group fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6 z-[60] rounded-[15px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 cursor-pointer"
+            className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-600/30 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 cursor-pointer"
           >
-            {/* Balão de mensagem acima do celular, até a primeira conversa */}
-            {messages.length === 0 && (
-              <span className="absolute bottom-full right-0 mb-2.5 whitespace-nowrap rounded-[1.1rem] rounded-br-[0.35rem] bg-white px-3 py-2 text-left text-xs font-medium text-zinc-800 shadow-lg shadow-black/15 ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-white/10" aria-hidden="true">
-                Oi! Precisa de ajuda?
-                <span className="block text-[10px] font-normal text-zinc-500 dark:text-zinc-400">Fale com a Ana</span>
-              </span>
-            )}
-            {/* Mini iPhone: moldura, ilha e o boneco das telas de login como papel de parede */}
-            <span className="relative flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg shadow-blue-900/30 ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
-              <span className="relative flex-1 overflow-hidden rounded-[12px] bg-gradient-to-br from-blue-500 to-indigo-600">
-                <img src={AUTH_CHARACTER_URL} alt="" className="absolute inset-x-0 top-1.5 h-full w-full object-cover object-top" referrerPolicy="no-referrer" />
-                <span className="absolute left-1/2 top-1 h-1 w-3.5 -translate-x-1/2 rounded-full bg-black" />
-                <span className="absolute bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-white/70" />
-              </span>
-              {/* Selo de notificação com o ícone do chat */}
-              <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow ring-2 ring-white dark:ring-zinc-900">
-                <MessageCircleQuestion size={12} aria-hidden="true" />
-              </span>
-            </span>
+            <MessageCircleQuestion size={26} aria-hidden="true" />
           </motion.button>
         )}
       </AnimatePresence>
@@ -235,133 +213,103 @@ export const SupportChat: React.FC = () => {
           <motion.section
             role="dialog"
             aria-label="Chat de ajuda com a Ana"
-            // Nasce do botão redondo (canto inferior direito) e cresce, como abrir um app no macOS.
-            initial={{ opacity: 0, scale: 0.1 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.1 }}
-            transition={macZoom}
-            style={{ transformOrigin: 'bottom right' }}
-            // No celular ocupa a tela; do sm para cima vira um iPhone (moldura, ilha, barra de status).
-            className="fixed z-[70] inset-0 flex sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(720px,calc(100dvh-3rem))] sm:w-[360px] sm:rounded-[3.25rem] sm:bg-zinc-900 sm:p-[11px] sm:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.55),inset_0_0_0_1.5px_rgba(255,255,255,0.14),0_0_0_1px_rgba(0,0,0,0.6)]"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed z-[70] flex flex-col overflow-hidden bg-white shadow-2xl dark:bg-zinc-900 inset-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(600px,calc(100dvh-3rem))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-zinc-200 sm:pt-0 sm:pb-0 dark:sm:border-zinc-800"
           >
-            {/* Tela no estilo WhatsApp com as cores do sistema: cabeçalho azul, papel de parede azulado, balões com "rabinho" */}
-            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#eef2fb] pb-[env(safe-area-inset-bottom)] dark:bg-[#0b1220] sm:rounded-[2.6rem] sm:pb-0">
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 pt-[env(safe-area-inset-top)] text-white sm:pt-0">
-                {/* Barra de status + Dynamic Island (só na moldura; no celular real o sistema já mostra) */}
-                <div className="relative hidden h-11 items-center justify-between px-7 text-[13px] font-semibold sm:flex" aria-hidden="true">
-                  <span className="tabular-nums">{clock}</span>
-                  <span className="absolute left-1/2 top-2.5 h-[26px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
-                  <span className="flex items-center gap-1">
-                    <Signal size={14} strokeWidth={2.5} />
-                    <Wifi size={14} strokeWidth={2.5} />
-                    <BatteryFull size={20} strokeWidth={2} />
-                  </span>
-                </div>
+            {/* Cabeçalho */}
+            <header className="flex items-center gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+              <AnaAvatar size="md" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-zinc-900 dark:text-white">Ana</p>
+                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">Assistente virtual · responde na hora</p>
+              </div>
+              {messages.length > 0 && (
+                <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer">
+                  <RotateCcw size={16} aria-hidden="true" />
+                </button>
+              )}
+              <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer">
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
 
-                <header className="flex items-center gap-2 px-1.5 pb-2 pt-1">
-                  <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="rounded-full p-1.5 transition-colors hover:bg-white/10 cursor-pointer">
-                    <ArrowLeft size={22} aria-hidden="true" />
-                  </button>
-                  <AnaAvatar size="md" />
-                  <div className="min-w-0 flex-1 leading-tight">
-                    <p className="text-[15px] font-semibold">Ana</p>
-                    <p className="truncate text-[11px] text-white/80">{busy ? 'digitando…' : 'online'}</p>
+            {/* Conversa */}
+            <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
+              <div className="flex items-end gap-2">
+                <AnaAvatar />
+                <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-zinc-100 px-3.5 py-2.5 text-sm leading-relaxed text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
+                  {greeting}
+                </div>
+              </div>
+
+              {messages.map((m, i) =>
+                m.role === 'user' ? (
+                  <div key={i} className="flex justify-end">
+                    <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-blue-600 px-3.5 py-2.5 text-sm leading-relaxed text-white">{m.text}</div>
                   </div>
-                  {messages.length > 0 && (
-                    <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="rounded-full p-2 transition-colors hover:bg-white/10 cursor-pointer">
-                      <RotateCcw size={18} aria-hidden="true" />
+                ) : (
+                  <div key={i} className="flex items-end gap-2">
+                    <AnaAvatar />
+                    <div className={`max-w-[85%] rounded-2xl rounded-bl-md px-3.5 py-2.5 text-sm leading-relaxed ${m.error ? 'border border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300' : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'}`}>
+                      {m.text ? renderRich(m.text) : <TypingDots />}
+                      {m.error && (
+                        <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
+                          Tentar de novo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ),
+              )}
+
+              {showSuggestions && (
+                <div className="flex flex-wrap gap-2 pl-9">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => send(s)}
+                      className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-left text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-950/60 cursor-pointer"
+                    >
+                      {s}
                     </button>
-                  )}
-                </header>
-              </div>
-
-              {/* Conversa */}
-              <div
-                ref={listRef}
-                className="flex-1 space-y-1 overflow-y-auto px-3 py-3 [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
-                aria-live="polite"
-              >
-                <p className="mx-auto mb-1 w-fit rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">Hoje</p>
-                <p className="mx-auto mb-2 max-w-[90%] rounded-md bg-white/90 px-3 py-1.5 text-center text-[11px] leading-snug text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
-                  A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.
-                </p>
-                <div className="flex">
-                  <div className="max-w-[80%] rounded-lg rounded-tl-none bg-white px-2.5 py-1.5 text-[14px] leading-snug text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100">
-                    {greeting}
-                  </div>
+                  ))}
                 </div>
-
-                {messages.map((m, i) =>
-                  m.role === 'user' ? (
-                    <div key={i} className="flex justify-end">
-                      <div className="max-w-[80%] whitespace-pre-wrap rounded-lg rounded-tr-none bg-blue-600 px-2.5 py-1.5 text-[14px] leading-snug text-white shadow-sm">
-                        {m.text}
-                        <CheckCheck size={14} className="-mb-0.5 ml-1.5 inline text-sky-200" aria-label="Lida" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div key={i} className="flex">
-                      <div className={`max-w-[80%] rounded-lg rounded-tl-none px-2.5 py-1.5 text-[14px] leading-snug shadow-sm ${m.error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>
-                        {m.text ? renderRich(m.text) : <TypingDots />}
-                        {m.error && (
-                          <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
-                            Tentar de novo
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ),
-                )}
-
-                {showSuggestions && (
-                  <div className="flex flex-col items-center gap-1.5 pt-3">
-                    {suggestions.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => send(s)}
-                        className="w-full max-w-[85%] rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-blue-600 shadow-sm transition-colors hover:bg-blue-50 dark:bg-slate-800 dark:text-blue-400 dark:hover:bg-slate-700 cursor-pointer"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Caixa de mensagem */}
-              <form
-                onSubmit={(e) => { e.preventDefault(); void send(input); }}
-                className="shrink-0 px-2 pb-2 pt-1"
-              >
-                <div className="flex items-end gap-1.5">
-                  <div className="flex min-h-[2.75rem] flex-1 items-center rounded-[1.4rem] bg-white px-4 py-1.5 shadow-sm dark:bg-slate-800">
-                    <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
-                    <textarea
-                      id="support-input"
-                      ref={inputRef}
-                      rows={1}
-                      value={input}
-                      maxLength={2000}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
-                      placeholder="Mensagem"
-                      className="max-h-28 min-h-[1.5rem] flex-1 resize-none bg-transparent py-0.5 text-[15px] text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={busy || !input.trim()}
-                    aria-label="Enviar"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-600/30 transition-opacity hover:brightness-110 disabled:opacity-50 cursor-pointer"
-                  >
-                    <SendHorizontal size={19} aria-hidden="true" />
-                  </button>
-                </div>
-                {/* Barra de gestos do iPhone */}
-                <span className="mx-auto mt-2 hidden h-[5px] w-28 rounded-full bg-zinc-900 dark:bg-white sm:block" aria-hidden="true" />
-              </form>
+              )}
             </div>
+
+            {/* Caixa de mensagem */}
+            <form
+              onSubmit={(e) => { e.preventDefault(); void send(input); }}
+              className="border-t border-zinc-200 p-3 dark:border-zinc-800"
+            >
+              <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20 dark:border-zinc-700 dark:bg-zinc-800/60">
+                <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
+                <textarea
+                  id="support-input"
+                  ref={inputRef}
+                  rows={1}
+                  value={input}
+                  maxLength={2000}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
+                  placeholder="Escreva sua dúvida…"
+                  className="max-h-32 min-h-[1.5rem] flex-1 resize-none bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !input.trim()}
+                  aria-label="Enviar"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-40 cursor-pointer"
+                >
+                  <Send size={16} aria-hidden="true" />
+                </button>
+              </div>
+              <p className="mt-1.5 text-center text-[11px] text-zinc-400">A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.</p>
+            </form>
           </motion.section>
         )}
       </AnimatePresence>

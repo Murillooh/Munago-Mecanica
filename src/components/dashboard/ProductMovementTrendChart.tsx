@@ -24,9 +24,7 @@ import {
   Layers, 
   ChevronRight,
   Calendar,
-  Zap,
-  Scale,
-  Gauge
+  Zap
 } from 'lucide-react';
 import { Transaction } from '../../context/AppContext';
 
@@ -173,14 +171,14 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
   }, [trendData]);
 
   return (
-    <div className="h-full flex-1 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors">
-      <div className="flex flex-1 flex-col">
+    <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors">
+      <div>
         {/* Header with Title, Controls & Timeframe Selector */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-500/30 ring-1 ring-white/30">
-                <Activity size={17} aria-hidden="true" />
+              <span className="p-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-200/50 dark:border-emerald-900/40">
+                <Activity size={16} />
               </span>
               <div>
                 <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
@@ -262,32 +260,51 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
           </div>
         </div>
 
-        {/* Números do período em blocos coloridos */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4 text-xs">
-          {([
-            ['Entradas', `+${totalIn}`, 'unidades', ArrowDownLeft, 'from-emerald-500/15 to-emerald-500/5 border-emerald-500/25', 'from-emerald-400 to-teal-600', 'text-emerald-600 dark:text-emerald-400'],
-            ['Saídas', `-${totalOut}`, 'unidades', ArrowUpRight, 'from-rose-500/15 to-rose-500/5 border-rose-500/25', 'from-rose-400 to-pink-600', 'text-rose-600 dark:text-rose-400'],
-            ['Saldo líquido', netBalance >= 0 ? `+${netBalance}` : `${netBalance}`, 'unidades', Scale, 'from-sky-500/15 to-blue-500/5 border-sky-500/25', 'from-sky-400 to-blue-600', netBalance >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'],
-            ['Média por dia', `${avgDailyVolume}`, 'un/dia', Gauge, 'from-violet-500/15 to-violet-500/5 border-violet-500/25', 'from-fuchsia-400 to-violet-600', 'text-violet-600 dark:text-violet-400'],
-          ] as const).map(([label, value, unit, Icon, tile, icon, tone]) => (
-            <div key={label} className={`rounded-xl border bg-gradient-to-br p-3 ${tile}`}>
-              <div className="flex items-center gap-2">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm ${icon}`}>
-                  <Icon size={13} aria-hidden="true" />
-                </span>
-                <span className="font-medium text-zinc-600 dark:text-zinc-300">{label}</span>
-              </div>
-              <div className="mt-1.5 flex items-baseline gap-1.5">
-                <span className={`text-lg font-bold tabular-nums ${tone}`}>{value}</span>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400">{unit}</span>
-              </div>
+        {/* Quick KPI Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-4 text-xs">
+          <div className="space-y-0.5">
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Entradas ({daysRange}d)</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
+                +{totalIn}
+              </span>
+              <span className="text-[10px] text-zinc-400">unidades</span>
             </div>
-          ))}
+          </div>
+
+          <div className="space-y-0.5 sm:border-l sm:border-zinc-200/70 sm:dark:border-zinc-700/60 sm:pl-3">
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Saídas ({daysRange}d)</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-red-600 dark:text-red-400 font-mono tabular-nums">
+                -{totalOut}
+              </span>
+              <span className="text-[10px] text-zinc-400">unidades</span>
+            </div>
+          </div>
+
+          <div className="space-y-0.5 border-t sm:border-t-0 sm:border-l border-zinc-200/70 dark:border-zinc-700/60 pt-2 sm:pt-0 sm:pl-3">
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Saldo Líquido</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-base font-bold font-mono tabular-nums ${netBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                {netBalance >= 0 ? `+${netBalance}` : netBalance}
+              </span>
+              <span className="text-[10px] text-zinc-400">unidades</span>
+            </div>
+          </div>
+
+          <div className="space-y-0.5 border-t sm:border-t-0 sm:border-l border-zinc-200/70 dark:border-zinc-700/60 pt-2 sm:pt-0 sm:pl-3">
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">Média Operacional</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-zinc-900 dark:text-white font-mono tabular-nums">
+                {avgDailyVolume}
+              </span>
+              <span className="text-[10px] text-zinc-400">un/dia</span>
+            </div>
+          </div>
         </div>
 
         {/* Dynamic Recharts Chart Area */}
-        {/* Cresce para acompanhar a altura do cartão ao lado (Pátio de OS) */}
-        <div className="min-h-[220px] w-full flex-1">
+        <div className="h-[220px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'area' ? (
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
