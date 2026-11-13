@@ -67,6 +67,19 @@ export interface UserPermissions {
   canManageUsers: boolean;
   canViewReports: boolean;
   canPerformTransactions: boolean;
+  canCheckin?: boolean;
+  canApproveOS?: boolean;
+  allUnits?: boolean;
+}
+
+/** Unidade da oficina: Base (atende as motos) ou CD. */
+export interface Unit {
+  id: string;
+  name: string;
+  kind: 'base' | 'cd';
+  franchiseeName?: string | null;
+  franchiseeEmail?: string | null;
+  franchiseePhone?: string | null;
 }
 
 export interface UserProfile {
@@ -84,6 +97,9 @@ export interface UserProfile {
   isSuperAdmin?: boolean;
   /** Oficina sendo exibida agora (a própria, ou a escolhida pelo admin geral). */
   workspace?: Workspace | null;
+  /** Perfil de acesso (mecanico, cs, estoquista...); vazio em usuários antigos. */
+  profile?: string | null;
+  unitId?: string | null;
 }
 
 export interface Workspace {
@@ -105,7 +121,12 @@ export interface Notification {
   title: string;
   message: string;
   productId?: string;
-  type: 'low_stock';
+  /** low_stock: estoque baixo; moto_os: OS da moto chegou na etapa do seu setor. */
+  type: 'low_stock' | 'moto_os';
+  target?: string | null;
+  unitId?: string | null;
+  /** OS da moto (botão "Abrir"). */
+  refId?: string | null;
   timestamp: any;
   read: boolean;
 }
@@ -140,8 +161,10 @@ export interface SystemSettings {
   enableSoundAlerts?: boolean;
   monitorAutoScrollEnabled?: boolean;
   monitorScrollIntervalSeconds?: number;
-  /** Carteira Asaas da oficina: recebe a parte dela no split das cobranças. */
+  /** Carteira Asaas da oficina: recebe a parte dela no split das cobranças. Só o admin geral altera. */
   asaasWalletId?: string;
+  /** Repasse mínimo da OS para a empresa, em % do total. Só o admin geral altera. */
+  repasseMinPercent?: number;
   lastFirestoreBackup?: string;
 }
 
@@ -167,6 +190,7 @@ export interface ServiceOrder {
   totalPartsCost: number;
   totalAmount: number;
   status: 'draft' | 'in_progress' | 'completed' | 'paid';
+  maintenanceType?: 'corretiva' | 'preventiva';
   scheduledDate: string;
   completionDate?: string;
   observations?: string;
@@ -200,6 +224,8 @@ interface ApiUser {
   workspaceId?: string;
   isSuperAdmin?: boolean;
   workspace?: Workspace | null;
+  profile?: string | null;
+  unitId?: string | null;
 }
 
 const toProfile = (u: ApiUser): UserProfile => ({
@@ -214,6 +240,8 @@ const toProfile = (u: ApiUser): UserProfile => ({
   workspaceId: u.workspaceId,
   isSuperAdmin: u.isSuperAdmin,
   workspace: u.workspace,
+  profile: u.profile,
+  unitId: u.unitId,
 });
 
 const OPEN_TAB_KEY = 'munago_open_tab';
@@ -222,7 +250,7 @@ const OPEN_TAB_KEY = 'munago_open_tab';
 const SETTINGS_KEYS = [
   'storeName', 'logoUrl', 'contactPhone', 'contactEmail', 'address', 'allowNegativeStock', 'accentColor',
   'autoBackupEnabled', 'enableSoundAlerts', 'monitorAutoScrollEnabled', 'monitorScrollIntervalSeconds',
-  'asaasWalletId',
+  'asaasWalletId', 'repasseMinPercent',
 ] as const;
 
 /** Remove null/undefined para não violar a validação da API em campos opcionais. */
@@ -249,6 +277,8 @@ interface AppContextType {
   allUsers: UserProfile[];
   users: UserProfile[];
   loading: boolean;
+  /** Primeira carga de dados terminou (ou não há dados a carregar): o preload só sai depois disso. */
+  dataReady: boolean;
   isAdmin: boolean;
   isEditor: boolean;
   isViewer: boolean;
@@ -259,6 +289,15 @@ interface AppContextType {
   canPerformTransactions: boolean;
   canViewInventory: boolean;
   canViewOS: boolean;
+  /** Registra a chegada da moto (check-list). */
+  canCheckin: boolean;
+  /** CS: aprova/recusa OS. */
+  canApproveOS: boolean;
+  /** Enxerga todas as unidades (senão só a própria). */
+  allUnits: boolean;
+  units: Unit[];
+  /** Abre a OS da moto de um aviso. */
+  openMotoOS: (n: Notification) => void;
   /** 'NEW_PASSWORD_REQUIRED' no primeiro acesso (senha temporária do convite). */
   loginEmail: (email: string, pass: string) => Promise<LoginResult>;
   completeNewPassword: (newPassword: string) => Promise<void>;
@@ -368,10 +407,12 @@ export const AppProvider = ({ children }: { children: any }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const [settings, setSettings] = useState<SystemSettings>(() => ({
     storeName: 'Munago Mecânica',
@@ -389,9 +430,10 @@ export const AppProvider = ({ children }: { children: any }) => {
   const [activeTab, setActiveTab] = useState(() => {
     try { return sessionStorage.getItem(OPEN_TAB_KEY) || 'dashboard'; } catch { return 'dashboard'; }
   });
+  // Lembra a tela aberta: atualizar a página (F5) volta para ela, não para o painel.
   useEffect(() => {
-    try { sessionStorage.removeItem(OPEN_TAB_KEY); } catch { /* armazenamento indisponível */ }
-  }, []);
+    try { sessionStorage.setItem(OPEN_TAB_KEY, activeTab); } catch { /* armazenamento indisponível */ }
+  }, [activeTab]);
   const [inventoryLowStockFilter, setInventoryLowStockFilter] = useState(false);
   const [isMonitorMode, setIsMonitorMode] = useState(false);
 
@@ -537,13 +579,28 @@ export const AppProvider = ({ children }: { children: any }) => {
   const canManageUsers = isAdmin || permissions.canManageUsers || false;
   const canViewReports = isAdmin || permissions.canViewReports || false;
   const canPerformTransactions = isAdmin || permissions.canPerformTransactions || false;
+  // Usuário antigo (sem as chaves novas): check-list segue quem mexe em OS; vê todas as unidades.
+  const canCheckin = isAdmin || (permissions.canCheckin ?? permissions.canManageOS) || false;
+  const canApproveOS = isAdmin || permissions.canApproveOS || false;
+  const allUnits = isAdmin || (permissions.allUnits ?? true);
 
   // Helper for viewing: all approved users can view inventory and OS (viewers read-only, operators and admins can manage)
   const canViewInventory = true;
   const canViewOS = true;
 
   const isApproved = !!profile && (profile.status === 'approved' || profile.role === 'admin');
-  const canSeeNotifications = canManageInventory || canManageOS;
+  // Todos recebem avisos; o servidor filtra por setor e unidade.
+  const canSeeNotifications = true;
+
+  /** Abre a OS da moto do aviso (aba "OS de motos") e marca o aviso como lido. */
+  const openMotoOSRef = useRef<(n: Notification) => void>(() => {});
+  openMotoOSRef.current = (n: Notification) => {
+    if (!n.refId) return;
+    try { sessionStorage.setItem('munago_open_moto_os', n.refId); } catch { /* armazenamento indisponível */ }
+    setActiveTab('checkin');
+    window.dispatchEvent(new CustomEvent('open-moto-os', { detail: n.refId }));
+    if (!n.read) apiPatch(`/notifications/${n.id}/read`, {}).catch(() => {});
+  };
 
   // Carrega tudo após aprovação e recarrega cada recurso quando o servidor avisa (SSE).
   useEffect(() => {
@@ -554,6 +611,7 @@ export const AppProvider = ({ children }: { children: any }) => {
       transactions: async () => setTransactions((await apiGet<Transaction[]>('/transactions')).map(hydrateDates)),
       categories: async () => setCategories((await apiGet<Category[]>('/categories')).map(hydrateDates)),
       services: async () => setServices(await apiGet<Service[]>('/services')),
+      units: async () => setUnits(await apiGet<Unit[]>('/units')),
       serviceOrders: async () => setServiceOrders((await apiGet<ServiceOrder[]>('/service-orders')).map(hydrateDates)),
       settings: async () => {
         const s = await apiGet<SystemSettings & { lastBackup?: string }>('/settings');
@@ -566,6 +624,14 @@ export const AppProvider = ({ children }: { children: any }) => {
         const previous = unreadIdsRef.current;
         if (previous && [...unread].some(id => !previous.has(id))) {
           playLowStockAlertIfEnabled(soundEnabledRef.current);
+          // OS de moto que chegou no meu setor: aviso na tela (e do sistema, se a aba estiver em segundo plano)
+          list.filter(n => n.type === 'moto_os' && !n.read && !previous.has(n.id)).forEach(n => {
+            toast(n.title, { description: n.message, duration: 12_000, action: n.refId ? { label: 'Abrir', onClick: () => openMotoOSRef.current(n) } : undefined });
+            if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+              const sys = new Notification(n.title, { body: n.message, tag: n.id, icon: '/brand/icon-192.png' });
+              sys.onclick = () => { window.focus(); openMotoOSRef.current(n); sys.close(); };
+            }
+          });
         }
         unreadIdsRef.current = unread;
         setNotifications(list);
@@ -580,9 +646,10 @@ export const AppProvider = ({ children }: { children: any }) => {
       },
     };
 
-    for (const [name, load] of Object.entries(loaders)) {
-      if (name !== 'users' || canManageUsers) load().catch((e) => handleApiError(e));
-    }
+    const initial = Object.entries(loaders)
+      .filter(([name]) => name !== 'users' || canManageUsers)
+      .map(([, load]) => load().catch((e) => handleApiError(e)));
+    Promise.allSettled(initial).then(() => setDataLoaded(true));
     return subscribeChanges((resource) => {
       loaders[resource]?.().catch((e) => handleApiError(e));
     });
@@ -946,6 +1013,7 @@ export const AppProvider = ({ children }: { children: any }) => {
       allUsers,
       users: allUsers,
       loading,
+      dataReady: !isApproved || dataLoaded,
       isAdmin,
       isEditor,
       isViewer,
@@ -956,6 +1024,11 @@ export const AppProvider = ({ children }: { children: any }) => {
       canPerformTransactions,
       canViewInventory,
       canViewOS,
+      canCheckin,
+      canApproveOS,
+      allUnits,
+      units,
+      openMotoOS: (n: Notification) => openMotoOSRef.current(n),
       loginEmail,
       completeNewPassword,
       handleLogout,

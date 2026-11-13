@@ -137,7 +137,7 @@ export const AdminPanel = () => {
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Atualizar
           </button>
         }
-        statsClassName="grid-cols-2 xl:grid-cols-4"
+        statsClassName="grid-cols-2 @3xl:grid-cols-4"
       >
         {data && (<>
           <HeroStat icon={Building2} iconClass="bg-blue-500" label="Oficinas" value={data.totals.workspaces} hint="cadastradas no sistema" />
@@ -154,7 +154,7 @@ export const AdminPanel = () => {
         </div>
       ) : data && (
         <>
-          <SignupQueue mode="super" workspaces={data.workspaces.map(w => ({ id: w.id, name: w.name }))} onDone={load} />
+          <SignupQueue workspaces={data.workspaces.map(w => ({ id: w.id, name: w.name }))} onDone={load} />
 
           <div className="relative max-w-sm">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden="true" />

@@ -31,4 +31,4 @@ export const AUTH_PANEL_GRID: React.CSSProperties = {
 };
 
 /** Personagem 3D da oficina usado no painel azul. */
-export const AUTH_CHARACTER_URL = 'https://cdn3d.iconscout.com/3d/premium/thumb/man-standing-with-hand-on-waist-5691550-4741094.png';
+export const AUTH_CHARACTER_URL = '/brand/murillo-personagem.webp';

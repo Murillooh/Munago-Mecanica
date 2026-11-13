@@ -428,7 +428,7 @@ export const Inventory = () => {
             </button>
           )}
         </>}
-        statsClassName="grid-cols-2 xl:grid-cols-4"
+        statsClassName="grid-cols-2 @3xl:grid-cols-4"
       >
         <HeroStat icon={Package} iconClass="bg-blue-500" label="Total de SKUs" value={products.length} hint="itens cadastrados" />
         <HeroStat
@@ -541,35 +541,37 @@ export const Inventory = () => {
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
-                  className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+                  className="group flex flex-col overflow-hidden rounded-[1.25rem] bg-white shadow-sm ring-1 ring-zinc-200/70 transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-950/10 dark:bg-zinc-900 dark:ring-white/[0.06] dark:hover:shadow-black/40 dark:hover:ring-white/10"
                 >
-                  {/* Foto da peça (identificação rápida no balcão); sem foto, quem pode editar já cai no cadastro */}
-                  <div className="-mx-1 -mt-1 mb-3 flex aspect-[16/10] items-center justify-center overflow-hidden rounded-lg bg-zinc-50 ring-1 ring-inset ring-zinc-100 dark:bg-zinc-800/60 dark:ring-zinc-800">
+                  {/* Foto ocupando o topo (identificação rápida no balcão); SKU e ações flutuam sobre ela */}
+                  <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-zinc-100 to-zinc-50 dark:from-zinc-800/80 dark:to-zinc-900">
                     {p.imageUrl ? (
-                      <img src={p.imageUrl} alt={p.name} loading="lazy" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={p.imageUrl} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" referrerPolicy="no-referrer" />
                     ) : canManageInventory ? (
                       <button
                         type="button"
                         onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
-                        className="flex h-full w-full flex-col items-center justify-center gap-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                        className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-zinc-400 transition-colors hover:text-blue-600 dark:hover:text-blue-400"
                         aria-label={`Adicionar foto de ${p.name}`}
                       >
-                        <Camera className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-sm dark:bg-white/5">
+                          <Camera className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+                        </span>
                         <span className="text-[11px] font-medium">Adicionar foto</span>
                       </button>
                     ) : (
-                      <ImageIcon className="h-6 w-6 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} aria-label="Sem foto" />
+                      <div className="flex h-full items-center justify-center">
+                        <ImageIcon className="h-6 w-6 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} aria-label="Sem foto" />
+                      </div>
                     )}
-                  </div>
-
-                  {/* SKU + ações */}
-                  <div className="flex h-6 items-center justify-between gap-2">
-                    <span className="truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">{p.sku || 'Sem SKU'}</span>
+                    <span className="pointer-events-none absolute left-2.5 top-2.5 max-w-[60%] truncate rounded-full bg-black/45 px-2 py-0.5 font-mono text-[10px] font-medium text-white backdrop-blur-md">
+                      {p.sku || 'Sem SKU'}
+                    </span>
                     {canManageInventory && (
-                      <div className="-mr-1.5 flex items-center transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                      <div className="absolute right-2 top-2 flex gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 [@media(hover:none)]:opacity-100">
                         <button
                           onClick={() => { setSelectedProduct(p); setIsModalOpen(true); }}
-                          className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md transition-colors hover:bg-black/70"
                           title="Editar peça"
                           aria-label={`Editar ${p.name}`}
                         >
@@ -577,7 +579,7 @@ export const Inventory = () => {
                         </button>
                         <button
                           onClick={() => setDeleteProductConfirm(p.id)}
-                          className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md transition-colors hover:bg-rose-600"
                           title="Excluir"
                           aria-label={`Excluir ${p.name}`}
                         >
@@ -587,63 +589,57 @@ export const Inventory = () => {
                     )}
                   </div>
 
-                  {/* Nome e categoria */}
-                  <div className="mt-1">
-                    <div className="min-w-0">
-                      <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 tracking-tight text-zinc-900 dark:text-white" title={p.name}>
-                        {p.name}
-                      </h3>
-                      <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${categoryTone(p.category, categoryOrder)}`} aria-hidden="true" />
-                        <span className="truncate" title={p.category || 'Sem categoria'}>{p.category || 'Sem categoria'}</span>
-                      </p>
-                    </div>
-                  </div>
+                  <div className="flex flex-1 flex-col p-4">
+                    {/* Nome e categoria */}
+                    <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 tracking-tight text-zinc-900 dark:text-white" title={p.name}>
+                      {p.name}
+                    </h3>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${categoryTone(p.category, categoryOrder)}`} aria-hidden="true" />
+                      <span className="truncate" title={p.category || 'Sem categoria'}>{p.category || 'Sem categoria'}</span>
+                    </p>
 
-                  {/* Saldo × mínimo e custo */}
-                  <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-                    <div className="flex items-end justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Saldo</p>
-                        <p className="mt-0.5 flex items-baseline gap-1.5">
-                          <span className={`text-xl font-semibold tabular-nums leading-none ${stock === 'ok' ? 'text-zinc-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>{p.quantity}</span>
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400">/ mín {minQty}</span>
-                        </p>
-                      </div>
-                      <div className="min-w-0 text-right">
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Custo médio</p>
-                        <p className="mt-0.5 truncate text-sm font-medium tabular-nums text-zinc-900 dark:text-zinc-100" title={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}</p>
-                      </div>
+                    {/* Saldo × mínimo e custo médio */}
+                    <div className="mt-4 flex items-end justify-between gap-2">
+                      <p className="flex items-baseline gap-1.5">
+                        <span className={`text-2xl font-bold tabular-nums leading-none ${stock === 'ok' ? 'text-zinc-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>{p.quantity}</span>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">un · mín {minQty}</span>
+                      </p>
+                      <span className="truncate rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-zinc-700 dark:bg-white/5 dark:text-zinc-200" title={`Custo médio ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}`}>
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price || 0)}
+                      </span>
                     </div>
-                    <div className="mt-2 flex h-5 items-center gap-2">
-                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800" role="img" aria-label={`Saldo ${p.quantity} de mínimo ${minQty}`}>
-                        <div className={`h-full rounded-full ${stock === 'ok' ? 'bg-blue-600 dark:bg-blue-500' : 'bg-rose-500'}`} style={{ width: `${coverage}%` }} />
+                    <div className="mt-2.5 flex h-5 items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-white/5" role="img" aria-label={`Saldo ${p.quantity} de mínimo ${minQty}`}>
+                        <div className={`h-full rounded-full ${stock === 'ok' ? 'bg-gradient-to-r from-blue-600 to-blue-400' : 'bg-gradient-to-r from-rose-600 to-rose-400'}`} style={{ width: `${coverage}%` }} />
                       </div>
                       {stock !== 'ok' && (
-                        <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${stock === 'out' ? 'bg-rose-600 text-white ring-rose-600' : 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30'}`}>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${stock === 'out' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'}`}>
                           {stock === 'out' ? 'Zerado' : 'Baixo'}
                         </span>
                       )}
                     </div>
-                  </div>
 
-                  {/* Entrada e saída */}
-                  {canPerformTransactions && (
-                    <div className="mt-auto grid grid-cols-2 gap-2 pt-4">
-                      <button
-                        onClick={() => { setSelectedProduct(p); setMovementType('in'); setIsMovementModalOpen(true); }}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                      >
-                        <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" /> Entrar
-                      </button>
-                      <button
-                        onClick={() => { setSelectedProduct(p); setMovementType('out'); setIsMovementModalOpen(true); }}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                      >
-                        <ArrowUpRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" aria-hidden="true" /> Sair
-                      </button>
-                    </div>
-                  )}
+                    {/* Entrada e saída: uma barra única em pílula */}
+                    {canPerformTransactions && (
+                      <div className="mt-auto pt-4">
+                        <div className="flex overflow-hidden rounded-full bg-zinc-100 p-0.5 dark:bg-white/5">
+                          <button
+                            onClick={() => { setSelectedProduct(p); setMovementType('in'); setIsMovementModalOpen(true); }}
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-white hover:text-emerald-700 hover:shadow-sm active:scale-[0.97] dark:text-zinc-200 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-300"
+                          >
+                            <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" /> Entrar
+                          </button>
+                          <button
+                            onClick={() => { setSelectedProduct(p); setMovementType('out'); setIsMovementModalOpen(true); }}
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-white hover:text-rose-700 hover:shadow-sm active:scale-[0.97] dark:text-zinc-200 dark:hover:bg-rose-500/15 dark:hover:text-rose-300"
+                          >
+                            <ArrowUpRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" aria-hidden="true" /> Sair
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
               );
             })}
@@ -1204,7 +1200,7 @@ export const Inventory = () => {
                           <button
                             type="button"
                             onClick={() => setFormImageUrl('')}
-                            className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 transition-opacity"
                             title="Remover imagem"
                           >
                             <X size={14} />

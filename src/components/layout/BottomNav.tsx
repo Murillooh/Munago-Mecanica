@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  LayoutDashboard, 
-  Package, 
-  FileText,
-  Wrench,
-  History, 
-  Bell, 
-  User, 
-  Settings, 
+  BarChart3, 
+  Boxes, 
+  ClipboardList,
+  ClipboardCheck,
+  Hammer,
+  ArrowLeftRight, 
+  BellDot, 
+  UsersRound, 
+  SlidersHorizontal, 
   LogOut, 
-  Menu,
-  Sparkles,
-  ShieldCheck
+  MoreHorizontal,
+  BrainCircuit,
+  ShieldHalf,
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -27,111 +30,226 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
     notifications,
     handleLogout,
     isViewer,
-    isSuperAdmin
+    isSuperAdmin,
+    profile,
+    canCheckin,
+    canManageOS,
+    canManageInventory,
+    canApproveOS
   } = useApp();
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const items = [
-    ...(canViewReports ? [{ id: 'dashboard', label: 'Início', icon: LayoutDashboard }] : []),
-    ...(canViewInventory ? [{ id: 'inventory', label: 'Estoque', icon: Package }] : []),
-    ...(canViewOS ? [{ id: 'os', label: 'OS', icon: FileText }] : []),
-    ...(!isViewer ? [{ id: 'ai', label: 'IA', icon: Sparkles }] : []),
-    ...(isAdmin || canManageUsers ? [{ id: 'more', label: 'Menu', icon: Menu }] : []),
+    ...(canViewReports    ? [{ id: 'dashboard', label: 'Início',   icon: BarChart3    }] : []),
+    ...(canViewInventory  ? [{ id: 'inventory', label: 'Estoque',  icon: Boxes        }] : []),
+    ...(canViewOS         ? [{ id: 'os',        label: 'OS',       icon: ClipboardList}] : []),
+    ...(!isViewer         ? [{ id: 'ai',        label: 'IA',       icon: BrainCircuit }] : []),
+    ...(isAdmin || canManageUsers || canViewOS ? [{ id: 'more', label: 'Mais', icon: MoreHorizontal }] : []),
   ];
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const moreItems = [
-    ...(canViewOS ? [{ id: 'services', label: 'Serviços', icon: Wrench }] : []),
-    ...(canPerformTransactions ? [{ id: 'transactions', label: 'Movimentações', icon: History }] : []),
-    ...(isAdmin ? [{ id: 'alerts', label: 'Alertas', icon: Bell, count: unreadCount }] : []),
-    ...(canManageUsers ? [{ id: 'users', label: 'Usuários', icon: User }] : []),
-    ...(isAdmin ? [{ id: 'settings', label: 'Ajustes', icon: Settings }] : []),
-    ...(isSuperAdmin ? [{ id: 'admin', label: 'Painel geral', icon: ShieldCheck }] : []),
-    { id: 'logout', label: 'Sair', icon: LogOut, color: 'text-red-500' }
-  ];
+  /** Seções do drawer "Mais" — lista vertical estilo iOS Settings */
+  const moreGroups = [
+    {
+      label: 'Operação',
+      items: [
+        ...(canCheckin || canManageOS || canApproveOS || canManageInventory || canViewReports ? [{ id: 'checkin',      label: 'OS de motos', icon: ClipboardCheck, gradient: 'from-blue-500 to-indigo-600'    }] : []),
+        ...(canViewOS           ? [{ id: 'services',     label: 'Serviços',        icon: Hammer,           gradient: 'from-green-500 to-emerald-600'  }] : []),
+        ...(canPerformTransactions ? [{ id: 'transactions', label: 'Movimentações',   icon: ArrowLeftRight,   gradient: 'from-purple-500 to-violet-600'  }] : []),
+      ],
+    },
+    {
+      label: 'Gestão',
+      items: [
+        { id: 'alerts',   label: 'Alertas',         icon: BellDot,        gradient: 'from-yellow-400 to-amber-500',  badge: unreadCount },
+        ...(canManageUsers   ? [{ id: 'users',    label: 'Equipe e acessos',icon: UsersRound,     gradient: 'from-teal-500 to-cyan-600'      }] : []),
+        ...(isSuperAdmin     ? [{ id: 'admin',    label: 'Painel geral',    icon: ShieldHalf,     gradient: 'from-slate-600 to-slate-700'    }] : []),
+        ...(isAdmin          ? [{ id: 'settings', label: 'Configurações',   icon: SlidersHorizontal, gradient: 'from-zinc-500 to-zinc-600'  }] : []),
+      ],
+    },
+  ].filter(g => g.items.length > 0);
+
+  const iconColors: Record<string, string> = {
+    dashboard:    'from-blue-500 to-blue-600',
+    inventory:    'from-orange-400 to-orange-500',
+    os:           'from-red-500 to-rose-600',
+    ai:           'from-pink-500 to-fuchsia-600',
+    more:         'from-zinc-400 to-zinc-500',
+  };
+
+  // Iniciais do usuário para o avatar no drawer
+  const nameParts = (profile?.name || 'U').trim().split(/\s+/);
+  const initials = (nameParts[0][0] + (nameParts.length > 1 ? nameParts[nameParts.length - 1][0] : '')).toUpperCase();
 
   return (
     <>
-      {/* pb com a área segura: no iPhone o menu fica acima da barra de gestos. */}
-      <nav aria-label="Navegação" className="lg:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="bg-white/60 dark:bg-zinc-900/55 backdrop-blur-2xl backdrop-saturate-[1.8] border border-white/70 dark:border-white/10 rounded-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.12)] flex items-center justify-around h-[4.25rem] px-1.5 relative">
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-current={activeTab === item.id ? 'page' : undefined}
-              onClick={() => item.id === 'more' ? setIsMenuOpen(true) : setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center gap-1 min-w-[3.5rem] flex-1 max-w-[4.5rem] h-14 rounded-2xl transition-all relative ${
-                activeTab === item.id 
-                ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' 
-                : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
-              }`}
-            >
-              <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} aria-hidden="true" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">{item.label}</span>
-              {activeTab === item.id && (
-                <motion.div
-                  layoutId="bottomTab"
-                  className="absolute -bottom-1 w-1 h-1 bg-blue-600 rounded-full"
-                />
-              )}
-            </button>
-          ))}
+      {/* ── Barra inferior ── */}
+      <nav
+        aria-label="Navegação"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      >
+        <div className="
+          bg-white/75 dark:bg-zinc-900/80
+          backdrop-blur-2xl backdrop-saturate-[1.8]
+          border border-white/60 dark:border-white/8
+          rounded-[1.75rem]
+          shadow-[0_-2px_32px_rgba(0,0,0,0.10)]
+          flex items-center justify-around
+          h-16 px-1
+        ">
+          {items.map((item) => {
+            const active = activeTab === item.id && item.id !== 'more';
+            const gradient = iconColors[item.id] ?? 'from-zinc-500 to-zinc-600';
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-current={active ? 'page' : undefined}
+                onClick={() => item.id === 'more' ? setIsMenuOpen(true) : setActiveTab(item.id)}
+                className="relative flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-[1.5rem] transition-all duration-200 active:scale-90"
+              >
+                {/* Pill de fundo no item ativo */}
+                {active && (
+                  <motion.span
+                    layoutId="bottomNavPill"
+                    className="absolute inset-x-1 inset-y-1.5 rounded-[1.25rem] bg-zinc-100 dark:bg-white/10"
+                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                  />
+                )}
+
+                {/* Ícone iOS */}
+                <span className={`
+                  relative flex items-center justify-center
+                  w-10 h-10 rounded-[14px]
+                  bg-gradient-to-br ${gradient}
+                  transition-all duration-200
+                  ${active ? 'shadow-lg scale-110' : 'shadow-sm opacity-80'}
+                `}>
+                  <item.icon size={19} strokeWidth={2} className="text-white" aria-hidden="true" />
+                  {/* Badge "Mais" se houver alertas */}
+                  {item.id === 'more' && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] bg-red-500 text-white text-[9px] font-black flex items-center justify-center rounded-full px-0.5 border-2 border-white dark:border-zinc-900">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </span>
+
+                <span className={`
+                  relative text-[9px] font-bold uppercase tracking-wider
+                  transition-colors duration-200
+                  ${active ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-500'}
+                `}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </nav>
 
+      {/* ── Drawer "Mais" ── */}
       <AnimatePresence>
         {isMenuOpen && (
           <div className="fixed inset-0 z-[100] lg:hidden">
-            <motion.div 
+            {/* Overlay */}
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               onClick={() => setIsMenuOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             />
-            <motion.div 
+
+            {/* Sheet */}
+            <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] rounded-t-[2rem] shadow-2xl max-h-[85dvh] overflow-y-auto"
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="absolute bottom-0 left-0 right-0 bg-[#f2f2f7] dark:bg-zinc-950 rounded-t-[2rem] shadow-2xl max-h-[88dvh] overflow-y-auto pb-[max(1.5rem,env(safe-area-inset-bottom))]"
             >
-              <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto mb-8" />
-              <h3 className="text-xl font-black text-zinc-900 dark:text-white mb-6 uppercase tracking-tight">Mais Opções</h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                {moreItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      if (item.id === 'logout') handleLogout();
-                      else setActiveTab(item.id);
-                      setIsMenuOpen(false);
-                    }}
-                    className={`flex flex-col items-start gap-3 p-5 bg-zinc-50 dark:bg-zinc-800/50 rounded-[2rem] border border-zinc-100 dark:border-zinc-700 transition-all active:scale-95 ${item.color || 'text-zinc-700 dark:text-zinc-300'}`}
-                  >
-                    <div className={`p-3 rounded-2xl ${item.color ? 'bg-red-100 dark:bg-red-900/20' : 'bg-white dark:bg-zinc-800'} shadow-sm relative`}>
-                      <item.icon size={20} />
-                      {item.count ? (
-                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-black flex items-center justify-center rounded-full border-2 border-zinc-50 dark:border-zinc-800">
-                          {item.count}
-                        </span>
-                      ) : null}
+              {/* Handle + cabeçalho */}
+              <div className="sticky top-0 bg-[#f2f2f7]/95 dark:bg-zinc-950/95 backdrop-blur-md pt-3 pb-4 px-5 border-b border-zinc-200/60 dark:border-zinc-800/60 z-10">
+                <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mb-4" />
+                <div className="flex items-center justify-between">
+                  {/* Avatar + nome */}
+                  <div className="flex items-center gap-3">
+                    {profile?.photoURL ? (
+                      <img src={profile.photoURL} alt="" className="w-9 h-9 rounded-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">{initials}</span>
+                    )}
+                    <div className="leading-tight">
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-white">{profile?.name || 'Usuário'}</p>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{profile?.email}</p>
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+                  </div>
+                  <button
+                    onClick={() => setIsMenuOpen(false)}
+                    className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 active:scale-90 transition-transform"
+                  >
+                    <X size={16} />
                   </button>
-                ))}
+                </div>
               </div>
-              
-              <button 
-                onClick={() => setIsMenuOpen(false)}
-                className="w-full mt-8 py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all active:scale-95"
-              >
-                Fechar Menu
-              </button>
+
+              {/* Grupos — estilo iOS Settings */}
+              <div className="px-4 pt-5 space-y-5">
+                {moreGroups.map((group) => (
+                  <div key={group.label}>
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 px-1 mb-2">
+                      {group.label}
+                    </p>
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800 shadow-sm">
+                      {group.items.map((item, i) => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setActiveTab(item.id);
+                            setIsMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 active:bg-zinc-100 dark:active:bg-zinc-800"
+                        >
+                          {/* Ícone iOS */}
+                          <span className={`flex items-center justify-center w-9 h-9 rounded-[10px] bg-gradient-to-br ${item.gradient} shadow-sm shrink-0`}>
+                            <item.icon size={17} strokeWidth={2} className="text-white" />
+                          </span>
+
+                          <span className="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200">{item.label}</span>
+
+                          {/* Badge */}
+                          {'badge' in item && item.badge && item.badge > 0 && (
+                            <span className="min-w-[1.4rem] h-5 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full px-1 mr-0.5">
+                              {item.badge > 99 ? '99+' : item.badge}
+                            </span>
+                          )}
+
+                          <ChevronRight size={16} className="text-zinc-300 dark:text-zinc-600 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Sair */}
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden shadow-sm">
+                  <button
+                    onClick={() => { handleLogout(); setIsMenuOpen(false); }}
+                    className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 active:bg-red-50 dark:active:bg-red-950/20"
+                  >
+                    <span className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-gradient-to-br from-red-500 to-rose-600 shadow-sm shrink-0">
+                      <LogOut size={17} strokeWidth={2} className="text-white" />
+                    </span>
+                    <span className="flex-1 text-sm font-medium text-red-500">Sair da conta</span>
+                  </button>
+                </div>
+
+                {/* Espaço extra para o scroll */}
+                <div className="h-2" />
+              </div>
             </motion.div>
           </div>
         )}

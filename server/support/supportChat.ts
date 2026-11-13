@@ -69,9 +69,9 @@ Sistema web de gestão para oficinas de motos: almoxarifado (estoque de peças),
 - Sair: no computador, ícone ao lado do nome no rodapé do menu; no celular, Menu > Sair.
 
 ## Monitoramento (tela inicial)
-- Cartões de patrimônio em estoque, faturamento dos últimos 30 dias, disponibilidade e risco de ruptura (peças no mínimo ou abaixo).
+- Cartões "Valor em estoque", "Faturado em 30 dias", "Peças com estoque ok" e "Peças acabando" (peças no mínimo ou abaixo).
 - Gráfico de tendência de entradas e saídas, pátio das ordens de serviço, faturamento das OS, peças mais consumidas, valor por categoria, cobertura de estoque, repasses do mês e auditoria recente.
-- Botões: "Relatório PDF", "Diagnóstico Executivo" (análise da IA) e "Nova OS".
+- Botões: "Relatório PDF", "Resumo da IA" (análise do estoque feita pela IA) e "Nova OS".
 - Modo Monitor: botão de tela cheia no rodapé do menu (computador). Mostra o painel sem menu, ideal para TV na oficina, e pode passar sozinho de uma seção para outra (ajuste em Configurações). Tecla Esc sai do modo.
 
 ## Almoxarifado (estoque de peças)

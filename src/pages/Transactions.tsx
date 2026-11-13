@@ -21,7 +21,8 @@ const dayLabel = (d: Date) => {
   yesterday.setDate(today.getDate() - 1);
   if (d.toDateString() === today.toDateString()) return 'Hoje';
   if (d.toDateString() === yesterday.toDateString()) return 'Ontem';
-  return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  const s = d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  return s.charAt(0).toUpperCase() + s.slice(1); // "Sáb., 14 de nov. de 2026" (só a 1ª letra)
 };
 
 const fmtQty = (n: number) => n.toLocaleString('pt-BR');
@@ -31,6 +32,7 @@ const th = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zi
 const td = 'px-3 py-1.5 border-b border-r last:border-r-0 border-zinc-100 dark:border-zinc-800/70';
 
 export const Transactions = () => {
+  const [headH, setHeadH] = useState(33);
   const { transactions, settings } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'in' | 'out'>('all');
@@ -238,8 +240,8 @@ export const Transactions = () => {
           <div className="md:hidden">
             {groups.map(g => (
               <section key={g.key} aria-label={g.label}>
-                <h3 className="sticky top-0 z-[5] flex items-center justify-between gap-3 px-3 py-1.5 bg-zinc-100/95 dark:bg-zinc-800/95 backdrop-blur-sm border-y border-zinc-200 dark:border-zinc-700 text-xs">
-                  <span className="font-semibold text-zinc-800 dark:text-zinc-100 capitalize">{g.label}</span>
+                <h3 className="sticky top-0 z-[5] flex items-center justify-between gap-3 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 border-y border-zinc-200 dark:border-zinc-700 text-xs">
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-100">{g.label}</span>
                   <span className="flex items-center gap-2 text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400">
                     {g.inQty > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{fmtQty(g.inQty)}</span>}
                     {g.outQty > 0 && <span className="text-red-600 dark:text-red-400">-{fmtQty(g.outQty)}</span>}
@@ -277,7 +279,8 @@ export const Transactions = () => {
 
           <div className="hidden md:block flex-1 min-h-0 overflow-auto max-h-[70dvh] lg:max-h-none">
             <table className="w-full min-w-[760px] text-xs border-separate border-spacing-0">
-              <thead className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900">
+              {/* A faixa do dia gruda logo abaixo do cabeçalho: mede a altura real (muda com fonte/zoom) */}
+              <thead ref={el => { if (el) setHeadH(el.offsetHeight); }} className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900">
                 <tr className="text-left">
                   <th scope="col" className={`${th} w-12 text-right`}>#</th>
                   <th scope="col" className={`${th} w-16`}>Hora</th>
@@ -296,10 +299,11 @@ export const Transactions = () => {
                       <th
                         scope="rowgroup"
                         colSpan={7}
-                        className="sticky top-[33px] z-[5] px-3 py-1.5 text-left bg-zinc-100/95 dark:bg-zinc-800/95 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-700"
+                        style={{ top: headH }}
+                        className="sticky z-[5] px-3 py-1.5 text-left bg-zinc-100 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700"
                       >
                         <div className="flex items-center justify-between gap-4">
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-100 capitalize">{g.label}</span>
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-100">{g.label}</span>
                           <span className="flex items-center gap-3 text-[11px] font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
                             <span>{g.rows.length} {g.rows.length === 1 ? 'registro' : 'registros'}</span>
                             {g.inQty > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{fmtQty(g.inQty)} un</span>}

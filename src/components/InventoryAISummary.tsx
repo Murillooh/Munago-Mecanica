@@ -463,8 +463,8 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                   </div>
 
                   {/* Products list with computed status */}
-                  <div className="overflow-hidden border border-zinc-100 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-950/20">
-                    <table className="w-full text-left border-collapse">
+                  <div className="overflow-x-auto border border-zinc-100 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-950/20">
+                    <table className="w-full min-w-[560px] text-left border-collapse">
                       <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900/30 text-[9px] uppercase tracking-widest font-black text-zinc-400 border-b border-zinc-100 dark:border-zinc-800">
                           <th className="py-4 px-6">Produto</th>

@@ -14,7 +14,7 @@ export interface ChargeInput {
 
 export interface PaymentGateway {
   createCharge(input: ChargeInput): Promise<{ id: string; invoiceUrl: string }>;
-  getCharge(id: string): Promise<{ status: string }>;
+  getCharge(id: string): Promise<{ status: string; value: number }>;
   getPixQrCode(id: string): Promise<{ payload: string; encodedImage: string } | null>;
 }
 
@@ -61,8 +61,8 @@ export function createAsaasGateway(apiKey: string, env: string): PaymentGateway 
       return { id: payment.id, invoiceUrl: payment.invoiceUrl };
     },
     async getCharge(id) {
-      const p = await call<{ status: string }>('GET', `/payments/${encodeURIComponent(id)}`);
-      return { status: p.status };
+      const p = await call<{ status: string; value: number }>('GET', `/payments/${encodeURIComponent(id)}`);
+      return { status: p.status, value: p.value };
     },
     async getPixQrCode(id) {
       try {

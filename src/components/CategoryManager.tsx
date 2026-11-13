@@ -177,7 +177,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={(e) => { e.stopPropagation(); setDeleteConfirm(cat); }}
                     className={`p-1.5 rounded-lg transition-colors ${
@@ -273,7 +273,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                           <button 
                             type="button" 
                             onClick={() => setImageUrl('')}
-                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 transition-opacity"
                           >
                             <X size={12} />
                           </button>

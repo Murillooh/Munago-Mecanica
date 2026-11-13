@@ -43,7 +43,7 @@ const ACCENT_COLORS = [
 ];
 
 // Campos de texto que só são gravados ao clicar em "Salvar"
-const FORM_KEYS = ['storeName', 'contactPhone', 'contactEmail', 'address', 'asaasWalletId'] as const;
+const FORM_KEYS = ['storeName', 'contactPhone', 'contactEmail', 'address', 'asaasWalletId', 'repasseMinPercent'] as const;
 
 const fieldClass =
   'w-full rounded-lg border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50 dark:bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none transition-colors focus:border-blue-600 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-blue-600/20';
@@ -104,7 +104,8 @@ export const SettingsView = () => {
     setThemePreference,
     playLowStockAlertSound,
     handleBackupToDrive,
-    handleRestoreFromDrive
+    handleRestoreFromDrive,
+    isSuperAdmin,
   } = useApp();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -367,23 +368,48 @@ export const SettingsView = () => {
         </Section>
 
         {/* Financeiro */}
-        <Section id="sec-finance" icon={Percent} title="Recebimentos" description="Para onde vai a parte da mecânica nas cobranças. O repasse para a empresa é definido em cada serviço, na tela Serviços.">
+        <Section id="sec-finance" icon={Percent} title="Recebimentos" description="Para onde vai a parte da mecânica nas cobranças. Carteira e repasse são definidos pela administração da Munago.">
           <div className="px-4 py-3 space-y-1">
             <label htmlFor="asaas-wallet" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Carteira Asaas da mecânica</label>
             <input
               id="asaas-wallet"
               value={form.asaasWalletId || ''}
               onChange={e => setForm({ ...form, asaasWalletId: e.target.value.trim() })}
+              readOnly={!isSuperAdmin}
+              aria-describedby="asaas-wallet-hint"
               maxLength={100}
               spellCheck={false}
               autoComplete="off"
-              placeholder="ex.: 0a1b2c3d-..."
-              className={`${fieldClass} max-w-md font-mono`}
+              placeholder={isSuperAdmin ? 'ex.: 0a1b2c3d-...' : 'Não configurada'}
+              className={`${fieldClass} max-w-md font-mono read-only:cursor-not-allowed read-only:opacity-70`}
             />
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Identificador da carteira (walletId) da conta Asaas no CNPJ da mecânica. Nas cobranças, a parte da oficina cai direto nela.
+            <p id="asaas-wallet-hint" className="text-xs text-zinc-500 dark:text-zinc-400">
+              {isSuperAdmin
+                ? 'Identificador da carteira (walletId) da conta Asaas no CNPJ da mecânica. Nas cobranças, a parte da oficina cai direto nela.'
+                : 'Por segurança, só a administração da Munago altera a carteira. Para trocar, fale com o suporte.'}
             </p>
           </div>
+          {isSuperAdmin && (
+            <div className="px-4 py-3 space-y-1">
+              <label htmlFor="repasse-min" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Repasse mínimo para a empresa (% do total da OS)</label>
+              <input
+                id="repasse-min"
+                type="number"
+                min={0}
+                max={100}
+                step="0.1"
+                inputMode="decimal"
+                value={form.repasseMinPercent ?? ''}
+                onChange={e => setForm({ ...form, repasseMinPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
+                aria-describedby="repasse-min-hint"
+                placeholder="0"
+                className={`${fieldClass} max-w-[8rem] font-mono`}
+              />
+              <p id="repasse-min-hint" className="text-xs text-zinc-500 dark:text-zinc-400">
+                Toda OS repassa pelo menos esse percentual, mesmo se for lançada só como mão de obra. Vale o maior entre ele e o repasse dos serviços.
+              </p>
+            </div>
+          )}
         </Section>
 
         {/* Alertas e monitor */}

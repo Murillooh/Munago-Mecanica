@@ -17,9 +17,14 @@ import {
   Package,
   Truck,
   TrendingUp,
-  FileText
+  FileText,
+  Mic,
+  Square
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Ditado por voz do navegador (Chrome, Edge, Safari). Firefox não tem: o botão some.
+const SpeechRec: any = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
 interface Message {
   role: 'user' | 'assistant';
@@ -170,6 +175,28 @@ const AIAssistant = () => {
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<any>(null);
+  useEffect(() => () => recRef.current?.abort(), []);
+
+  /** Fala vira texto no campo e, ao terminar de falar, já envia (como áudio no WhatsApp). */
+  const toggleMic = () => {
+    if (recRef.current) { recRef.current.stop(); return; }
+    const rec = new SpeechRec();
+    rec.lang = 'pt-BR';
+    rec.interimResults = true;
+    let text = '';
+    rec.onresult = (e: any) => { text = Array.from(e.results, (res: any) => res[0].transcript).join(''); setInput(text); };
+    rec.onerror = (e: any) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast.error('Permita o microfone no navegador para mandar áudio.');
+      else if (e.error !== 'no-speech' && e.error !== 'aborted') toast.error('Não consegui ouvir. Tente de novo.');
+    };
+    rec.onend = () => { recRef.current = null; setListening(false); if (text.trim()) void sendRef.current(text); };
+    recRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
+
   const send = async (text?: string) => {
     const userQuery = (text ?? input).trim();
     if (!userQuery || isLoading) return;
@@ -292,6 +319,8 @@ const AIAssistant = () => {
       setIsLoading(false);
     }
   };
+  const sendRef = useRef(send);
+  sendRef.current = send;
 
   const openHistory = (item: SavedSearch) => {
     setMessages([
@@ -391,7 +420,7 @@ const AIAssistant = () => {
                       type="button"
                       onClick={() => setDeleteConfirmId(item.id)}
                       aria-label={`Excluir conversa: ${item.query}`}
-                      className="mt-1.5 mr-1 p-1 rounded-md text-zinc-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition cursor-pointer"
+                      className="mt-1.5 mr-1 p-1 rounded-md text-zinc-400 opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition cursor-pointer"
                     >
                       <Trash2 size={13} aria-hidden="true" />
                     </button>
@@ -502,9 +531,22 @@ const AIAssistant = () => {
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
                 }}
-                placeholder="Pergunte sobre preços, fornecedores ou seu estoque…"
+                placeholder={listening ? 'Ouvindo… fale sua pergunta' : 'Pergunte sobre preços, fornecedores ou seu estoque…'}
                 className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none"
               />
+              {SpeechRec && (
+                <button
+                  type="button"
+                  onClick={toggleMic}
+                  disabled={isLoading}
+                  aria-label={listening ? 'Parar e enviar áudio' : 'Mandar áudio'}
+                  aria-pressed={listening}
+                  title={listening ? 'Parar e enviar' : 'Mandar áudio'}
+                  className={`shrink-0 p-2 rounded-lg transition-colors disabled:opacity-40 cursor-pointer ${listening ? 'bg-rose-600 text-white motion-safe:animate-pulse' : 'text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >
+                  {listening ? <Square size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}

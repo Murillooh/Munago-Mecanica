@@ -1,3 +1,4 @@
+import type { MotoEvent, MotoItem, MotoStatus } from '../services/motoFlow';
 import {
   pgTable, text, integer, numeric, boolean, timestamp, jsonb, index, uniqueIndex, pgEnum,
 } from 'drizzle-orm/pg-core';
@@ -19,6 +20,12 @@ export interface Permissions {
   canManageUsers: boolean;
   canViewReports: boolean;
   canPerformTransactions: boolean;
+  /** Registra a chegada da moto (check-list). */
+  canCheckin: boolean;
+  /** Aprova/recusa OS (CS). */
+  canApproveOS: boolean;
+  /** Enxerga todas as unidades (senão, só a própria). */
+  allUnits: boolean;
 }
 
 /** Oficina (tenant). Todo dado operacional pertence a uma; usuários enxergam só a sua. */
@@ -36,6 +43,19 @@ export const UNASSIGNED_WORKSPACE = 'unassigned';
 
 const workspaceId = () => text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' });
 
+/** Unidade da oficina: Base (atende as motos) ou CD (centro de distribuição de peças). */
+export const units = pgTable('units', {
+  id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
+  name: text('name').notNull(),
+  kind: text('kind').$type<'base' | 'cd'>().notNull().default('base'),
+  /** Franqueado da unidade: quem autoriza as manutenções (e-mail / WhatsApp). */
+  franchiseeName: text('franchisee_name'),
+  franchiseeEmail: text('franchisee_email'),
+  franchiseePhone: text('franchisee_phone'),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('units_workspace_name_uq').on(t.workspaceId, t.name)]);
+
 export const users = pgTable('users', {
   id: text('id').primaryKey(), // Cognito sub (ou UID Firebase antes do primeiro login pós-migração)
   workspaceId: workspaceId(),
@@ -43,7 +63,11 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   role: roleEnum('role').notNull().default('viewer'),
   status: userStatusEnum('status').notNull().default('pending'),
-  permissions: jsonb('permissions').$type<Permissions>(),
+  /** Permissões personalizadas por cima do perfil/cargo (pode faltar chave). */
+  permissions: jsonb('permissions').$type<Partial<Permissions>>(),
+  /** Perfil de acesso (server/auth/profiles.ts); nulo = usuário antigo, vale o cargo. */
+  profile: text('profile'),
+  unitId: text('unit_id').references(() => units.id, { onDelete: 'set null' }),
   photoUrl: text('photo_url'),
   legacyFirebaseUid: text('legacy_firebase_uid'),
   createdAt: createdAt(),
@@ -108,6 +132,7 @@ export interface ServiceOrderItem {
 }
 
 export type RepasseType = 'fixed' | 'percent';
+export type MaintenanceType = 'corretiva' | 'preventiva';
 
 /** Serviço como entrou na OS: preço e repasse copiados do catálogo na hora (mudar o catálogo não altera a OS). */
 export interface ServiceOrderService {
@@ -149,6 +174,7 @@ export const serviceOrders = pgTable('service_orders', {
   totalPartsCost: money('total_parts_cost').notNull().default(0),
   totalAmount: money('total_amount').notNull().default(0),
   status: osStatusEnum('status').notNull().default('draft'),
+  maintenanceType: text('maintenance_type').$type<MaintenanceType>().notNull().default('corretiva'),
   scheduledDate: text('scheduled_date').notNull(),
   completionDate: text('completion_date'),
   observations: text('observations'),
@@ -168,6 +194,51 @@ export const serviceOrders = pgTable('service_orders', {
   uniqueIndex('os_asaas_payment_uq').on(t.asaasPaymentId),
 ]);
 
+/** Fotos da entrada da moto (data URL JPEG comprimida no navegador). */
+export interface MotoCheckinPhotos {
+  front?: string;
+  back?: string;
+  left?: string;
+  right?: string;
+  /** Painel mostrando a quilometragem. */
+  odometer?: string;
+  /** Fotos extras (avarias, detalhes). */
+  extra?: string[];
+  /** Fotos que o mecânico tira ao finalizar a manutenção. */
+  final?: string[];
+  /** Comprovante da autorização do franqueado (print/PDF do e-mail de resposta). */
+  authProof?: { name: string; url: string };
+}
+
+/** Check-list de recebimento da moto: o que chegou e em que estado, antes de abrir a OS. */
+export const motoCheckins = pgTable('moto_checkins', {
+  id: text('id').primaryKey(),
+  workspaceId: workspaceId(),
+  plate: text('plate').notNull(),
+  model: text('model').notNull(),
+  /** Nome da unidade na hora do registro. */
+  unit: text('unit'),
+  unitId: text('unit_id').references(() => units.id, { onDelete: 'set null' }),
+  km: integer('km').notNull(),
+  photos: jsonb('photos').$type<MotoCheckinPhotos>().notNull().default({}),
+  notes: text('notes'),
+  /** Etapa do fluxo (server/services/motoFlow.ts). */
+  status: text('status').$type<MotoStatus>().notNull().default('recebida'),
+  /** O que o mecânico pediu (e o estoque conferiu). */
+  items: jsonb('items').$type<MotoItem[]>().notNull().default([]),
+  /** Linha do tempo: cada passo com quem fez e quando. */
+  events: jsonb('events').$type<MotoEvent[]>().notNull().default([]),
+  /** Tempo que o mecânico estimou para o serviço (o prazo do cronômetro). */
+  estimatedMinutes: integer('estimated_minutes'),
+  /** Cronômetro da manutenção. */
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  createdBy: text('created_by').notNull(),
+  createdByName: text('created_by_name').notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index('moto_checkins_workspace_idx').on(t.workspaceId, t.createdAt)]);
+
 export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),
   workspaceId: workspaceId(),
@@ -175,6 +246,12 @@ export const notifications = pgTable('notifications', {
   message: text('message').notNull(),
   productId: text('product_id'),
   type: text('type').notNull().default('low_stock'),
+  /** Aviso dirigido: só quem tem esta permissão (ex.: canApproveOS = CS) recebe. Nulo = quem cuida de estoque/OS. */
+  target: text('target'),
+  /** Unidade do aviso: quem é de uma unidade só recebe os dela. */
+  unitId: text('unit_id'),
+  /** OS da moto a que o aviso se refere (botão "Abrir"). */
+  refId: text('ref_id'),
   read: boolean('read').notNull().default(false),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { createHarness } from './test/apiHarness';
@@ -22,6 +22,126 @@ describe('API v1', () => {
     it('/me funciona para pendente e traz permissões efetivas', async () => {
       const res = await h.as('pending').get('/me').expect(200);
       expect(res.body).toMatchObject({ id: 'pending', status: 'pending', permissions: { canManageInventory: true } });
+    });
+  });
+
+  describe('moto-checkins', () => {
+    const img = 'data:image/jpeg;base64,/9j/AAAA';
+    const checkin = (over: object = {}) => ({
+      plate: 'abc1d23', model: 'Haojue DK 160', unit: 'Base Centro', km: 15230, notes: 'Risco no tanque',
+      photos: { front: img, back: img, left: img, right: img, odometer: img }, ...over,
+    });
+
+    it('mecânico registra; lista vem sem fotos e o item traz as fotos', async () => {
+      const res = await h.as('editor').post('/moto-checkins', checkin()).expect(201);
+      expect(res.body).toMatchObject({ plate: 'ABC1D23', km: 15230, createdByName: 'Editor' });
+      expect(res.body.photos).toBeUndefined();
+      expect(h.changes).toContain('motoCheckins');
+
+      const list = await h.as('viewer').get('/moto-checkins').expect(200);
+      expect(list.body).toHaveLength(1);
+      expect(list.body[0].photos).toBeUndefined();
+      expect((await h.as('viewer').get(`/moto-checkins/${res.body.id}`).expect(200)).body.photos.front).toBe(img);
+    });
+
+    it('exige as 5 fotos, recusa arquivo que não é imagem; viewer não registra; outra oficina não vê', async () => {
+      await h.as('editor').post('/moto-checkins', checkin({ photos: { front: img } })).expect(400);
+      await h.as('editor').post('/moto-checkins', checkin({ photos: { front: 'data:text/html;base64,PGI+', back: img, left: img, right: img, odometer: img } })).expect(400);
+      await h.as('viewer').post('/moto-checkins', checkin()).expect(403);
+      const { id } = (await h.as('editor').post('/moto-checkins', checkin())).body;
+      expect((await h.as('outsider').get('/moto-checkins')).body).toHaveLength(0);
+      await h.as('outsider').get(`/moto-checkins/${id}`).expect(404);
+    });
+  });
+
+  describe('perfis e unidades', () => {
+    const img = 'data:image/jpeg;base64,/9j/AAAA';
+    const checkin = { plate: 'XYZ9A88', model: 'Haojue DK 150', km: 900, photos: { front: img, back: img, left: img, right: img, odometer: img } };
+
+    it('perfil define permissões; cada um vê só o check-list da própria unidade', async () => {
+      const base = (await h.as('admin').post('/units', { name: 'Base Centro', kind: 'base' }).expect(201)).body;
+      const outra = (await h.as('admin').post('/units', { name: 'Base Norte', kind: 'base' }).expect(201)).body;
+      await h.as('admin').post('/units', { name: 'Base Centro', kind: 'base' }).expect(409);
+      await h.as('editor').post('/units', { name: 'X', kind: 'cd' }).expect(403);
+
+      const front = (await h.as('admin').patch('/users/editor', { profile: 'recepcao', unitId: base.id }).expect(200)).body;
+      expect(front).toMatchObject({ role: 'viewer', profile: 'recepcao', permissions: { canCheckin: true, canManageOS: false, allUnits: false } });
+      await h.as('admin').patch('/users/viewer', { profile: 'recepcao', unitId: outra.id }).expect(200);
+
+      // Front tenta registrar em outra unidade: vai para a dele mesmo assim
+      const c1 = (await h.as('editor').post('/moto-checkins', { ...checkin, unitId: outra.id }).expect(201)).body;
+      expect(c1).toMatchObject({ unitId: base.id, unit: 'Base Centro' });
+      await h.as('viewer').post('/moto-checkins', checkin).expect(201);
+
+      expect((await h.as('editor').get('/moto-checkins')).body).toHaveLength(1);
+      expect((await h.as('viewer').get('/moto-checkins')).body).toHaveLength(1);
+      expect((await h.as('admin').get('/moto-checkins')).body).toHaveLength(2);
+      await h.as('viewer').get(`/moto-checkins/${c1.id}`).expect(404);
+
+      // Mecânico não recebe moto (é o Front), mas vê as da unidade dele
+      const mec = (await h.as('admin').patch('/users/editor', { profile: 'mecanico' }).expect(200)).body;
+      expect(mec).toMatchObject({ role: 'editor', permissions: { canCheckin: false, canManageOS: true, canManageInventory: false } });
+      await h.as('editor').post('/moto-checkins', checkin).expect(403);
+      expect((await h.as('editor').get('/moto-checkins')).body).toHaveLength(1);
+
+      // Gestor só lê; mecânico não gerencia estoque; unidade de outra oficina é recusada
+      await h.as('admin').patch('/users/viewer', { profile: 'gestor' }).expect(200);
+      await h.as('viewer').post('/moto-checkins', checkin).expect(403);
+      expect((await h.as('viewer').get('/moto-checkins')).body).toHaveLength(2);
+      await h.as('editor').post('/products', { name: 'Peça', quantity: 1, minQuantity: 0 }).expect(403);
+      const alheia = (await h.as('outsider').post('/units', { name: 'Base Fora', kind: 'base' }).expect(201)).body;
+      await h.as('admin').patch('/users/editor', { unitId: alheia.id }).expect(400);
+    });
+
+    it('fluxo da OS da moto: front → mecânico → estoque → CS → manutenção com cronômetro', async () => {
+      const base = (await h.as('admin').post('/units', { name: 'Base A', kind: 'base' })).body;
+      await h.as('admin').patch('/users/editor', { profile: 'mecanico', unitId: base.id }).expect(200);
+      await h.as('admin').patch('/users/viewer', { profile: 'cs', unitId: base.id }).expect(200);
+      const { id } = (await h.as('admin').post('/moto-checkins', { ...checkin, unitId: base.id, notes: 'Risco no tanque' }).expect(201)).body;
+      const act = (who: 'admin' | 'editor' | 'viewer', body: object) => h.as(who).post(`/moto-checkins/${id}/actions`, body);
+
+      await act('viewer', { action: 'diagnose', items: [{ description: 'x', quantity: 1 }] }).expect(403);
+      await act('editor', { action: 'diagnose' }).expect(400);
+      const items = [{ code: 'DK-FRE-001', description: 'Pastilha de freio', quantity: 1, purpose: 'Freio gasto' }, { description: 'Óleo 4T', quantity: 1 }];
+      await act('editor', { action: 'diagnose', items }).expect(400);
+      await act('editor', { action: 'diagnose', items, estimatedMinutes: 120 }).expect(400);
+      const diag = (await act('editor', { action: 'diagnose', items, estimatedMinutes: 90 }).expect(200)).body;
+      expect(diag).toMatchObject({ status: 'aguardando_estoque', estimatedMinutes: 90 });
+      await act('editor', { action: 'stock_ok' }).expect(403);
+      const missing = (await act('admin', { action: 'stock_missing', available: [true, false], note: 'Sem óleo' }).expect(200)).body;
+      expect(missing).toMatchObject({ status: 'aguardando_peca', items: [{ available: true }, { available: false }] });
+      expect((await act('admin', { action: 'stock_ok' }).expect(200)).body.status).toBe('aguardando_autorizacao');
+      await act('viewer', { action: 'reject' }).expect(400);
+      // CS recebeu o aviso da OS que chegou para ele; mecânico não recebe o do CS
+      const csNotes = (await h.as('viewer').get('/notifications').expect(200)).body;
+      expect(csNotes).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'moto_os', target: 'canApproveOS', refId: id })]));
+      expect(csNotes.every((n: { target: string }) => n.target === 'canApproveOS')).toBe(true);
+      expect((await h.as('editor').get('/notifications')).body.some((n: { target: string }) => n.target === 'canApproveOS')).toBe(false);
+      const asked = (await act('viewer', { action: 'request_auth', note: 'Enviado por WhatsApp' }).expect(200)).body;
+      expect(asked.status).toBe('aguardando_autorizacao');
+      await act('viewer', { action: 'authorize' }).expect(400);
+      await act('viewer', { action: 'authorize', proof: { name: 'x.html', url: 'data:text/html;base64,PGI+' } }).expect(400);
+      const proof = { name: 'autorizacao.pdf', url: 'data:application/pdf;base64,JVBERi0=' };
+      expect((await act('viewer', { action: 'authorize', proof }).expect(200)).body.status).toBe('autorizada');
+      expect((await h.as('editor').get('/notifications')).body[0]).toMatchObject({ target: 'canManageOS', message: expect.stringContaining('pode iniciar') });
+      await act('editor', { action: 'finish' }).expect(409);
+      const started = (await act('editor', { action: 'start' }).expect(200)).body;
+      expect(started.startedAt).toBeTruthy();
+      await act('editor', { action: 'start' }).expect(409);
+      await act('editor', { action: 'finish', note: 'Trocado' }).expect(400);
+      await act('editor', { action: 'finish', photos: [img] }).expect(400);
+      const done = (await act('editor', { action: 'finish', note: 'Pastilha e óleo trocados', photos: [img, img] }).expect(200)).body;
+      expect(done.status).toBe('finalizada');
+      expect(new Date(done.finishedAt).getTime()).toBeGreaterThanOrEqual(new Date(started.startedAt).getTime());
+      expect(done.events.map((e: { type: string }) => e.type)).toEqual(['recebida', 'diagnose', 'stock_missing', 'stock_ok', 'request_auth', 'authorize', 'start', 'finish']);
+      expect(done.events[0]).toMatchObject({ byName: 'Admin', note: 'Risco no tanque' });
+      expect((await h.as('editor').get(`/moto-checkins/${id}`)).body.photos).toMatchObject({ front: img, final: [img, img], authProof: { name: 'autorizacao.pdf' } });
+    });
+
+    it('só admin dá perfil de administrador', async () => {
+      await h.as('admin').patch('/users/editor', { profile: 'gestor' }).expect(200);
+      await h.as('admin').patch('/users/viewer', { profile: 'admin' }).expect(200);
+      expect((await h.as('viewer').get('/me')).body).toMatchObject({ role: 'admin' });
     });
   });
 
@@ -140,7 +260,7 @@ describe('API v1', () => {
 
     it('cria OS, baixa estoque e registra movimentações', async () => {
       const res = await h.as('editor').post('/service-orders', os([item(a, 2), item(b, 1)])).expect(201);
-      expect(res.body).toMatchObject({ customerName: 'João', createdBy: 'editor', status: 'draft' });
+      expect(res.body).toMatchObject({ customerName: 'João', createdBy: 'editor', status: 'draft', maintenanceType: 'corretiva' });
 
       const qty = Object.fromEntries((await h.db.select().from(products)).map((p) => [p.id, p.quantity]));
       expect(qty).toEqual({ [a]: 8, [b]: 0 });
@@ -160,6 +280,8 @@ describe('API v1', () => {
     it('edita status mas não itens; exclui', async () => {
       const id = (await h.as('editor').post('/service-orders', os([item(a, 1)]))).body.id;
       const upd = await h.as('editor').patch(`/service-orders/${id}`, { status: 'completed', completionDate: '2026-10-07' }).expect(200);
+      expect((await h.as('editor').patch(`/service-orders/${id}`, { maintenanceType: 'preventiva' }).expect(200)).body.maintenanceType).toBe('preventiva');
+      await h.as('editor').patch(`/service-orders/${id}`, { maintenanceType: 'outra' }).expect(400);
       expect(upd.body).toMatchObject({ status: 'completed', totalAmount: 150, generalLaborCost: 50 });
       await h.as('editor').patch(`/service-orders/${id}`, { items: [] }).expect(400);
       await h.as('viewer').del(`/service-orders/${id}`).expect(403);
@@ -171,8 +293,8 @@ describe('API v1', () => {
       let rev: string;
       let ali: string;
       beforeEach(async () => {
-        rev = (await h.as('editor').post('/services', { name: 'Revisão', price: 100, repasseType: 'fixed', repasseValue: 10 }).expect(201)).body.id;
-        ali = (await h.as('editor').post('/services', { name: 'Alinhamento', price: 50, repasseType: 'percent', repasseValue: 20 }).expect(201)).body.id;
+        rev = (await h.as('boss').post('/services', { name: 'Revisão', price: 100, repasseType: 'fixed', repasseValue: 10 }).expect(201)).body.id;
+        ali = (await h.as('boss').post('/services', { name: 'Alinhamento', price: 50, repasseType: 'percent', repasseValue: 20 }).expect(201)).body.id;
       });
       // Peças 100 + mão de obra 50 + serviços (100 + 2×50) = 350; repasse 10 + 2×10 = 30.
       const withServices = () => ({
@@ -187,7 +309,7 @@ describe('API v1', () => {
           expect.objectContaining({ serviceId: rev, name: 'Revisão', price: 100, quantity: 1, repasseAmount: 10 }),
           expect.objectContaining({ serviceId: ali, name: 'Alinhamento', price: 50, quantity: 2, repasseAmount: 20 }),
         ]);
-        const paid = await h.as('editor').patch(`/service-orders/${res.body.id}`, { status: 'paid' }).expect(200);
+        const paid = await h.as('boss').patch(`/service-orders/${res.body.id}`, { status: 'paid' }).expect(200);
         expect(paid.body).toMatchObject({ companyAmount: 30, workshopAmount: 320 });
         expect(paid.body.paidAt).toBeTruthy();
       });
@@ -200,14 +322,14 @@ describe('API v1', () => {
       });
 
       it('OS sem serviços: tudo fica com a mecânica', async () => {
-        const res = await h.as('editor').post('/service-orders', { ...os([item(a, 1)]), status: 'paid' }).expect(201);
+        const res = await h.as('boss').post('/service-orders', { ...os([item(a, 1)]), status: 'paid' }).expect(201);
         expect(res.body).toMatchObject({ repasseAmount: 0, companyAmount: 0, workshopAmount: 150 });
       });
 
       it('mudar o serviço no catálogo não altera OS já criada', async () => {
         const id = (await h.as('editor').post('/service-orders', withServices())).body.id;
-        await h.as('editor').patch(`/services/${rev}`, { price: 500, repasseValue: 99 }).expect(200);
-        const paid = await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
+        await h.as('boss').patch(`/services/${rev}`, { price: 500, repasseValue: 99 }).expect(200);
+        const paid = await h.as('boss').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
         expect(paid.body.companyAmount).toBe(30);
       });
 
@@ -216,10 +338,10 @@ describe('API v1', () => {
         const upd = await h.as('editor').patch(`/service-orders/${id}`, { serviceItems: [{ serviceId: rev, quantity: 3 }], totalAmount: 450 }).expect(200);
         expect(upd.body).toMatchObject({ repasseAmount: 30 });
         expect(upd.body.serviceItems).toHaveLength(1);
-        await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
-        const back = await h.as('editor').patch(`/service-orders/${id}`, { status: 'completed' }).expect(200);
+        await h.as('boss').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
+        const back = await h.as('boss').patch(`/service-orders/${id}`, { status: 'completed' }).expect(200);
         expect(back.body).toMatchObject({ companyAmount: null, workshopAmount: null, paidAt: null });
-        const again = await h.as('editor').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
+        const again = await h.as('boss').patch(`/service-orders/${id}`, { status: 'paid' }).expect(200);
         expect(again.body).toMatchObject({ companyAmount: 30, workshopAmount: 420 });
       });
 
@@ -235,24 +357,36 @@ describe('API v1', () => {
     const svc = (over: object = {}) => ({ name: 'Troca de óleo', price: 100, repasseType: 'fixed', repasseValue: 10, ...over });
 
     it('editor cria, lista, edita e exclui; viewer só lê', async () => {
-      const id = (await h.as('editor').post('/services', svc()).expect(201)).body.id;
+      const id = (await h.as('boss').post('/services', svc()).expect(201)).body.id;
       expect((await h.as('viewer').get('/services').expect(200)).body).toEqual([expect.objectContaining({ id, name: 'Troca de óleo', price: 100, repasseType: 'fixed', repasseValue: 10 })]);
       await h.as('viewer').post('/services', svc()).expect(403);
-      expect((await h.as('editor').patch(`/services/${id}`, { repasseType: 'percent', repasseValue: 15 }).expect(200)).body).toMatchObject({ repasseType: 'percent', repasseValue: 15 });
+      expect((await h.as('editor').patch(`/services/${id}`, { name: 'Troca de óleo e filtro', price: 120 }).expect(200)).body).toMatchObject({ price: 120, repasseValue: 10 });
+      expect((await h.as('boss').patch(`/services/${id}`, { repasseType: 'percent', repasseValue: 15 }).expect(200)).body).toMatchObject({ repasseType: 'percent', repasseValue: 15 });
       await h.as('editor').del(`/services/${id}`).expect(204);
       expect((await h.as('editor').get('/services')).body).toEqual([]);
       expect(h.changes).toContain('services');
     });
 
     it('repasse não passa do preço (fixo) nem de 100% (percentual)', async () => {
-      await h.as('editor').post('/services', svc({ repasseValue: 101 })).expect(400);
-      await h.as('editor').post('/services', svc({ repasseType: 'percent', repasseValue: 120 })).expect(400);
-      const id = (await h.as('editor').post('/services', svc())).body.id;
+      await h.as('boss').post('/services', svc({ repasseValue: 101 })).expect(400);
+      await h.as('boss').post('/services', svc({ repasseType: 'percent', repasseValue: 120 })).expect(400);
+      const id = (await h.as('boss').post('/services', svc())).body.id;
       await h.as('editor').patch(`/services/${id}`, { price: 5 }).expect(400);
     });
 
+    it('a oficina não define nem altera o próprio repasse', async () => {
+      // Cadastro pela oficina ignora o repasse enviado.
+      const own = (await h.as('admin').post('/services', svc({ repasseValue: 50 })).expect(201)).body;
+      expect(own).toMatchObject({ repasseType: 'fixed', repasseValue: 0 });
+      const id = (await h.as('boss').post('/services', svc()).expect(201)).body.id;
+      expect((await h.as('admin').patch(`/services/${id}`, { repasseValue: 0 }).expect(403)).body.code).toBe('REPASSE_LOCKED');
+      await h.as('admin').patch(`/services/${id}`, { repasseType: 'percent', repasseValue: 10 }).expect(403);
+      // Reenviar o mesmo repasse (formulário inteiro) é permitido.
+      await h.as('admin').patch(`/services/${id}`, { name: 'Óleo', repasseType: 'fixed', repasseValue: 10 }).expect(200);
+    });
+
     it('cada oficina vê só os próprios serviços', async () => {
-      const id = (await h.as('editor').post('/services', svc())).body.id;
+      const id = (await h.as('boss').post('/services', svc())).body.id;
       expect((await h.as('outsider').get('/services')).body).toEqual([]);
       await h.as('outsider').patch(`/services/${id}`, { price: 1 }).expect(404);
       await h.as('outsider').del(`/services/${id}`).expect(204);
@@ -265,14 +399,14 @@ describe('API v1', () => {
     /** OS de R$ 40 com um serviço de R$ 40 cujo repasse é `repasse` (padrão R$ 10: oficina 30, empresa 10). */
     const newOS = async (repasse: { repasseType: 'fixed' | 'percent'; repasseValue: number } | null = { repasseType: 'fixed', repasseValue: 10 }) => {
       const serviceItems = repasse
-        ? [{ serviceId: (await h.as('admin').post('/services', { name: 'Revisão', price: 40, ...repasse }).expect(201)).body.id, quantity: 1 }]
+        ? [{ serviceId: (await h.as('boss').post('/services', { name: 'Revisão', price: 40, ...repasse }).expect(201)).body.id, quantity: 1 }]
         : [];
       return (await h.as('admin').post('/service-orders', {
         customerName: 'Ana', customerPhone: '11999990000', scheduledDate: '2026-10-20', items: [], serviceItems, totalAmount: 40,
       }).expect(201)).body;
     };
     const setup = async (repasse?: Parameters<typeof newOS>[0]) => {
-      await h.as('admin').patch('/settings', { asaasWalletId: 'wallet-oficina' }).expect(200);
+      await h.as('boss').patch('/settings', { asaasWalletId: 'wallet-oficina' }).expect(200);
       return newOS(repasse);
     };
 
@@ -320,7 +454,7 @@ describe('API v1', () => {
       await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: '123' }).expect(400);
       const zero = (await h.as('admin').post('/service-orders', { customerName: 'B', scheduledDate: '2026-10-20', items: [], totalAmount: 0 })).body;
       await h.as('admin').post(`/service-orders/${zero.id}/charge`, { cpfCnpj: doc }).expect(400);
-      await h.as('admin').patch(`/service-orders/${os.id}`, { status: 'paid' }).expect(200);
+      await h.as('boss').patch(`/service-orders/${os.id}`, { status: 'paid' }).expect(200);
       await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(409);
       const other = await newOS();
       await h.as('viewer').post(`/service-orders/${other.id}/charge`, { cpfCnpj: doc }).expect(403);
@@ -356,6 +490,7 @@ describe('API v1', () => {
       const os = await setup();
       await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc });
       const event = { event: 'PAYMENT_RECEIVED', payment: { id: 'pay-1', externalReference: os.id, status: 'RECEIVED' } };
+      h.paymentStatus.set('pay-1', 'RECEIVED');
       await request(h.app).post('/api/v1/asaas/webhook').send(event).expect(401);
       await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'errado').send(event).expect(401);
       await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'whk-test').send(event).expect(200);
@@ -365,6 +500,69 @@ describe('API v1', () => {
       await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'whk-test').send(event).expect(200);
       await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'whk-test')
         .send({ event: 'PAYMENT_RECEIVED', payment: { id: 'nao-existe' } }).expect(200);
+    });
+
+    it('webhook não confia no corpo: confere status e valor no Asaas', async () => {
+      const os = await setup();
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc });
+      const hook = () => request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'whk-test')
+        .send({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay-1', status: 'RECEIVED', value: 40 } }).expect(200);
+      const status = async () => (await h.db.select().from(serviceOrders).where(eq(serviceOrders.id, os.id)))[0].status;
+      // Asaas diz que ainda está pendente: não baixa, mesmo com o corpo dizendo "recebido".
+      await hook();
+      expect(await status()).toBe('draft');
+      // Pago com valor diferente do total da OS: não baixa.
+      h.paymentStatus.set('pay-1', 'RECEIVED');
+      h.paymentValue.set('pay-1', 1);
+      await hook();
+      expect(await status()).toBe('draft');
+      h.paymentValue.set('pay-1', 40);
+      await hook();
+      expect(await status()).toBe('paid');
+    });
+
+    it('repasse mínimo da oficina vale mesmo sem serviços (só mão de obra)', async () => {
+      await h.as('boss').patch('/settings', { asaasWalletId: 'wallet-oficina', repasseMinPercent: 20 }).expect(200);
+      const os = await newOS(null);
+      expect(os.repasseAmount).toBe(8);
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc }).expect(201);
+      expect(h.payments.createCharge).toHaveBeenCalledWith(expect.objectContaining({ split: { walletId: 'wallet-oficina', percent: 80 } }));
+      // Serviço com repasse maior que o mínimo: vale o do serviço.
+      const withService = await newOS({ repasseType: 'fixed', repasseValue: 10 });
+      expect(withService.repasseAmount).toBe(10);
+      // Edição do total recalcula o mínimo.
+      const edited = (await h.as('admin').patch(`/service-orders/${withService.id}`, { totalAmount: 100 }).expect(200)).body;
+      expect(edited.repasseAmount).toBe(20);
+      // Mínimo novo não vale retroativo para OS com cobrança emitida.
+      await h.as('boss').patch('/settings', { repasseMinPercent: 50 }).expect(200);
+      expect((await h.as('admin').patch(`/service-orders/${os.id}`, { status: 'completed' }).expect(200)).body.repasseAmount).toBe(8);
+    });
+
+    it('OS paga: total não pode cair abaixo do repasse congelado', async () => {
+      await h.as('boss').patch('/settings', { repasseMinPercent: 50 }).expect(200);
+      const os = await newOS(null);
+      await h.as('boss').patch(`/service-orders/${os.id}`, { status: 'paid' }).expect(200);
+      expect((await h.as('admin').patch(`/service-orders/${os.id}`, { totalAmount: 5 }).expect(400)).body.code).toBe('INVALID_TOTAL');
+    });
+
+    it('oficina não marca nem desmarca "paga" na mão: só pelo Asaas', async () => {
+      const os = await setup();
+      expect((await h.as('admin').patch(`/service-orders/${os.id}`, { status: 'paid' }).expect(403)).body.code).toBe('PAYMENT_VIA_ASAAS');
+      await h.as('admin').post('/service-orders', { customerName: 'B', scheduledDate: '2026-10-20', items: [], totalAmount: 10, status: 'paid' }).expect(403);
+      // Pago pelo Asaas: a oficina não volta a etapa, mas pode salvar a OS (status igual) e editar observações.
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc });
+      h.paymentStatus.set('pay-1', 'RECEIVED');
+      await h.as('admin').get(`/service-orders/${os.id}/charge`).expect(200);
+      await h.as('admin').patch(`/service-orders/${os.id}`, { status: 'paid', observations: 'entregue' }).expect(200);
+      await h.as('admin').patch(`/service-orders/${os.id}`, { status: 'completed' }).expect(403);
+    });
+
+    it('webhook: Asaas fora do ar → 503 para ele reenviar', async () => {
+      const os = await setup();
+      await h.as('admin').post(`/service-orders/${os.id}/charge`, { cpfCnpj: doc });
+      vi.mocked(h.payments.getCharge).mockRejectedValueOnce(new Error('timeout'));
+      await request(h.app).post('/api/v1/asaas/webhook').set('asaas-access-token', 'whk-test')
+        .send({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay-1' } }).expect(503);
     });
   });
 
@@ -395,17 +593,27 @@ describe('API v1', () => {
       const s = (await h.as('viewer').get('/settings')).body;
       expect(s).toMatchObject({ storeName: 'Oficina', accentColor: '#ff0000' });
     });
+
+    it('carteira Asaas e repasse mínimo: só o admin geral altera', async () => {
+      expect((await h.as('admin').patch('/settings', { asaasWalletId: 'carteira-do-invasor' }).expect(403)).body.code).toBe('SUPER_ADMIN_ONLY');
+      await h.as('admin').patch('/settings', { repasseMinPercent: 0 }).expect(403);
+      await h.as('boss').patch('/settings', { asaasWalletId: 'wallet-oficina', repasseMinPercent: 10 }).expect(200);
+      // A tela da oficina reenvia o formulário inteiro sem mudar a carteira: passa.
+      await h.as('admin').patch('/settings', { storeName: 'Oficina', asaasWalletId: 'wallet-oficina' }).expect(200);
+      expect((await h.as('viewer').get('/settings')).body).toMatchObject({ asaasWalletId: 'wallet-oficina', repasseMinPercent: 10 });
+    });
   });
 
   describe('notifications', () => {
-    it('editor lê e marca como lida; viewer não lê', async () => {
+    it('editor lê e marca como lida; viewer não vê o aviso de estoque', async () => {
       const pid = (await h.as('editor').post('/products', product({ quantity: 3, minQuantity: 2 }))).body.id;
       await h.as('editor').post('/transactions', { productId: pid, type: 'out', quantity: 1 });
       const [n] = (await h.as('editor').get('/notifications').expect(200)).body;
       await h.as('editor').patch(`/notifications/${n.id}/read`, {}).expect(204);
       const [after] = await h.db.select().from(notifications);
       expect(after.read).toBe(true);
-      await h.as('viewer').get('/notifications').expect(403);
+      expect((await h.as('viewer').get('/notifications').expect(200)).body).toHaveLength(0);
+      await h.as('viewer').patch(`/notifications/${n.id}/read`, {}).expect(204);
     });
   });
 
@@ -483,47 +691,43 @@ describe('API v1', () => {
   });
 
   describe('cadastros aguardando oficina', () => {
-    const signupIds = async (who: 'admin' | 'boss' | 'outsider') =>
-      (await h.as(who).get('/signups').expect(200)).body.map((s: { id: string }) => s.id);
+    const signupIds = async () =>
+      (await h.as('boss').get('/signups').expect(200)).body.map((s: { id: string }) => s.id);
 
-    it('quem se cadastra fica pendente e aparece para o admin geral e para os donos', async () => {
+    it('quem se cadastra fica pendente e aparece para o admin geral', async () => {
       await h.as('newbie').get('/me').expect(200);
       await h.as('newbie').get('/products').expect(403);
-      expect(await signupIds('boss')).toEqual(['newbie']);
-      expect(await signupIds('admin')).toEqual(['newbie']);
-      expect(await signupIds('outsider')).toEqual(['newbie']);
+      expect(await signupIds()).toEqual(['newbie']);
       const [s] = (await h.as('boss').get('/signups')).body;
       expect(s).toMatchObject({ id: 'newbie', name: 'newbie', email: 'newbie@z.com' });
       expect(s.createdAt).toBeTruthy();
     });
 
-    it('só admins veem a fila', async () => {
-      await h.as('editor').get('/signups').expect(403);
-      await h.as('viewer').get('/signups').expect(403);
-      await h.as('newbie').get('/signups').expect(403);
+    it('só o admin geral vê a fila (dono de oficina não vê dados de quem não é da oficina dele)', async () => {
+      await h.as('newbie').get('/me');
+      for (const who of ['admin', 'outsider', 'editor', 'viewer', 'newbie'] as const) {
+        await h.as(who).get('/signups').expect(403);
+      }
     });
 
-    it('dono coloca na própria oficina com a função escolhida; a pessoa passa a operar lá', async () => {
+    it('dono de oficina não atende cadastros, nem na própria oficina', async () => {
       await h.as('newbie').get('/me');
-      const res = await h.as('outsider').post('/signups/newbie/assign', { workspaceId: 'other', role: 'editor' }).expect(200);
-      expect(res.body).toMatchObject({ id: 'newbie', workspaceId: 'other', role: 'editor', status: 'approved', permissions: { canManageInventory: true } });
-      expect((await h.as('newbie').get('/me')).body.workspace).toMatchObject({ id: 'other' });
-      await h.as('newbie').get('/products').expect(200);
-      expect(await signupIds('boss')).toEqual([]);
-      expect(h.changes).toContain('users');
-    });
-
-    it('dono não coloca em oficina alheia nem cria oficina nova', async () => {
-      await h.as('newbie').get('/me');
+      await h.as('outsider').post('/signups/newbie/assign', { workspaceId: 'other', role: 'editor' }).expect(403);
       await h.as('outsider').post('/signups/newbie/assign', { workspaceId: 'default', role: 'viewer' }).expect(403);
       await h.as('outsider').post('/signups/newbie/assign', { newWorkspaceName: 'Minha', role: 'admin' }).expect(403);
+      expect(await signupIds()).toEqual(['newbie']);
     });
 
-    it('admin geral coloca em qualquer oficina', async () => {
+    it('admin geral coloca em qualquer oficina com a função escolhida; a pessoa passa a operar lá', async () => {
       await h.as('newbie').get('/me');
-      await h.as('boss').post('/signups/newbie/assign', { workspaceId: 'other', role: 'viewer' }).expect(200);
+      const res = await h.as('boss').post('/signups/newbie/assign', { workspaceId: 'other', role: 'editor' }).expect(200);
+      expect(res.body).toMatchObject({ id: 'newbie', workspaceId: 'other', role: 'editor', status: 'approved', permissions: { canManageInventory: true } });
       const [u] = await h.db.select().from(users).where(eq(users.id, 'newbie'));
-      expect(u).toMatchObject({ workspaceId: 'other', role: 'viewer', status: 'approved' });
+      expect(u).toMatchObject({ workspaceId: 'other', role: 'editor', status: 'approved' });
+      expect((await h.as('newbie').get('/me')).body.workspace).toMatchObject({ id: 'other' });
+      await h.as('newbie').get('/products').expect(200);
+      expect(await signupIds()).toEqual([]);
+      expect(h.changes).toContain('users');
     });
 
     it('admin geral cria mecânica nova e a pessoa vira admin dela', async () => {
@@ -537,8 +741,8 @@ describe('API v1', () => {
 
     it('não dá para atender o mesmo cadastro duas vezes nem mexer em quem já tem oficina', async () => {
       await h.as('newbie').get('/me');
-      await h.as('admin').post('/signups/newbie/assign', { workspaceId: 'default', role: 'viewer' }).expect(200);
-      const again = await h.as('outsider').post('/signups/newbie/assign', { workspaceId: 'other', role: 'admin' }).expect(409);
+      await h.as('boss').post('/signups/newbie/assign', { workspaceId: 'default', role: 'viewer' }).expect(200);
+      const again = await h.as('boss').post('/signups/newbie/assign', { workspaceId: 'other', role: 'admin' }).expect(409);
       expect(again.body.code).toBe('ALREADY_ASSIGNED');
       await h.as('boss').post('/signups/editor/assign', { workspaceId: 'other', role: 'viewer' }).expect(409);
     });
@@ -556,7 +760,7 @@ describe('API v1', () => {
       await h.as('newbie2').get('/me');
       await h.as('admin').post('/signups/newbie/reject').expect(403);
       await h.as('boss').post('/signups/newbie/reject').expect(200);
-      expect(await signupIds('boss')).toEqual(['newbie2']);
+      expect(await signupIds()).toEqual(['newbie2']);
       expect((await h.as('newbie').get('/me')).body.status).toBe('denied');
     });
 
@@ -646,7 +850,7 @@ describe('API v1', () => {
       await h.as('outsider').get('/admin/overview').expect(403);
 
       const p = (await h.as('admin').post('/products', { name: 'Pastilha', quantity: 2, minQuantity: 5, price: 10 })).body;
-      await h.as('admin').post('/service-orders', {
+      await h.as('boss').post('/service-orders', {
         customerName: 'Ana', scheduledDate: '2026-10-07', status: 'paid', totalAmount: 150,
         items: [{ productId: p.id, name: 'Pastilha', quantity: 1, price: 10, total: 10 }],
       }).expect(201);

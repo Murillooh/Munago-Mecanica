@@ -30,7 +30,7 @@ export function createTransactionsRouter({ db, bus }: ApiDeps) {
     const { allowNegativeStock } = await getSettings(db, ws(req));
     const result = await db.transaction((tx) =>
       applyMovement(tx, { ...m, workspaceId: ws(req), userId: req.user!.id, userName: req.user!.name }, allowNegativeStock));
-    bus.emitChange('transactions', 'products', ...(result.notified ? ['notifications' as const] : []));
+    bus.emitChange(ws(req), 'transactions', 'products', ...(result.notified ? ['notifications' as const] : []));
     res.status(201).json({ newQty: result.newQty, lowStock: result.lowStock });
   }));
 

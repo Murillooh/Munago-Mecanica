@@ -5,13 +5,14 @@
   --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Plus Jakarta Sans", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --breakpoint-xs: 475px;
 }
 
 /* Forçar modo escuro via classe .dark no html */
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #fdfdfd;
+  --background: #eef3f8; /* gelo */
   --foreground: #09090b;
 }
 
@@ -25,7 +26,7 @@
   html, body {
     background-color: var(--background) !important;
     color: var(--foreground) !important;
-    @apply min-h-screen transition-colors duration-700 antialiased;
+    @apply min-h-dvh transition-colors duration-700 antialiased;
   }
 }
 
@@ -35,6 +36,12 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+  }
+  /* Toque responde na hora (sem espera de duplo toque para zoom) */
+  a, button, [role="button"], label, summary { touch-action: manipulation; }
+  /* Computador: base 14px (em vez de 16px). Tailwind usa rem, então textos, espaços e cards encolhem juntos. Celular fica igual. */
+  @media (min-width: 1024px) {
+    html { font-size: 87.5%; }
   }
   /* iOS dá zoom ao focar campos com fonte < 16px; em telas de toque o campo usa no mínimo 16px. */
   @media (pointer: coarse) {
@@ -69,7 +76,7 @@
   background: transparent;
 }
 
-/* Fundo que aparece através do vidro (cinza do sistema da Apple + manchas suaves de cor). */
+/* Fundo que aparece através do vidro: claro em tom gelo (branco azulado frio); escuro com manchas de cor. */
 .ios-glass::before {
   content: '';
   position: fixed;
@@ -77,11 +84,10 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(46rem 34rem at 8% -5%, rgb(59 130 246 / 0.30), transparent 62%),
-    radial-gradient(40rem 32rem at 95% 10%, rgb(168 85 247 / 0.24), transparent 62%),
-    radial-gradient(46rem 36rem at 60% 105%, rgb(16 185 129 / 0.20), transparent 62%),
-    radial-gradient(30rem 24rem at 35% 45%, rgb(244 114 182 / 0.10), transparent 60%),
-    #f2f2f7;
+    radial-gradient(46rem 34rem at 8% -5%, rgb(56 189 248 / 0.16), transparent 62%),
+    radial-gradient(40rem 32rem at 95% 10%, rgb(147 197 253 / 0.20), transparent 62%),
+    radial-gradient(46rem 36rem at 60% 105%, rgb(165 243 252 / 0.18), transparent 62%),
+    #eef3f8;
 }
 .dark .ios-glass::before {
   background:

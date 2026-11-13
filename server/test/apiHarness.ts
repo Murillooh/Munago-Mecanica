@@ -61,9 +61,16 @@ export async function createHarness(extra?: (db: DB) => (r: Router) => void) {
   // Gateway de pagamento falso: cada cobrança vira "pay-N", pendente até o teste mudar o status.
   let p = 0;
   const paymentStatus = new Map<string, string>();
+  /** Valor de cada cobrança como o Asaas devolveria na consulta (o teste pode adulterar). */
+  const paymentValue = new Map<string, number>();
   const payments: PaymentGateway = {
-    createCharge: vi.fn(async () => { const id = `pay-${++p}`; paymentStatus.set(id, 'PENDING'); return { id, invoiceUrl: `https://pague.test/${id}` }; }),
-    getCharge: vi.fn(async (id: string) => ({ status: paymentStatus.get(id) ?? 'PENDING' })),
+    createCharge: vi.fn(async (input) => {
+      const id = `pay-${++p}`;
+      paymentStatus.set(id, 'PENDING');
+      paymentValue.set(id, input.value);
+      return { id, invoiceUrl: `https://pague.test/${id}` };
+    }),
+    getCharge: vi.fn(async (id: string) => ({ status: paymentStatus.get(id) ?? 'PENDING', value: paymentValue.get(id) ?? 0 })),
     getPixQrCode: vi.fn(async () => ({ payload: 'pix-copia-e-cola', encodedImage: 'aW1n' })),
   };
 
@@ -87,5 +94,5 @@ export async function createHarness(extra?: (db: DB) => (r: Router) => void) {
     };
   };
 
-  return { app, db, bus, changes, cognito, payments, paymentStatus, as, anon: request(app) };
+  return { app, db, bus, changes, cognito, payments, paymentStatus, paymentValue, as, anon: request(app) };
 }

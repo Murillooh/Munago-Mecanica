@@ -18,7 +18,7 @@ const repasseLabel = (s: Pick<Service, 'repasseType' | 'repasseValue'>) =>
 
 /** Catálogo de serviços da mecânica: preço cobrado e repasse para a empresa (R$ fixo ou %). */
 export const Services = () => {
-  const { services, canManageOS } = useApp();
+  const { services, canManageOS, isSuperAdmin } = useApp();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Service | null>(null);
@@ -135,8 +135,11 @@ export const Services = () => {
               <input id="svc-price" required type="number" min={0} step="0.01" inputMode="decimal" value={draft.price} onChange={e => setDraft({ ...draft, price: e.target.value })} placeholder="100,00" className={`${fieldClass} font-mono`} />
             </div>
 
-            <fieldset className="space-y-1">
-              <legend className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Repasse para a empresa</legend>
+            {/* Repasse: só o admin geral edita; a oficina vê o valor travado. */}
+            <fieldset className="space-y-1" disabled={!isSuperAdmin}>
+              <legend className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Repasse para a empresa{!isSuperAdmin && <span className="ml-1.5 font-normal text-zinc-400">definido pela administração da Munago</span>}
+              </legend>
               <div className="flex gap-2">
                 <div role="radiogroup" aria-label="Tipo de repasse" className="flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
                   {([['fixed', 'R$'], ['percent', '%']] as const).map(([t, label]) => (

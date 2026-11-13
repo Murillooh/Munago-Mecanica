@@ -7,23 +7,21 @@ import {
   Trash2,
   X,
   Clock,
-  Shield,
   Briefcase,
   UserPlus,
   Loader2,
-  Package,
   Eye,
   SlidersHorizontal,
-  BarChart3,
-  ArrowLeftRight,
-  FileText,
   Check,
   AlertTriangle,
+  Building2,
+  Plus,
+  Warehouse,
   Users as UsersIcon
 } from 'lucide-react';
-import { useApp, ROLE_PRESETS, UserPermissions, UserProfile } from '../context/AppContext';
-import { apiGet, apiPost } from '../lib/api';
-import { SignupQueue } from '../components/SignupQueue';
+import { useApp, UserProfile, type Unit } from '../context/AppContext';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
+import { PROFILES, PROFILE_IDS, type Profile } from '../../server/auth/profiles';
 import { HeroStat, PageHero, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
 
@@ -56,14 +54,6 @@ const ROLE_META: Record<Role, { label: string; short: string; description: strin
   },
 };
 
-const PERMISSIONS: { id: keyof UserPermissions; label: string; short: string; description: string; icon: React.ElementType }[] = [
-  { id: 'canManageInventory', label: 'Gerenciar estoque', short: 'Estoque', description: 'Cadastrar, editar e excluir peças do catálogo.', icon: Package },
-  { id: 'canPerformTransactions', label: 'Movimentar estoque', short: 'Movimentação', description: 'Registrar entradas e saídas com justificativa.', icon: ArrowLeftRight },
-  { id: 'canManageOS', label: 'Ordens de serviço', short: 'OS', description: 'Abrir OS, lançar peças e mudar a etapa.', icon: FileText },
-  { id: 'canViewReports', label: 'Relatórios e monitoramento', short: 'Relatórios', description: 'Ver o painel e exportar PDF/Excel.', icon: BarChart3 },
-  { id: 'canManageUsers', label: 'Gerenciar equipe', short: 'Equipe', description: 'Aprovar cadastros e mudar funções e permissões.', icon: Shield },
-];
-
 const roleOf = (r?: string): Role => (r === 'admin' || r === 'editor' ? r : 'viewer');
 
 const initials = (name?: string) =>
@@ -86,79 +76,173 @@ const fieldClass =
 const ghostBtn = 'rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 cursor-pointer';
 const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-60 dark:focus-visible:ring-offset-zinc-900 cursor-pointer';
 
-/** Seletor de função + permissões, usado no cadastro e na edição. */
+/** Rótulo do acesso: perfil (novo) ou cargo (usuário antigo). */
+const accessLabel = (u: UserProfile) => (u.profile && u.profile in PROFILES ? PROFILES[u.profile as Profile].label : ROLE_META[roleOf(u.role)].label);
+
+/** Perfil de acesso + unidade, usado no cadastro e na edição. O perfil já define o que a pessoa pode fazer. */
 const AccessEditor: React.FC<{
-  role: Role;
-  permissions: UserPermissions;
-  onRole: (r: Role) => void;
-  onPermissions: (p: UserPermissions) => void;
-}> = ({ role, permissions, onRole, onPermissions }) => {
-  const preset = ROLE_PRESETS[role].permissions;
-  const customized = PERMISSIONS.some(p => Boolean(permissions[p.id]) !== Boolean(preset[p.id]));
+  profile: Profile;
+  unitId: string;
+  units: Unit[];
+  onProfile: (p: Profile) => void;
+  onUnit: (id: string) => void;
+}> = ({ profile, unitId, units, onProfile, onUnit }) => {
+  const needsUnit = !PROFILES[profile].permissions.allUnits;
   return (
     <div className="space-y-6">
       <fieldset>
-        <legend className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">Função</legend>
-        <div role="radiogroup" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {(['admin', 'editor', 'viewer'] as const).map(r => {
-            const meta = ROLE_META[r];
-            const Icon = meta.icon;
-            const selected = role === r;
+        <legend className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">Perfil de acesso</legend>
+        <div role="radiogroup" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {PROFILE_IDS.map(id => {
+            const meta = PROFILES[id];
+            const selected = profile === id;
             return (
               <button
-                key={r}
+                key={id}
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                onClick={() => onRole(r)}
-                className={`text-left p-3 rounded-xl border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
+                onClick={() => onProfile(id)}
+                className={`flex items-start gap-2.5 rounded-xl border p-3 text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
                   selected
-                    ? 'border-blue-600 bg-blue-50/60 dark:bg-blue-950/20 ring-1 ring-blue-600/30'
-                    : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                    ? 'border-blue-600 bg-blue-50/60 ring-1 ring-blue-600/30 dark:bg-blue-950/20'
+                    : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600'
                 }`}
               >
-                <span className="flex items-center justify-between">
-                  <span className={`p-1.5 rounded-lg border ${meta.badge}`}><Icon size={14} aria-hidden="true" /></span>
-                  {selected && <Check size={16} className="text-blue-600" aria-hidden="true" />}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-zinc-900 dark:text-white">{meta.label}</span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">{meta.description}</span>
                 </span>
-                <span className="mt-2 block text-sm font-semibold text-zinc-900 dark:text-white">{meta.label}</span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">{meta.description}</span>
+                {selected && <Check size={16} className="mt-0.5 shrink-0 text-blue-600" aria-hidden="true" />}
               </button>
             );
           })}
         </div>
       </fieldset>
 
-      <fieldset>
-        <div className="mb-2 flex items-center justify-between">
-          <legend className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Permissões</legend>
-          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${customized ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>
-            {customized ? 'Personalizadas' : `Padrão de ${ROLE_META[role].label}`}
-          </span>
-        </div>
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
-          {PERMISSIONS.map(perm => {
-            const checked = Boolean(permissions[perm.id]);
-            const Icon = perm.icon;
+      <div className="space-y-1.5">
+        <label htmlFor="access-unit" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Unidade</label>
+        <select id="access-unit" value={unitId} onChange={e => onUnit(e.target.value)} className={fieldClass} required={needsUnit && units.length > 0}>
+          <option value="">{needsUnit ? 'Escolha a unidade' : 'Todas as unidades'}</option>
+          {units.map(u => <option key={u.id} value={u.id}>{u.name}{u.kind === 'cd' ? ' (CD)' : ''}</option>)}
+        </select>
+        <p className="text-[11px] text-zinc-500">
+          {needsUnit ? 'A pessoa só vê os dados desta unidade.' : 'Este perfil enxerga todas as unidades.'}
+          {units.length === 0 && ' Cadastre as unidades em "Unidades", logo abaixo da equipe.'}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+/** Cadastro das unidades (Bases e CD). */
+/** Contato do franqueado da unidade (quem autoriza as manutenções). */
+const FranchiseeForm: React.FC<{ unit: Unit; onDone: () => void }> = ({ unit, onDone }) => {
+  const [f, setF] = useState({ franchiseeName: unit.franchiseeName ?? '', franchiseeEmail: unit.franchiseeEmail ?? '', franchiseePhone: unit.franchiseePhone ?? '' });
+  const [saving, setSaving] = useState(false);
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await apiPatch(`/units/${unit.id}`, { franchiseeName: f.franchiseeName || null, franchiseeEmail: f.franchiseeEmail || null, franchiseePhone: f.franchiseePhone || null });
+      toast.success('Franqueado salvo.');
+      onDone();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível salvar.');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <form onSubmit={save} className="grid gap-2 px-4 pb-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+      <input aria-label="Nome do franqueado" value={f.franchiseeName} onChange={e => setF({ ...f, franchiseeName: e.target.value })} placeholder="Nome do franqueado" maxLength={100} className={`${fieldClass} !py-2`} />
+      <input aria-label="E-mail do franqueado" type="email" value={f.franchiseeEmail} onChange={e => setF({ ...f, franchiseeEmail: e.target.value })} placeholder="email@franqueado.com" maxLength={200} className={`${fieldClass} !py-2`} />
+      <input aria-label="WhatsApp do franqueado" type="tel" value={f.franchiseePhone} onChange={e => setF({ ...f, franchiseePhone: e.target.value })} placeholder="WhatsApp (11) 98888-7777" maxLength={30} className={`${fieldClass} !py-2`} />
+      <div className="flex gap-2">
+        <button type="button" onClick={onDone} className={`${ghostBtn} !py-2`}>Cancelar</button>
+        <button type="submit" disabled={saving} className={`${primaryBtn} !py-2`}>{saving && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}Salvar</button>
+      </div>
+    </form>
+  );
+};
+
+const UnitsSection: React.FC<{ units: Unit[]; users: UserProfile[] }> = ({ units, users }) => {
+  const [editing, setEditing] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [kind, setKind] = useState<Unit['kind']>('base');
+  const [saving, setSaving] = useState(false);
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await apiPost('/units', { name, kind });
+      toast.success('Unidade cadastrada.');
+      setName('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível cadastrar.');
+    } finally {
+      setSaving(false);
+    }
+  };
+  const remove = async (u: Unit) => {
+    if (!window.confirm(`Excluir a unidade "${u.name}"? As pessoas dela ficam sem unidade.`)) return;
+    try { await apiDelete(`/units/${u.id}`); toast.success('Unidade excluída.'); } catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível excluir.'); }
+  };
+  return (
+    <section aria-labelledby="units-heading" className="overflow-hidden rounded-xl border border-zinc-200/70 bg-white shadow-xs dark:border-zinc-800/80 dark:bg-zinc-900/90">
+      <div className="flex items-center gap-2.5 border-b border-zinc-200 bg-zinc-50/70 px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-900">
+        <Building2 size={15} className="text-zinc-500" aria-hidden="true" />
+        <h2 id="units-heading" className="text-sm font-semibold text-zinc-900 dark:text-white">Unidades</h2>
+        <span className="text-xs text-zinc-500">Bases que atendem as motos e o CD de peças</span>
+      </div>
+      {units.length > 0 && (
+        <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+          {units.map(u => {
+            const Icon = u.kind === 'cd' ? Warehouse : Building2;
+            const people = users.filter(x => x.unitId === u.id).length;
             return (
-              <label key={perm.id} className="flex items-center gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
-                <Icon size={16} className={checked ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-400'} aria-hidden="true" />
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-medium text-zinc-900 dark:text-white">{perm.label}</span>
-                  <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{perm.description}</span>
+              <li key={u.id}>
+              <div className="flex items-center gap-3 px-4 py-2.5">
+                <Icon size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-zinc-900 dark:text-white">{u.name}</span>
+                  {u.kind === 'base' && (
+                    <span className="block truncate text-xs text-zinc-500">
+                      {u.franchiseeName || u.franchiseeEmail || u.franchiseePhone
+                        ? <>Franqueado: {[u.franchiseeName, u.franchiseeEmail, u.franchiseePhone].filter(Boolean).join(' · ')}</>
+                        : <span className="text-amber-600 dark:text-amber-400">Sem franqueado cadastrado (necessário para pedir autorização)</span>}
+                    </span>
+                  )}
                 </span>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={e => onPermissions({ ...permissions, [perm.id]: e.target.checked })}
-                  className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-600/30 cursor-pointer"
-                />
-              </label>
+                <span className="text-[11px] font-semibold text-zinc-500">{u.kind === 'cd' ? 'CD' : 'Base'} · {people} {people === 1 ? 'pessoa' : 'pessoas'}</span>
+                {u.kind === 'base' && (
+                  <button type="button" onClick={() => setEditing(editing === u.id ? null : u.id)} className="rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30 cursor-pointer">
+                    Franqueado
+                  </button>
+                )}
+                <button type="button" onClick={() => remove(u)} aria-label={`Excluir ${u.name}`} className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 cursor-pointer">
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              </div>
+              {editing === u.id && <FranchiseeForm unit={u} onDone={() => setEditing(null)} />}
+              </li>
             );
           })}
-        </div>
-      </fieldset>
-    </div>
+        </ul>
+      )}
+      <form onSubmit={add} className="flex flex-wrap items-center gap-2 border-t border-zinc-100 px-4 py-3 dark:border-zinc-800/70">
+        <label htmlFor="unit-name" className="sr-only">Nome da unidade</label>
+        <input id="unit-name" required value={name} onChange={e => setName(e.target.value)} maxLength={100} placeholder="Nome da unidade (ex.: Base Centro)" className={`${fieldClass} min-w-[200px] flex-1 !py-2`} />
+        <label htmlFor="unit-kind" className="sr-only">Tipo</label>
+        <select id="unit-kind" value={kind} onChange={e => setKind(e.target.value as Unit['kind'])} className={`${fieldClass} w-auto !py-2`}>
+          <option value="base">Base</option>
+          <option value="cd">CD</option>
+        </select>
+        <button type="submit" disabled={saving} className={`${primaryBtn} !py-2`}>
+          {saving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />} Adicionar
+        </button>
+      </form>
+    </section>
   );
 };
 
@@ -206,12 +290,12 @@ const Dialog: React.FC<{ title: string; subtitle?: string; onClose: () => void; 
   );
 };
 
-const EMPTY_NEW_USER = { name: '', email: '', role: 'editor' as Role, permissions: { ...ROLE_PRESETS.editor.permissions } };
+const EMPTY_NEW_USER = { name: '', email: '', profile: 'mecanico' as Profile, unitId: '' };
 
 export const Users = () => {
   const {
     users,
-    updateUserRoleAndPermissions,
+    units,
     approveUser,
     denyUser,
     deleteUser,
@@ -231,8 +315,8 @@ export const Users = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-  const [editRole, setEditRole] = useState<Role>('viewer');
-  const [editPermissions, setEditPermissions] = useState<UserPermissions>({ ...ROLE_PRESETS.viewer.permissions });
+  const [editProfile, setEditProfile] = useState<Profile>('mecanico');
+  const [editUnit, setEditUnit] = useState('');
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
 
   const [newUser, setNewUser] = useState(EMPTY_NEW_USER);
@@ -257,8 +341,8 @@ export const Users = () => {
       await apiPost('/users', {
         email: newUser.email,
         name: newUser.name,
-        role: newUser.role,
-        permissions: newUser.permissions,
+        profile: newUser.profile,
+        unitId: newUser.unitId || null,
       });
       toast.success('Usuário criado! O convite com a senha temporária foi enviado por e-mail.');
       setIsAddModalOpen(false);
@@ -271,23 +355,22 @@ export const Users = () => {
   };
 
   const openEditPermissionsModal = (user: UserProfile) => {
-    const currentRole = roleOf(user.role);
     setEditingUser(user);
-    setEditRole(currentRole);
-    setEditPermissions(
-      user.permissions && Object.keys(user.permissions).length > 0
-        ? { ...user.permissions }
-        : { ...ROLE_PRESETS[currentRole].permissions }
-    );
+    // Usuário antigo (sem perfil): parte do perfil equivalente ao cargo.
+    const fallback: Profile = user.role === 'admin' ? 'admin' : user.role === 'editor' ? 'mecanico' : 'gestor';
+    setEditProfile(user.profile && user.profile in PROFILES ? user.profile as Profile : fallback);
+    setEditUnit(user.unitId ?? '');
   };
 
-  // As ações do AppContext já mostram toast de sucesso/erro.
   const handleSavePermissions = async () => {
     if (!editingUser) return;
     setIsSavingPermissions(true);
     try {
-      await updateUserRoleAndPermissions(editingUser.uid, editRole, editPermissions);
+      await apiPatch(`/users/${editingUser.uid}`, { profile: editProfile, unitId: editUnit || null });
+      toast.success('Acesso atualizado.');
       setEditingUser(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível salvar.');
     } finally {
       setIsSavingPermissions(false);
     }
@@ -326,7 +409,7 @@ export const Users = () => {
       const matchesSearch = !q ||
         (u.name || '').toLowerCase().includes(q) ||
         (u.email || '').toLowerCase().includes(q) ||
-        ROLE_META[roleOf(u.role)].label.toLowerCase().includes(q);
+        accessLabel(u).toLowerCase().includes(q);
       return matchesSearch && (roleFilter === 'all' || roleOf(u.role) === roleFilter);
     })
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
@@ -345,7 +428,7 @@ export const Users = () => {
             <UserPlus size={15} aria-hidden="true" /> Novo usuário
           </button>
         )}
-        statsClassName="grid-cols-2 xl:grid-cols-4"
+        statsClassName="grid-cols-2 @3xl:grid-cols-4"
       >
         <HeroStat
           icon={UsersIcon} iconClass="bg-blue-500" label="Membros"
@@ -368,15 +451,6 @@ export const Users = () => {
           value={pendingTotal} hint={pendingTotal > 0 ? 'cadastros para aprovar' : 'ninguém esperando'}
         />
       </PageHero>
-
-      {/* Quem criou conta e ainda não está em nenhuma mecânica */}
-      {isAdmin && (profile?.workspace?.id ?? profile?.workspaceId) && (
-        <SignupQueue
-          mode="owner"
-          workspaceId={(profile?.workspace?.id ?? profile?.workspaceId)!}
-          workspaceName={profile?.workspace?.name}
-        />
-      )}
 
       {/* Aguardando aprovação */}
       {canManageUsers && pendingTotal > 0 && (
@@ -494,7 +568,6 @@ export const Users = () => {
               const role = roleOf(user.role);
               const meta = ROLE_META[role];
               const RoleIcon = meta.icon;
-              const perms = user.permissions && Object.keys(user.permissions).length > 0 ? user.permissions : ROLE_PRESETS[role].permissions;
               const isMe = profile?.uid === user.uid;
               return (
                 <li key={user.uid} className="px-3 py-3 space-y-2.5">
@@ -532,20 +605,13 @@ export const Users = () => {
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 pl-[2.625rem]">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${meta.chip}`}>
-                      <RoleIcon size={12} aria-hidden="true" /> {meta.label}
+                      <RoleIcon size={12} aria-hidden="true" /> {accessLabel(user)}
                     </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500"><Building2 size={11} aria-hidden="true" />{units.find(x => x.id === user.unitId)?.name ?? 'Todas as unidades'}</span>
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
                       <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'approved' ? 'bg-emerald-500' : user.status === 'denied' ? 'bg-red-500' : 'bg-amber-500'}`} aria-hidden="true" />
                       {user.status === 'approved' ? 'Ativo' : user.status === 'denied' ? 'Negado' : 'Pendente'}
                     </span>
-                    {PERMISSIONS.filter(p => perms?.[p.id]).map(p => {
-                      const Icon = p.icon;
-                      return (
-                        <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700 text-[11px] text-zinc-600 dark:text-zinc-300" title={p.label}>
-                          <Icon size={11} aria-hidden="true" /> {p.short}
-                        </span>
-                      );
-                    })}
                   </div>
                 </li>
               );
@@ -557,8 +623,8 @@ export const Users = () => {
               <thead className="bg-zinc-50 dark:bg-zinc-900">
                 <tr>
                   <th scope="col" className={th}>Membro</th>
-                  <th scope="col" className={`${th} w-32`}>Função</th>
-                  <th scope="col" className={th}>Permissões</th>
+                  <th scope="col" className={`${th} w-44`}>Perfil</th>
+                  <th scope="col" className={th}>Unidade</th>
                   <th scope="col" className={`${th} w-28`}>Situação</th>
                   <th scope="col" className={`${th} w-28 text-right`}><span className="sr-only">Ações</span></th>
                 </tr>
@@ -568,7 +634,6 @@ export const Users = () => {
                   const role = roleOf(user.role);
                   const meta = ROLE_META[role];
                   const RoleIcon = meta.icon;
-                  const perms = user.permissions && Object.keys(user.permissions).length > 0 ? user.permissions : ROLE_PRESETS[role].permissions;
                   const isMe = profile?.uid === user.uid;
                   return (
                     <tr key={user.uid} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors">
@@ -586,21 +651,11 @@ export const Users = () => {
                       </td>
                       <td className="px-3 py-2">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${meta.chip}`}>
-                          <RoleIcon size={12} aria-hidden="true" /> {meta.label}
+                          <RoleIcon size={12} aria-hidden="true" /> {accessLabel(user)}
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-1">
-                          {PERMISSIONS.filter(p => perms?.[p.id]).map(p => {
-                            const Icon = p.icon;
-                            return (
-                              <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700 text-[11px] text-zinc-600 dark:text-zinc-300" title={p.label}>
-                                <Icon size={11} aria-hidden="true" /> {p.short}
-                              </span>
-                            );
-                          })}
-                          {!PERMISSIONS.some(p => perms?.[p.id]) && <span className="text-zinc-400">Nenhuma</span>}
-                        </div>
+                        <span className="text-zinc-600 dark:text-zinc-300">{units.find(x => x.id === user.unitId)?.name ?? <span className="text-zinc-400">Todas</span>}</span>
                       </td>
                       <td className="px-3 py-2">
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
@@ -650,6 +705,8 @@ export const Users = () => {
         )}
       </section>
 
+      {canManageUsers && <UnitsSection units={units} users={allUsers} />}
+
       {/* Editar acessos */}
       <AnimatePresence>
         {editingUser && (
@@ -668,12 +725,7 @@ export const Users = () => {
               </>
             }
           >
-            <AccessEditor
-              role={editRole}
-              permissions={editPermissions}
-              onRole={r => { setEditRole(r); setEditPermissions({ ...ROLE_PRESETS[r].permissions }); }}
-              onPermissions={setEditPermissions}
-            />
+            <AccessEditor profile={editProfile} unitId={editUnit} units={units} onProfile={setEditProfile} onUnit={setEditUnit} />
           </Dialog>
         )}
       </AnimatePresence>
@@ -727,10 +779,11 @@ export const Users = () => {
                 </div>
               </div>
               <AccessEditor
-                role={newUser.role}
-                permissions={newUser.permissions}
-                onRole={r => setNewUser({ ...newUser, role: r, permissions: { ...ROLE_PRESETS[r].permissions } })}
-                onPermissions={p => setNewUser({ ...newUser, permissions: p })}
+                profile={newUser.profile}
+                unitId={newUser.unitId}
+                units={units}
+                onProfile={p => setNewUser({ ...newUser, profile: p })}
+                onUnit={u => setNewUser({ ...newUser, unitId: u })}
               />
             </form>
           </Dialog>

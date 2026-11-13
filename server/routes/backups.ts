@@ -47,7 +47,7 @@ export function createBackupsRouter({ db, bus }: ApiDeps) {
         });
       }
     });
-    bus.emitChange('products', 'categories');
+    bus.emitChange(ws(req), 'products', 'categories');
     res.json({ products: data.products.length, categories: data.categories.length });
   }));
 

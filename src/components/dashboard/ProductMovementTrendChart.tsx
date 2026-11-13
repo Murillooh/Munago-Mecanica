@@ -176,27 +176,27 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
     <div className="h-full flex-1 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors">
       <div className="flex flex-1 flex-col">
         {/* Header with Title, Controls & Timeframe Selector */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-500/30 ring-1 ring-white/30">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
                 <Activity size={17} aria-hidden="true" />
               </span>
               <div>
-                <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
-                  Tendência de Entradas e Saídas
-                  <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-full border border-blue-200/60 dark:border-blue-800/50">
+                <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex flex-wrap items-center gap-x-2 gap-y-1">
+                  Entradas e saídas
+                  <span className="whitespace-nowrap text-[11px] font-semibold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-full border border-blue-200/60 dark:border-blue-800/50">
                     Últimos {daysRange} dias
                   </span>
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Monitoramento diário de compras de peças vs. requisições para ordens de serviço
+                  Peças compradas x peças usadas nas OS, por dia
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-auto">
+          <div className="flex items-center gap-2.5 flex-wrap">
             {/* Chart Type Selector */}
             <div className="flex items-center p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200/70 dark:border-zinc-700 text-xs">
               <button
@@ -265,14 +265,14 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
         {/* Números do período em blocos coloridos */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4 text-xs">
           {([
-            ['Entradas', `+${totalIn}`, 'unidades', ArrowDownLeft, 'from-emerald-500/15 to-emerald-500/5 border-emerald-500/25', 'from-emerald-400 to-teal-600', 'text-emerald-600 dark:text-emerald-400'],
-            ['Saídas', `-${totalOut}`, 'unidades', ArrowUpRight, 'from-rose-500/15 to-rose-500/5 border-rose-500/25', 'from-rose-400 to-pink-600', 'text-rose-600 dark:text-rose-400'],
-            ['Saldo líquido', netBalance >= 0 ? `+${netBalance}` : `${netBalance}`, 'unidades', Scale, 'from-sky-500/15 to-blue-500/5 border-sky-500/25', 'from-sky-400 to-blue-600', netBalance >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'],
-            ['Média por dia', `${avgDailyVolume}`, 'un/dia', Gauge, 'from-violet-500/15 to-violet-500/5 border-violet-500/25', 'from-fuchsia-400 to-violet-600', 'text-violet-600 dark:text-violet-400'],
+            ['Entradas', `+${totalIn}`, 'unidades', ArrowDownLeft, 'border-zinc-200 dark:border-zinc-800', 'bg-emerald-500', 'text-emerald-600 dark:text-emerald-400'],
+            ['Saídas', `-${totalOut}`, 'unidades', ArrowUpRight, 'border-zinc-200 dark:border-zinc-800', 'bg-rose-500', 'text-rose-600 dark:text-rose-400'],
+            ['Saldo líquido', netBalance >= 0 ? `+${netBalance}` : `${netBalance}`, 'unidades', Scale, 'border-zinc-200 dark:border-zinc-800', 'bg-blue-500', netBalance >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'],
+            ['Média por dia', `${avgDailyVolume}`, 'un/dia', Gauge, 'border-zinc-200 dark:border-zinc-800', 'bg-zinc-500', 'text-violet-600 dark:text-violet-400'],
           ] as const).map(([label, value, unit, Icon, tile, icon, tone]) => (
-            <div key={label} className={`rounded-xl border bg-gradient-to-br p-3 ${tile}`}>
+            <div key={label} className={`rounded-xl border p-3 ${tile}`}>
               <div className="flex items-center gap-2">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm ${icon}`}>
+                <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-white ${icon}`}>
                   <Icon size={13} aria-hidden="true" />
                 </span>
                 <span className="font-medium text-zinc-600 dark:text-zinc-300">{label}</span>

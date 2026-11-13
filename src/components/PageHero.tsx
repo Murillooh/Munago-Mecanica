@@ -28,31 +28,43 @@ export const PageHero: React.FC<{
 }> = ({ icon: Icon, title, subtitle, eyebrow, titleAside, actions, children, statsClassName, statsId }) => {
   const titleId = React.useId();
   return (
-    <section aria-labelledby={titleId} className="relative shrink-0 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 p-4 text-white shadow-lg shadow-blue-900/20 sm:p-6">
-      {/* Só um brilho suave no canto, longe do texto, para o degradê não ficar chapado */}
-      <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-32 h-72 w-72 rounded-full bg-sky-400/25 blur-3xl" />
+    <section aria-labelledby={titleId} className="@container relative shrink-0 overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-[#4d4ca6] via-[#3b3995] to-[#2c2878] p-4 sm:p-5 text-white shadow-xl shadow-black/40">
+      {/* Brilhos e grade de pontos decorativos */}
+      <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-indigo-400/15 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-16 bottom-0 h-56 w-56 rounded-full bg-indigo-300/10 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(rgb(255_255_255/0.12)_1px,transparent_1px)] [background-size:14px_14px] [mask-image:linear-gradient(to_left,black,transparent)]" />
 
-      <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="relative flex flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
         <div className="min-w-0">
-          {eyebrow && <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-blue-50">{eyebrow}</div>}
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <h1 id={titleId} className="flex items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl">
+          {eyebrow && (
+            <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs font-medium text-blue-100/80">
+              {eyebrow}
+            </div>
+          )}
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h1 id={titleId} className="flex items-center gap-2 text-2xl @5xl:text-3xl font-bold tracking-tight leading-tight">
               {Icon && (
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-inset ring-white/25">
-                  <Icon size={19} aria-hidden="true" />
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-inset ring-white/25">
+                  <Icon size={17} aria-hidden="true" />
                 </span>
               )}
               {title}
             </h1>
-            {titleAside && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-blue-50">{titleAside}</div>}
+            {titleAside && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs font-medium text-blue-100/80">
+                {titleAside}
+              </div>
+            )}
           </div>
-          {subtitle && <p className="mt-1 text-sm text-blue-50/90">{subtitle}</p>}
+          {subtitle && <p className="mt-0.5 text-xs sm:text-sm text-blue-50/80">{subtitle}</p>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2.5">{actions}</div>}
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2 @3xl:justify-end">{actions}</div>
+        )}
       </div>
 
       {children && (
-        <div id={statsId} className={`relative mt-5 grid gap-3 ${statsClassName ?? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'}`}>
+        <div id={statsId} className={`relative mt-3 sm:mt-4 grid gap-2 sm:gap-3 ${statsClassName ?? 'grid-cols-2 @3xl:grid-cols-4'}`}>
           {children}
         </div>
       )}
@@ -79,30 +91,28 @@ export const HeroStat: React.FC<{
   className?: string;
 }> = ({ icon: Icon, iconClass, label, value, hint, aside, onClick, selected, alert, className = '' }) => {
   const tone = alert
-    ? 'border-rose-300/60 bg-rose-500/20 hover:bg-rose-500/25'
+    ? 'border-rose-500/80 bg-fuchsia-700/40 hover:bg-fuchsia-700/50'
     : selected
       ? 'border-white/70 bg-white/20 ring-2 ring-white/40'
-      : 'border-white/15 bg-white/10 hover:bg-white/15';
+      : 'border-indigo-200/35 bg-indigo-500/45 hover:bg-indigo-500/55';
   const body = (
     <>
-      <div className="flex w-full items-center gap-2">
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-sm ring-1 ring-inset ring-white/25 ${iconClass}`}>
-          <Icon size={16} aria-hidden="true" />
+      <div className="flex w-full items-center gap-1.5">
+        <span className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg shadow-md ring-1 ring-inset ring-white/25 ${iconClass}`}>
+          <Icon size={15} aria-hidden="true" />
         </span>
-        {/* Quebra em vez de cortar: no celular os blocos ficam 2 por linha. */}
-        <span className="min-w-0 flex-1 text-sm font-medium leading-tight text-blue-50">{label}</span>
-        {alert && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-300 motion-safe:animate-pulse" aria-hidden="true" />}
-        {/* No celular o bloco é estreito: sem a seta (continua clicável). */}
-        {onClick && <ChevronRight size={16} className="hidden shrink-0 text-blue-50/80 sm:block" aria-hidden="true" />}
+        <span className="min-w-0 flex-1 text-xs @5xl:text-sm font-semibold leading-tight text-white line-clamp-2">{label}</span>
+        {alert && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 motion-safe:animate-pulse" aria-hidden="true" />}
+        {onClick && <ChevronRight size={16} className="hidden shrink-0 text-white/50 sm:block" aria-hidden="true" />}
       </div>
-      <div className="mt-3 flex w-full items-center justify-between gap-3">
-        <div className="whitespace-nowrap text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{value}</div>
-        {aside && <div className="w-20 min-w-0 shrink">{aside}</div>}
+      <div className="mt-2 flex w-full items-end justify-between gap-2">
+        <div className="whitespace-nowrap text-[clamp(1.15rem,2.3cqi,1.75rem)] font-bold tracking-tight tabular-nums leading-none">{value}</div>
+        {aside && <div className="w-16 sm:w-20 min-w-0 shrink hidden xs:block">{aside}</div>}
       </div>
-      {hint && <div className="mt-1 text-xs text-blue-50/90">{hint}</div>}
+      {hint && <div className="mt-1 text-[11px] @5xl:text-xs font-medium text-white/85 line-clamp-1">{hint}</div>}
     </>
   );
-  const cls = `flex flex-col justify-between rounded-2xl border p-4 text-left text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.18)] transition-colors duration-200 ${tone} ${className}`;
+  const cls = `flex flex-col justify-between rounded-2xl border p-3 @5xl:p-4 text-left text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_8px_24px_-12px_rgb(30_27_75/0.5)] transition-colors duration-200 ${tone} ${className}`;
   return onClick ? (
     <button type="button" onClick={onClick} aria-pressed={selected} className={`${cls} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}>
       {body}

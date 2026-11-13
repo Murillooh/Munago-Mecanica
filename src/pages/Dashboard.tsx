@@ -7,7 +7,7 @@ import {
   FileText, 
   AlertTriangle, 
   Plus, 
-  Sparkles, 
+  ClipboardList, 
   Loader2, 
   Calendar, 
   Clock, 
@@ -115,43 +115,43 @@ export const Dashboard = ({
   const MONITOR_SECTIONS = useMemo(() => [
     {
       id: 'widget-section-kpis',
-      title: 'Indicadores Gerais & Alertas de Ruptura',
+      title: 'Resumo do dia',
       shortLabel: 'Indicadores',
       tag: 'Kpis & Estoque',
       badge: 'Visão Geral'
     },
     {
       id: 'widget-section-logistics-os',
-      title: 'Balanço Logístico & Pátio de Ordens de Serviço',
-      shortLabel: 'Balanço & Oficina',
+      title: 'Movimento de peças e carros na oficina',
+      shortLabel: 'Oficina',
       tag: 'Movimentações & OS',
       badge: 'Operação'
     },
     {
       id: 'widget-section-revenue',
-      title: 'Faturamento de OS & Peças Mais Consumidas',
-      shortLabel: 'Faturamento & Consumo',
+      title: 'Faturamento e peças mais usadas',
+      shortLabel: 'Faturamento',
       tag: 'Receita & Giro',
       badge: 'Financeiro'
     },
     {
       id: 'widget-section-replenishment-cat',
-      title: 'Central de Reposição & Valor por Categoria',
-      shortLabel: 'Reposição & Categorias',
+      title: 'Reposição e valor por categoria',
+      shortLabel: 'Reposição',
       tag: 'Itens Críticos & Categorias',
       badge: 'Almoxarifado'
     },
     {
       id: 'widget-section-coverage',
-      title: 'Cobertura de Estoque em Dias',
+      title: 'Quantos dias o estoque dura',
       shortLabel: 'Cobertura',
       tag: 'Dias de Estoque',
       badge: 'Planejamento'
     },
     {
       id: 'widget-section-audit',
-      title: 'Auditoria Operacional de Movimentações',
-      shortLabel: 'Auditoria em Tempo Real',
+      title: 'Últimas movimentações',
+      shortLabel: 'Movimentações',
       tag: 'Logs & Histórico',
       badge: 'Auditoria'
     }
@@ -389,11 +389,11 @@ export const Dashboard = ({
         .sort((a, b) => ((b.minQuantity || 0) - (b.quantity || 0)) - ((a.minQuantity || 0) - (a.quantity || 0)))
         .slice(0, 40)
         .map(p => ({
-          n: p.name,
-          q: p.quantity,
-          m: p.minQuantity,
-          c: p.category,
-          v: p.price
+          nome: p.name,
+          estoque: p.quantity,
+          minimo: p.minQuantity,
+          categoria: p.category,
+          preco: p.price
         }));
 
       const res = await authFetch('/api/gemini/generate', {
@@ -405,7 +405,7 @@ export const Dashboard = ({
           1. DIAGNÓSTICO GERAL (2 linhas sobre a saúde do estoque e índice de ruptura).
           2. TOP 3 ITENS CRÍTICOS PARA REPOSIÇÃO IMEDIATA (com justificativa de impacto).
           3. RECOMENDAÇÃO LOGÍSTICA PARA ESTA SEMANA (plano de ação direto para o almoxarifado).
-          Mantenha linguagem profissional, enxuta e sem clichês.`,
+          Mantenha linguagem profissional, enxuta e sem clichês. Escreva números com algarismos (ex.: "estoque 0, mínimo 1", "38%"), sem LaTeX, sem crases e sem nomes de campos do JSON.`,
           config: {
             maxOutputTokens: 600,
             temperature: 0.2,
@@ -431,8 +431,19 @@ export const Dashboard = ({
     if (!summary) return;
     navigator.clipboard.writeText(summary);
     setCopiedSummary(true);
-    toast.success("Diagnóstico copiado para a área de transferência!");
+    toast.success("Resumo copiado.");
     setTimeout(() => setCopiedSummary(false), 2000);
+  };
+
+  const handleDiagnosticPDF = async () => {
+    if (!summary) return;
+    try {
+      const { exportDiagnosticToPDF } = await import('../lib/pdfExport');
+      exportDiagnosticToPDF({ store: settings, text: summary, products });
+      toast.success("PDF baixado.");
+    } catch {
+      toast.error("Erro ao gerar o PDF do diagnóstico.");
+    }
   };
 
   const handleExportPDF = async () => {
@@ -466,7 +477,7 @@ export const Dashboard = ({
           </span>
         </>}
         title={<>Olá{profile?.name ? `, ${profile.name.trim().split(/\s+/)[0]}` : ''}</>}
-        subtitle={`${settings.storeName || 'Munago Mecânica'} · Monitoramento operacional`}
+        subtitle={settings.storeName || 'Munago Mecânica'}
         actions={<>
           <button onClick={handleExportPDF} className={heroBtn}>
             <Download size={14} aria-hidden="true" />
@@ -474,8 +485,8 @@ export const Dashboard = ({
           </button>
           {!isViewer && (
             <button onClick={generateSummary} disabled={isGeneratingSummary} className={heroBtn}>
-              {isGeneratingSummary ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
-              <span>Diagnóstico Executivo</span>
+              {isGeneratingSummary ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <ClipboardList size={14} aria-hidden="true" />}
+              <span>Resumo da IA</span>
             </button>
           )}
           {canManageOS && (
@@ -486,15 +497,15 @@ export const Dashboard = ({
           )}
         </>}
         statsId="widget-section-kpis"
-        statsClassName={`grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 rounded-3xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
+        statsClassName={`grid-cols-1 @sm:grid-cols-2 @3xl:grid-cols-4 rounded-3xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
       >
         <HeroStat
-          icon={Package} iconClass="bg-blue-500" label="Patrimônio em estoque"
+          icon={Package} iconClass="bg-blue-500" label="Valor em estoque"
           value={formatBRL(totalStockValue)}
           hint={`${totalItems} referências · média ${formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}`}
         />
         <HeroStat
-          icon={TrendingUp} iconClass="bg-emerald-500" label="Faturamento 30 dias"
+          icon={TrendingUp} iconClass="bg-emerald-500" label="Faturado em 30 dias"
           value={formatBRL(revenue30.total)}
           aside={<Sparkline id="spark-revenue" data={revenue30.daily} color="#ffffff" />}
           hint={<span className="flex items-center gap-1.5">
@@ -508,7 +519,7 @@ export const Dashboard = ({
           </span>}
         />
         <HeroStat
-          icon={Boxes} iconClass="bg-violet-500" label="Disponibilidade"
+          icon={Boxes} iconClass="bg-violet-500" label="Peças com estoque ok"
           value={`${healthyRate}%`}
           aside={<Sparkline id="spark-out" data={outDaily14} color="#c4b5fd" />}
           hint={`${new Intl.NumberFormat('pt-BR').format(totalUnits)} un · ${healthyItemsCount} acima do mínimo`}
@@ -516,11 +527,11 @@ export const Dashboard = ({
         <HeroStat
           icon={lowStockProducts.length > 0 ? AlertTriangle : CheckCircle2}
           iconClass={lowStockProducts.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}
-          label="Risco de ruptura"
+          label="Peças acabando"
           alert={lowStockProducts.length > 0}
           onClick={onSeeAllLowStock}
           value={<>{lowStockProducts.length} <span className="text-base font-normal text-blue-100/80">itens</span></>}
-          hint={lowStockProducts.length > 0 ? 'Abaixo do mínimo: risco de parar OS' : 'Nenhuma ruptura agora'}
+          hint={lowStockProducts.length > 0 ? 'Abaixo do mínimo, repor logo' : 'Nada faltando agora'}
         />
       </PageHero>
 
@@ -540,12 +551,12 @@ export const Dashboard = ({
               {/* Left: Monitor Status & Active Widget Name */}
               <div className="flex items-center gap-3 min-w-0 flex-wrap">
                 <div className="flex items-center gap-2 px-2.5 py-1 bg-blue-600/25 text-blue-400 border border-blue-500/40 rounded-lg text-xs font-bold">
-                  <Tv size={14} className="animate-pulse text-blue-400" />
+                  <Tv size={14} className="text-blue-400" />
                   <span className="tracking-wide uppercase text-[10px]">Painel de Parede</span>
                 </div>
 
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
                   <span className="text-xs font-semibold text-zinc-300">
                     Widget {activeWidgetIndex + 1}/{MONITOR_SECTIONS.length}:
                   </span>
@@ -675,7 +686,7 @@ export const Dashboard = ({
               <div
                 className={`h-full transition-all ease-linear ${
                   isAutoScrollActive && !isUserInteracting
-                    ? 'bg-gradient-to-r from-blue-500 via-indigo-400 to-emerald-400'
+                    ? 'bg-blue-500'
                     : 'bg-zinc-600'
                 }`}
                 style={{
@@ -713,12 +724,12 @@ export const Dashboard = ({
           <div className="col-span-12 xl:col-span-4 flex flex-col p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg shadow-blue-500/30 ring-1 ring-white/30">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
                   <Car size={17} aria-hidden="true" />
                 </span>
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Pátio de Ordens de Serviço</h2>
-                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">Fluxo operacional da oficina</p>
+                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Carros na oficina</h2>
+                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">OS abertas agora</p>
                 </div>
               </div>
               {canManageOS && (
@@ -731,62 +742,68 @@ export const Dashboard = ({
             {/* Contadores do pátio em blocos coloridos */}
             <div className="mb-4 grid grid-cols-3 gap-2 text-center">
               {([
-                ['Triagem', (serviceOrders || []).filter(os => os.status === 'draft').length, 'from-zinc-500/15 to-zinc-500/5 border-zinc-500/20', 'text-zinc-700 dark:text-zinc-200'],
-                ['Execução', inProgressOS.length, 'from-amber-500/20 to-orange-500/5 border-amber-500/30', 'text-amber-600 dark:text-amber-400'],
-                ['Concluídas', completedOS.length, 'from-emerald-500/20 to-teal-500/5 border-emerald-500/30', 'text-emerald-600 dark:text-emerald-400'],
+                ['Orçamento', (serviceOrders || []).filter(os => os.status === 'draft').length, 'border-zinc-200 dark:border-zinc-800', 'text-zinc-700 dark:text-zinc-200'],
+                ['Em serviço', inProgressOS.length, 'border-zinc-200 dark:border-zinc-800', 'text-amber-600 dark:text-amber-400'],
+                ['Prontas', completedOS.length, 'border-zinc-200 dark:border-zinc-800', 'text-emerald-600 dark:text-emerald-400'],
               ] as const).map(([label, count, tile, tone]) => (
-                <div key={label} className={`rounded-xl border bg-gradient-to-br py-2.5 ${tile}`}>
-                  <span className={`block text-[10px] font-semibold uppercase tracking-wide ${tone}`}>{label}</span>
+                <div key={label} className={`rounded-xl border py-2.5 ${tile}`}>
+                  <span className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">{label}</span>
                   <span className={`text-xl font-bold tabular-nums ${tone}`}>{count}</span>
                 </div>
               ))}
             </div>
 
+            {/* Tipo de manutenção das OS em aberto */}
+            {activeOS.length > 0 && (() => {
+              const preventivas = activeOS.filter(os => os.maintenanceType === 'preventiva').length;
+              return (
+                <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-orange-500" aria-hidden="true" />Corretivas <b className="tabular-nums text-zinc-800 dark:text-zinc-200">{activeOS.length - preventivas}</b></span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal-500" aria-hidden="true" />Preventivas <b className="tabular-nums text-zinc-800 dark:text-zinc-200">{preventivas}</b></span>
+                  <span className="text-zinc-400">em aberto</span>
+                </p>
+              );
+            })()}
+
             {/* OS em andamento: faixa colorida pela etapa */}
-            <div className="flex-1 space-y-2.5">
-              {activeOS.length > 0 ? (
-                activeOS.slice(0, 3).map((os) => {
+            {/* Lista simples: carro e placa primeiro (é assim que a oficina chama), cliente e etapa embaixo */}
+            {activeOS.length > 0 ? (
+              <ul className="flex-1 divide-y divide-zinc-100 dark:divide-zinc-800">
+                {activeOS.slice(0, 4).map((os) => {
                   const running = os.status === 'in_progress';
                   return (
-                    <button
-                      key={os.id}
-                      type="button"
-                      onClick={onNewOS}
-                      className={`relative w-full overflow-hidden rounded-xl border border-zinc-200/60 bg-zinc-50/70 py-3 pl-4 pr-3.5 text-left transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-800/40 dark:hover:border-zinc-700 cursor-pointer`}
-                    >
-                      <span className={`absolute inset-y-0 left-0 w-1 ${running ? 'bg-gradient-to-b from-amber-400 to-orange-500' : 'bg-gradient-to-b from-zinc-300 to-zinc-500'}`} aria-hidden="true" />
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs font-bold text-zinc-900 dark:text-white">OS #{os.id.substring(0, 6)}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${running ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-300'}`}>
-                          {running ? 'Em andamento' : 'Orçamento'}
-                        </span>
-                      </div>
-                      <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
-                        <span className="truncate font-semibold text-zinc-700 dark:text-zinc-200">{os.customerName || 'Cliente sem nome'}</span>
-                        <span className="shrink-0 font-bold tabular-nums text-zinc-900 dark:text-white">{formatBRL(os.finalAmount || os.totalAmount || 0)}</span>
-                      </div>
-                      {(os.vehicleModel || os.licensePlate) && (
-                        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-500">
-                          <Car size={12} className="text-zinc-400" aria-hidden="true" />
-                          <span className="truncate">{os.vehicleModel || 'Veículo'} {os.licensePlate ? `(${os.licensePlate})` : ''}</span>
+                    <li key={os.id}>
+                      <button
+                        type="button"
+                        onClick={onNewOS}
+                        className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{os.vehicleModel || os.customerName || 'Sem veículo'}</span>
+                            {os.licensePlate && <span className="shrink-0 font-mono text-[11px] uppercase text-zinc-500">{os.licensePlate}</span>}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${running ? 'bg-amber-500' : 'bg-zinc-400'}`} aria-hidden="true" />
+                            <span className="truncate">{running ? 'Em serviço' : 'Orçamento'}{os.vehicleModel && os.customerName ? ` · ${os.customerName}` : ''}</span>
+                          </div>
                         </div>
-                      )}
-                    </button>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-900 dark:text-white">{formatBRL(os.finalAmount || os.totalAmount || 0)}</span>
+                      </button>
+                    </li>
                   );
-                })
-              ) : (
-                <div className="rounded-xl border border-dashed border-zinc-200 py-7 text-center text-xs text-zinc-500 dark:border-zinc-800">
-                  Nenhuma ordem em andamento no pátio.
-                </div>
-              )}
-            </div>
+                })}
+              </ul>
+            ) : (
+              <p className="flex-1 py-7 text-center text-xs text-zinc-500">Nenhum carro em serviço agora.</p>
+            )}
 
             {canManageOS && (
               <button
                 onClick={onNewOS}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-600/25 transition hover:brightness-110 cursor-pointer"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 cursor-pointer"
               >
-                <Plus size={14} aria-hidden="true" /> Abrir painel de ordens
+                Ver todas as OS <ChevronRight size={14} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -824,10 +841,10 @@ export const Dashboard = ({
                 <div>
                   <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
                     <ShieldAlert size={16} className={lowStockProducts.length > 0 ? "text-red-500" : "text-zinc-400"} />
-                    Central de Reposição & Itens Críticos
+                    Peças para repor
                   </h2>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Produtos que atingiram o limite mínimo de segurança cadastrado
+                    Chegaram no estoque mínimo que você definiu
                   </p>
                 </div>
 
@@ -949,10 +966,10 @@ export const Dashboard = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
                 <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
-                  Auditoria de Movimentações Recentes
+                  Últimas movimentações
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Log contínuo de entradas, devoluções e requisições para a oficina
+                  Entradas, saídas e devoluções de peças
                 </p>
               </div>
               <button
@@ -1033,14 +1050,14 @@ export const Dashboard = ({
               <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                    <Sparkles size={16} />
+                    <ClipboardList size={16} aria-hidden="true" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
-                      Diagnóstico Operacional & Riscos de Ruptura
+                      Resumo do estoque
                     </h3>
                     <p className="text-xs text-zinc-500">
-                      Análise automatizada de conformidade e giro de estoque
+                      Feito pela IA com base no seu estoque e nas OS
                     </p>
                   </div>
                 </div>
@@ -1057,10 +1074,10 @@ export const Dashboard = ({
                   <div className="py-12 text-center space-y-3">
                     <Loader2 size={24} className="animate-spin mx-auto text-blue-600" />
                     <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                      Processando telemetria do estoque...
+                      Lendo seu estoque…
                     </p>
                     <p className="text-xs text-zinc-500 max-w-md mx-auto">
-                      Avaliando níveis de reserva, histórico recente de saídas e calculando pontos críticos de reposição.
+                      Leva alguns segundos.
                     </p>
                   </div>
                 ) : summary ? (
@@ -1069,14 +1086,14 @@ export const Dashboard = ({
                   </div>
                 ) : (
                   <p className="text-sm text-zinc-500 text-center py-8">
-                    Nenhum diagnóstico gerado ainda. Clique em atualizar para calcular.
+                    Nenhum resumo ainda.
                   </p>
                 )}
               </div>
 
               <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <span className="text-xs text-zinc-400">
-                  Munago Mecânica · Análise Executiva
+                  Gerado por IA. Confira antes de decidir.
                 </span>
                 <div className="flex items-center gap-2">
                   {summary && (
@@ -1085,7 +1102,16 @@ export const Dashboard = ({
                       className="px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors inline-flex items-center gap-1.5"
                     >
                       {copiedSummary ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                      {copiedSummary ? "Copiado!" : "Copiar Diagnóstico"}
+                      {copiedSummary ? "Copiado!" : "Copiar"}
+                    </button>
+                  )}
+                  {summary && !isGeneratingSummary && (
+                    <button
+                      onClick={handleDiagnosticPDF}
+                      className="px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors inline-flex items-center gap-1.5"
+                    >
+                      <Download size={14} aria-hidden="true" />
+                      Baixar PDF
                     </button>
                   )}
                   <button

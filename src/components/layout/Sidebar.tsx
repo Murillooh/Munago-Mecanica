@@ -1,19 +1,19 @@
 import React from 'react';
 import {
-  LayoutDashboard,
-  Package,
-  FileText,
-  Wrench,
-  History,
-  Bell,
-  Users,
-  Settings,
+  BarChart3,
+  Boxes,
+  ClipboardList,
+  ClipboardCheck,
+  Hammer,
+  ArrowLeftRight,
+  BellDot,
+  UsersRound,
+  SlidersHorizontal,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Sparkles,
+  ChevronLeft,
+  BrainCircuit,
   Maximize2,
-  ShieldCheck,
+  ShieldHalf,
   type LucideIcon,
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -60,7 +60,11 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
     setIsMonitorMode,
     isSuperAdmin,
     workspaces,
-    switchWorkspace
+    switchWorkspace,
+    canCheckin,
+    canManageOS,
+    canManageInventory,
+    canApproveOS
   } = useApp();
 
   if (isMonitorMode) {
@@ -71,28 +75,43 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
   const lowStockCount = (products || []).filter(p => (p.quantity || 0) < (p.minQuantity || 0)).length;
   const openOSCount = (serviceOrders || []).filter(os => os.status === 'draft' || os.status === 'in_progress').length;
 
+  // Gradientes iOS por item
+  const iconColors: Record<string, string> = {
+    dashboard:    'from-blue-500 to-blue-600',
+    inventory:    'from-orange-400 to-orange-500',
+    os:           'from-red-500 to-rose-600',
+    services:     'from-green-500 to-emerald-600',
+    transactions: 'from-purple-500 to-violet-600',
+    ai:           'from-pink-500 to-fuchsia-600',
+    alerts:       'from-yellow-400 to-amber-500',
+    users:        'from-teal-500 to-cyan-600',
+    admin:        'from-slate-600 to-slate-700',
+    settings:     'from-zinc-500 to-zinc-600',
+  };
+
   const groups: NavGroup[] = [
     {
       label: 'Operação',
       items: [
-        ...(canViewReports ? [{ id: 'dashboard', label: 'Monitoramento', icon: LayoutDashboard }] : []),
-        ...(canViewInventory ? [{ id: 'inventory', label: 'Almoxarifado', icon: Package, count: lowStockCount, tone: 'alert' as const }] : []),
-        ...(canViewOS ? [{ id: 'os', label: 'Ordens de serviço', icon: FileText, count: openOSCount, tone: 'neutral' as const }] : []),
-        ...(canViewOS ? [{ id: 'services', label: 'Serviços', icon: Wrench }] : []),
-        ...(canPerformTransactions || canViewReports ? [{ id: 'transactions', label: 'Movimentações', icon: History }] : []),
+        ...(canViewReports ? [{ id: 'dashboard', label: 'Monitoramento', icon: BarChart3 }] : []),
+        ...(canViewInventory ? [{ id: 'inventory', label: 'Almoxarifado', icon: Boxes, count: lowStockCount, tone: 'alert' as const }] : []),
+        ...(canCheckin || canManageOS || canApproveOS || canManageInventory || canViewReports ? [{ id: 'checkin', label: 'OS de motos', icon: ClipboardCheck }] : []),
+        ...(canViewOS ? [{ id: 'os', label: 'Ordens de serviço', icon: ClipboardList, count: openOSCount, tone: 'neutral' as const }] : []),
+        ...(canViewOS ? [{ id: 'services', label: 'Serviços', icon: Hammer }] : []),
+        ...(canPerformTransactions || canViewReports ? [{ id: 'transactions', label: 'Movimentações', icon: ArrowLeftRight }] : []),
       ],
     },
     {
       label: 'Inteligência',
-      items: !isViewer ? [{ id: 'ai', label: 'Assistente IA', icon: Sparkles }] : [],
+      items: !isViewer ? [{ id: 'ai', label: 'Assistente IA', icon: BrainCircuit }] : [],
     },
     {
       label: 'Gestão',
       items: [
-        ...(isAdmin ? [{ id: 'alerts', label: 'Alertas', icon: Bell, count: unreadCount, tone: 'alert' as const }] : []),
-        ...(canManageUsers ? [{ id: 'users', label: 'Equipe e acessos', icon: Users }] : []),
-        ...(isSuperAdmin ? [{ id: 'admin', label: 'Painel geral', icon: ShieldCheck }] : []),
-        ...(isAdmin ? [{ id: 'settings', label: 'Configurações', icon: Settings }] : []),
+        { id: 'alerts', label: 'Alertas', icon: BellDot, count: unreadCount, tone: 'alert' as const },
+        ...(canManageUsers ? [{ id: 'users', label: 'Equipe e acessos', icon: UsersRound }] : []),
+        ...(isSuperAdmin ? [{ id: 'admin', label: 'Painel geral', icon: ShieldHalf }] : []),
+        ...(isAdmin ? [{ id: 'settings', label: 'Configurações', icon: SlidersHorizontal }] : []),
       ],
     },
   ].filter(g => g.items.length > 0);
@@ -136,27 +155,28 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       className={`hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 ${isCollapsed ? 'w-[4.25rem]' : 'w-64'} border-r border-zinc-200 bg-white text-zinc-600 transition-[width] duration-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400`}
     >
       {/* Marca + recolher */}
-      <div className={`flex h-16 shrink-0 items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-2'}`}>
-        {!isCollapsed && (
-          <div className="flex min-w-0 items-center gap-2.5">
-            <img src="/brand/munago-mecanica-icon.svg" alt="" width={32} height={32} className="h-8 w-8 shrink-0 rounded-xl shadow-sm" />
+      <div className={`flex h-16 shrink-0 items-center ${isCollapsed ? 'justify-center px-2' : 'pl-4 pr-2'}`}>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <img src="/brand/munago-mecanica-icon.svg" alt="" width={32} height={32} className="h-8 w-8 shrink-0 rounded-xl shadow-sm" />
+          {!isCollapsed && (
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{storeName}</p>
               <p className="truncate text-[11px] text-zinc-500">Gestão da oficina</p>
             </div>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
-          aria-expanded={!isCollapsed}
-          title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
-          className={iconButton}
-        >
-          {isCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
-        </button>
+          )}
+        </div>
       </div>
+      {/* Recolher/expandir: botão redondo em cima da borda do menu */}
+      <button
+        type="button"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+        aria-expanded={!isCollapsed}
+        title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+        className="absolute -right-3.5 top-16 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 shadow-sm transition-colors hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        <ChevronLeft size={15} aria-hidden="true" className={`transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`} />
+      </button>
 
       {/* Admin geral: escolhe qual oficina está administrando */}
       {isSuperAdmin && !isCollapsed && workspaces.length > 0 && (
@@ -172,7 +192,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       )}
 
       {/* Navegação */}
-      <nav className="flex-1 overflow-y-auto px-2.5 py-3" aria-label="Menu principal">
+      <nav className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 py-3" aria-label="Menu principal">
         {groups.map((group, gi) => (
           <div key={group.label} className={gi > 0 ? 'mt-4' : ''}>
             {isCollapsed ? (
@@ -184,6 +204,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
               {group.items.map(item => {
                 const active = activeTab === item.id;
                 const showCount = !!item.count && item.count > 0;
+                const gradient = iconColors[item.id] ?? 'from-zinc-500 to-zinc-600';
                 return (
                   <li key={item.id} className="group/item relative">
                     <button
@@ -191,37 +212,46 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
                       onClick={() => go(item.id)}
                       aria-current={active ? 'page' : undefined}
                       aria-label={isCollapsed ? `${item.label}${showCount ? ` (${item.count})` : ''}` : undefined}
-                      className={`relative flex h-10 w-full items-center rounded-xl text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
-                        isCollapsed ? 'justify-center' : 'gap-3 px-3'
+                      className={`relative flex h-11 w-full items-center rounded-xl text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
+                        isCollapsed ? 'justify-center px-1' : 'gap-3 px-2.5'
                       } ${
                         active
-                          ? 'font-semibold text-white'
-                          : 'font-medium hover:bg-zinc-900/5 hover:text-zinc-900 dark:hover:bg-white/5 dark:hover:text-zinc-100'
+                          ? 'font-semibold'
+                          : 'font-medium hover:bg-zinc-900/5 dark:hover:bg-white/5'
                       }`}
                     >
-                      {/* Pílula do item ativo: desliza até o item clicado, como no macOS (layoutId compartilhado). */}
+                      {/* Fundo sutil no item ativo */}
                       {active && (
                         <motion.span
                           layoutId="sidebar-active-pill"
-                          className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md shadow-blue-600/25"
+                          className="absolute inset-0 rounded-xl bg-zinc-100 dark:bg-white/8"
                           aria-hidden="true"
                         />
                       )}
-                      <item.icon size={18} strokeWidth={active ? 2.25 : 1.75} className="relative shrink-0" aria-hidden="true" />
-                      {!isCollapsed && <span className="relative truncate">{item.label}</span>}
+
+                      {/* Ícone estilo iOS: container colorido com gradiente */}
+                      <span className={`relative shrink-0 flex items-center justify-center w-8 h-8 rounded-[10px] bg-gradient-to-br ${gradient} shadow-sm`}>
+                        <item.icon size={16} strokeWidth={2} className="text-white" aria-hidden="true" />
+                        {/* Badge de alerta no canto do ícone (modo colapsado) */}
+                        {showCount && isCollapsed && item.tone === 'alert' && (
+                          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-zinc-950" aria-hidden="true" />
+                        )}
+                      </span>
+
+                      {!isCollapsed && (
+                        <span className={`relative truncate text-sm ${
+                          active ? 'text-zinc-900 dark:text-white font-semibold' : 'text-zinc-600 dark:text-zinc-400'
+                        }`}>{item.label}</span>
+                      )}
+
                       {showCount && !isCollapsed && (
                         <span className={`relative ml-auto min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums ${
-                          active
-                            ? 'bg-white/25 text-white'
-                            : item.tone === 'alert'
-                              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
-                              : 'bg-zinc-900/5 text-zinc-600 dark:bg-white/10 dark:text-zinc-300'
+                          item.tone === 'alert'
+                            ? 'bg-rose-500/12 text-rose-600 dark:text-rose-400'
+                            : 'bg-zinc-900/6 text-zinc-600 dark:bg-white/10 dark:text-zinc-300'
                         }`}>
                           {item.count! > 99 ? '99+' : item.count}
                         </span>
-                      )}
-                      {showCount && isCollapsed && item.tone === 'alert' && (
-                        <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-zinc-950" aria-hidden="true" />
                       )}
                     </button>
 

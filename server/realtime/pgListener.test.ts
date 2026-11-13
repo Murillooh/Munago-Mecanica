@@ -44,12 +44,14 @@ describe('startPgChangeListener', () => {
   it('repassa notificações válidas para o ChangeBus', async () => {
     const bus = new ChangeBus();
     const seen: string[] = [];
-    bus.on('change', (r) => seen.push(r));
+    bus.on('change', (r, scope) => seen.push(`${r}@${scope}`));
     const stop = startPgChangeListener('postgres://x', bus, log);
     await flush();
-    clients[0].emit('notification', { channel: 'mecanica_changes', payload: 'products' });
-    clients[0].emit('notification', { channel: 'mecanica_changes', payload: 'qualquer_coisa' });
-    expect(seen).toEqual(['products']);
+    clients[0].emit('notification', { channel: 'mecanica_changes', payload: 'products:w1' });
+    clients[0].emit('notification', { channel: 'mecanica_changes', payload: 'qualquer_coisa:w1' });
+    // Formato antigo, sem oficina: só o admin geral.
+    clients[0].emit('notification', { channel: 'mecanica_changes', payload: 'services' });
+    expect(seen).toEqual(['products@w1', 'services@*']);
     await stop();
   });
 });

@@ -102,6 +102,12 @@ const PlateBadge: React.FC<{ plate?: string }> = ({ plate }) => (
   </span>
 );
 
+type MaintenanceType = 'corretiva' | 'preventiva';
+const MAINTENANCE_META: Record<MaintenanceType, { label: string; chip: string }> = {
+  corretiva: { label: 'Corretiva', chip: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300' },
+  preventiva: { label: 'Preventiva', chip: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300' },
+};
+
 const fieldClass =
   'w-full rounded-lg border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50 dark:bg-zinc-800/60 px-3.5 py-2.5 text-[15px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-600 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-blue-600/15 disabled:opacity-60';
 
@@ -146,7 +152,8 @@ export const ServiceOrders = () => {
     deleteServiceOrder, 
     canManageOS,
     profile,
-    services
+    services,
+    isSuperAdmin
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -155,6 +162,7 @@ export const ServiceOrders = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [typeFilter, setTypeFilter] = useState<MaintenanceType | 'all'>('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   
   // OS Form State
@@ -167,6 +175,7 @@ export const ServiceOrders = () => {
   const [generalLaborCost, setGeneralLaborCost] = useState(0);
   const [items, setItems] = useState<any[]>([]);
   const [osStatus, setOsStatus] = useState<OSStatus>('draft');
+  const [maintenanceType, setMaintenanceType] = useState<MaintenanceType>('corretiva');
   const [observations, setObservations] = useState('');
   const [osServices, setOsServices] = useState<OSService[]>([]);
   const [serviceToAdd, setServiceToAdd] = useState('');
@@ -185,6 +194,7 @@ export const ServiceOrders = () => {
       setGeneralLaborCost(selectedOS.generalLaborCost || 0);
       setItems(selectedOS.items || []);
       setOsStatus(selectedOS.status || 'draft');
+      setMaintenanceType(selectedOS.maintenanceType || 'corretiva');
       setObservations(selectedOS.observations || '');
       setOsServices(selectedOS.serviceItems || []);
     } else {
@@ -197,6 +207,7 @@ export const ServiceOrders = () => {
       setGeneralLaborCost(0);
       setItems([]);
       setOsStatus('draft');
+      setMaintenanceType('corretiva');
       setObservations('');
       setOsServices([]);
     }
@@ -249,6 +260,7 @@ export const ServiceOrders = () => {
         os.vehicleModel?.toLowerCase().includes(q) ||
         os.id.toLowerCase().includes(q);
       if (!matchesSearch) return false;
+      if (typeFilter !== 'all' && (os.maintenanceType ?? 'corretiva') !== typeFilter) return false;
       if (statusFilter === 'all') return true;
       if (statusFilter === 'active') return os.status === 'draft' || os.status === 'in_progress';
       return os.status === statusFilter;
@@ -302,6 +314,7 @@ export const ServiceOrders = () => {
       generalLaborCost,
       items,
       status: osStatus,
+      maintenanceType,
       observations,
       totalAmount: totalOSAmount,
       // Só id + quantidade chegam ao servidor; ele calcula o repasse pelo catálogo.
@@ -345,7 +358,7 @@ export const ServiceOrders = () => {
             <Plus size={15} aria-hidden="true" /> Nova OS
           </button>
         )}
-        statsClassName="grid-cols-2 xl:grid-cols-4"
+        statsClassName="grid-cols-2 @3xl:grid-cols-4"
       >
         {statusStats.map(s => {
           const selected = statusFilter === s.value;
@@ -396,6 +409,23 @@ export const ServiceOrders = () => {
             </button>
           ))}
         </div>
+        <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/70 dark:border-zinc-700/60 overflow-x-auto" role="group" aria-label="Filtrar por tipo de manutenção">
+          {([['all', 'Todos os tipos'], ['corretiva', 'Corretiva'], ['preventiva', 'Preventiva']] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTypeFilter(value)}
+              aria-pressed={typeFilter === value}
+              className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                typeFilter === value
+                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Lista */}
@@ -433,6 +463,9 @@ export const ServiceOrders = () => {
                   <div className="flex items-center gap-2 min-w-0 text-xs text-zinc-500 dark:text-zinc-400">
                     <PlateBadge plate={os.vehiclePlate} />
                     <span className="truncate">{os.vehicleModel || 'Modelo não informado'}</span>
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${MAINTENANCE_META[os.maintenanceType ?? 'corretiva'].chip}`}>
+                      {MAINTENANCE_META[os.maintenanceType ?? 'corretiva'].label}
+                    </span>
                     <span className="ml-auto shrink-0 font-mono text-[10px] text-zinc-400">#{os.id.slice(-6).toUpperCase()}</span>
                   </div>
 
@@ -554,15 +587,18 @@ export const ServiceOrders = () => {
                   {OS_STEPS.map((step, i) => {
                     const current = OS_STEPS.findIndex(s => s.value === osStatus);
                     const reached = i <= current;
+                    // "Pago" só vem do Asaas; OS paga também não volta de etapa (admin geral pode corrigir).
+                    const locked = !isSuperAdmin && (step.value === 'paid' || selectedOS?.status === 'paid') && step.value !== osStatus;
                     return (
                       <button
                         key={step.value}
                         type="button"
                         role="radio"
                         aria-checked={osStatus === step.value}
-                        disabled={!canManageOS}
+                        disabled={!canManageOS || locked}
+                        title={locked ? (step.value === 'paid' ? 'Fica pago sozinho quando o cliente paga pelo Asaas' : 'OS paga pelo Asaas não volta de etapa') : undefined}
                         onClick={() => setOsStatus(step.value)}
-                        className="group text-left focus-visible:outline-none disabled:cursor-default"
+                        className={`group text-left focus-visible:outline-none disabled:cursor-default ${locked ? 'opacity-60' : ''}`}
                       >
                         <span className={`block h-1 rounded-full transition-colors ${reached ? 'bg-blue-600' : 'bg-zinc-200 dark:bg-zinc-700'} group-focus-visible:ring-2 group-focus-visible:ring-blue-600 group-focus-visible:ring-offset-2 dark:group-focus-visible:ring-offset-zinc-900`} />
                         <span className={`mt-1.5 block truncate text-xs ${osStatus === step.value ? 'font-semibold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400'} ${canManageOS ? 'group-hover:text-zinc-900 dark:group-hover:text-white' : ''}`}>
@@ -677,6 +713,29 @@ export const ServiceOrders = () => {
                         </div>
                       </section>
                     </div>
+
+                    <fieldset className="space-y-1.5">
+                      <legend className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Tipo de manutenção</legend>
+                      <div className="grid max-w-sm grid-cols-2 gap-2">
+                        {(Object.keys(MAINTENANCE_META) as MaintenanceType[]).map(t => (
+                          <label
+                            key={t}
+                            className={`flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors focus-within:ring-4 focus-within:ring-blue-600/15 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 ${maintenanceType === t ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700/80 dark:bg-zinc-800/60 dark:text-zinc-300'}`}
+                          >
+                            <input
+                              type="radio"
+                              name="os-maintenance-type"
+                              value={t}
+                              checked={maintenanceType === t}
+                              onChange={() => setMaintenanceType(t)}
+                              disabled={!canManageOS}
+                              className="sr-only"
+                            />
+                            {MAINTENANCE_META[t].label}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
 
                     <Field id="os-observations" label="Relato e diagnóstico" hint="o que o cliente contou e o que foi encontrado">
                       <textarea

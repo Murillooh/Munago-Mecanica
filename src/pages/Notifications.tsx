@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
+import { Bike,
   Bell,
   AlertTriangle,
   Check,
@@ -27,7 +27,8 @@ export const Notifications = () => {
   const {
     notifications,
     products,
-    markNotificationAsRead
+    markNotificationAsRead,
+    openMotoOS
   } = useApp();
 
   // Abre em "Todos": marcar como lido não tira o alerta da lista, só muda o visual.
@@ -147,7 +148,7 @@ export const Notifications = () => {
                       ? 'bg-zinc-50 dark:bg-zinc-800 text-zinc-400 border-zinc-200/70 dark:border-zinc-700'
                       : 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40'
                   }`}>
-                    <AlertTriangle size={15} aria-hidden="true" />
+                    {n.type === 'moto_os' ? <Bike size={15} aria-hidden="true" /> : <AlertTriangle size={15} aria-hidden="true" />}
                   </span>
 
                   <div className="flex-1 min-w-0">
@@ -173,6 +174,12 @@ export const Notifications = () => {
                     </div>
                   </div>
 
+                  {n.type === 'moto_os' && n.refId && (
+                    <button type="button" onClick={() => openMotoOS(n)}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-white rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer">
+                      Abrir OS
+                    </button>
+                  )}
                   {!n.read && (
                     <button
                       type="button"
