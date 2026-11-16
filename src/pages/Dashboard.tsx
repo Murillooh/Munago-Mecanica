@@ -498,7 +498,7 @@ export const Dashboard = ({
           )}
         </>}
         statsId="widget-section-kpis"
-        statsClassName={`grid-cols-1 @sm:grid-cols-2 @3xl:grid-cols-4 rounded-xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
+        statsClassName={`grid-cols-1 @sm:grid-cols-2 @3xl:grid-cols-4 rounded-xl transition-[box-shadow,background-color] duration-700 ${sectionHighlight('widget-section-kpis')}`}
       >
         <HeroStat
           icon={Package} iconClass="bg-blue-500" label="Valor em estoque"
@@ -606,7 +606,7 @@ export const Dashboard = ({
                       toast.info('Auto-scroll pausado');
                     }
                   }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shadow-xs ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors shadow-xs ${
                     isAutoScrollActive && !isUserInteracting
                       ? 'bg-blue-600 text-white hover:bg-blue-500'
                       : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
@@ -663,7 +663,7 @@ export const Dashboard = ({
                     key={sec.id}
                     type="button"
                     onClick={() => scrollToSection(idx)}
-                    className={`flex-1 min-w-[130px] flex items-center justify-between px-3 py-1.5 rounded-xl text-left text-xs font-semibold transition-all border ${
+                    className={`flex-1 min-w-[130px] flex items-center justify-between px-3 py-1.5 rounded-xl text-left text-xs font-semibold transition-colors border ${
                       isActive
                         ? 'bg-zinc-800 text-white border-blue-500 shadow-md ring-1 ring-blue-500/50'
                         : 'bg-zinc-950/50 text-zinc-400 border-zinc-800 hover:bg-zinc-800/60 hover:text-zinc-200'
@@ -685,7 +685,7 @@ export const Dashboard = ({
             {/* Continuous Smooth Progress Countdown Bar */}
             <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
               <div
-                className={`h-full transition-all ease-linear ${
+                className={`h-full transition-colors ease-linear ${
                   isAutoScrollActive && !isUserInteracting
                     ? 'bg-blue-500'
                     : 'bg-zinc-600'
@@ -710,7 +710,7 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div 
           id="widget-section-logistics-os"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-[box-shadow,background-color] duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
         >
           {/* BENTO 4: VISUALIZAÇÃO DE TENDÊNCIA DE ENTRADAS E SAÍDAS (RECHARTS) - col-span-12 xl:col-span-8 */}
           <div className="col-span-12 xl:col-span-8 flex flex-col">
@@ -725,11 +725,11 @@ export const Dashboard = ({
           <div className="col-span-12 xl:col-span-4 flex flex-col p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-700/60 dark:bg-zinc-800/60 dark:text-zinc-400">
                   <Car size={17} aria-hidden="true" />
                 </span>
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Carros na oficina</h2>
+                  <h2 className="text-base font-semibold text-zinc-900 dark:text-white">Carros na oficina</h2>
                   <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">OS abertas agora</p>
                 </div>
               </div>
@@ -744,12 +744,12 @@ export const Dashboard = ({
             <div className="mb-4 grid grid-cols-3 gap-2 text-center">
               {([
                 ['Orçamento', (serviceOrders || []).filter(os => os.status === 'draft').length, 'border-zinc-200 dark:border-zinc-800', 'text-zinc-700 dark:text-zinc-200'],
-                ['Em serviço', inProgressOS.length, 'border-zinc-200 dark:border-zinc-800', 'text-amber-600 dark:text-amber-400'],
-                ['Prontas', completedOS.length, 'border-zinc-200 dark:border-zinc-800', 'text-emerald-600 dark:text-emerald-400'],
+                ['Em serviço', inProgressOS.length, 'border-zinc-200 dark:border-zinc-800', 'text-zinc-900 dark:text-white'],
+                ['Prontas', completedOS.length, 'border-zinc-200 dark:border-zinc-800', 'text-zinc-900 dark:text-white'],
               ] as const).map(([label, count, tile, tone]) => (
                 <div key={label} className={`rounded-xl border py-2.5 ${tile}`}>
                   <span className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">{label}</span>
-                  <span className={`text-xl font-bold tabular-nums ${tone}`}>{count}</span>
+                  <span className={`text-xl font-semibold tabular-nums ${tone}`}>{count}</span>
                 </div>
               ))}
             </div>
@@ -815,7 +815,7 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div
           id="widget-section-revenue"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-revenue')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-[box-shadow,background-color] duration-700 p-1.5 ${sectionHighlight('widget-section-revenue')}`}
         >
           <div className="col-span-12 xl:col-span-8 flex flex-col">
             <OSRevenueChart serviceOrders={serviceOrders || []} darkMode={darkMode} onOpenOS={canManageOS ? onNewOS : undefined} />
@@ -833,14 +833,14 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div 
           id="widget-section-replenishment-cat"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-replenishment-cat')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-[box-shadow,background-color] duration-700 p-1.5 ${sectionHighlight('widget-section-replenishment-cat')}`}
         >
           {/* BENTO 6: CENTRAL DE REPOSIÇÃO (EXPANSIVE TABLE) - col-span-12 xl:col-span-8 */}
           <div className="col-span-12 xl:col-span-8 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                     <ShieldAlert size={16} className={lowStockProducts.length > 0 ? "text-red-500" : "text-zinc-400"} />
                     Peças para repor
                   </h2>
@@ -867,9 +867,9 @@ export const Dashboard = ({
                         <th className="py-3 px-3">Código/SKU</th>
                         <th className="py-3 px-3">Produto</th>
                         <th className="py-3 px-3">Categoria</th>
-                        <th className="py-3 px-3 text-right">Estoque / Mín</th>
+                        <th className="py-3 px-3 text-right">Estoque / mín.</th>
                         <th className="py-3 px-3 text-right">Déficit</th>
-                        <th className="py-3 px-3 text-right">Preço Unit.</th>
+                        <th className="py-3 px-3 text-right">Preço unit.</th>
                         <th className="py-3 px-3 text-center">Ação</th>
                       </tr>
                     </thead>
@@ -934,7 +934,7 @@ export const Dashboard = ({
                 onClick={onSeeAllLowStock}
                 className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
               >
-                Abrir Almoxarifado Completo
+                Abrir almoxarifado
               </button>
             </div>
           </div>
@@ -950,7 +950,7 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div
           id="widget-section-coverage"
-          className={`rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-coverage')}`}
+          className={`rounded-xl transition-[box-shadow,background-color] duration-700 p-1.5 ${sectionHighlight('widget-section-coverage')}`}
         >
           <StockCoverage products={products || []} transactions={transactions || []} onSeeAll={onSeeAllLowStock} />
         </div>
@@ -960,13 +960,13 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div 
           id="widget-section-audit"
-          className={`col-span-12 rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-audit')}`}
+          className={`col-span-12 rounded-xl transition-[box-shadow,background-color] duration-700 p-1.5 ${sectionHighlight('widget-section-audit')}`}
         >
           {/* BENTO 8: AUDITORIA OPERACIONAL RECENTE (WIDE STRIP) - col-span-12       */}
           <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
-                <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
+                <h2 className="text-base font-semibold text-zinc-900 dark:text-white">
                   Últimas movimentações
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -986,9 +986,9 @@ export const Dashboard = ({
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-[10px] ">
-                      <th className="py-3 px-3">Data / Hora</th>
-                      <th className="py-3 px-3">Produto / Referência</th>
-                      <th className="py-3 px-3">Tipo de Operação</th>
+                      <th className="py-3 px-3">Data e hora</th>
+                      <th className="py-3 px-3">Produto</th>
+                      <th className="py-3 px-3">Operação</th>
                       <th className="py-3 px-3 text-right">Volume</th>
                       <th className="py-3 px-3">Operador</th>
                       <th className="py-3 px-3">Justificativa / OS Destino</th>

@@ -308,7 +308,7 @@ export const SupportChat: React.FC = () => {
             {/* Balão de mensagem acima do celular, até a primeira conversa */}
             {messages.length === 0 && (
               <span className="absolute bottom-full right-0 mb-2.5 whitespace-nowrap rounded-[1.1rem] rounded-br-[0.35rem] bg-white px-3 py-2 text-left text-xs font-medium text-zinc-800 shadow-lg shadow-black/15 ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-white/10" aria-hidden="true">
-                Oi! Precisa de ajuda?
+                Precisa de ajuda?
                 <span className="block text-[10px] font-normal text-zinc-500 dark:text-zinc-400">Fale com a Ana</span>
               </span>
             )}

@@ -44,7 +44,9 @@ export const CategoryDonut: React.FC<{ products: Product[]; darkMode: boolean }>
     const head = sorted.slice(0, MAX_SLICES);
     const tail = sorted.slice(MAX_SLICES);
     const pct = (v: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
-    const slices: Slice[] = head.map((c, i) => ({ ...c, share: pct(c.value), color: palette[i] }));
+    // Uma cor de destaque: a maior categoria em azul, as outras em degraus neutros
+    const steps = darkMode ? ['#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a'] : ['#71717a', '#a1a1aa', '#c4c4cc', '#d4d4d8', '#e4e4e7'];
+    const slices: Slice[] = head.map((c, i) => ({ ...c, share: pct(c.value), color: i === 0 ? palette[0] : steps[i - 1] }));
     if (tail.length) {
       const value = tail.reduce((a, c) => a + c.value, 0);
       const qty = tail.reduce((a, c) => a + c.qty, 0);
@@ -63,7 +65,7 @@ export const CategoryDonut: React.FC<{ products: Product[]; darkMode: boolean }>
             <PieChartIcon size={16} aria-hidden="true" />
           </span>
           <div>
-            <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Valor por Categoria</h2>
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-white">Valor por categoria</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Onde está o dinheiro parado no estoque</p>
           </div>
         </div>

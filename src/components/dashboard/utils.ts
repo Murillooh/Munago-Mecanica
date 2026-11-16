@@ -43,12 +43,8 @@ export const OTHER_DARK = '#52525b';
 // h-full + flex-1: cartões na mesma linha do grid ficam sempre com a mesma altura.
 export const cardClass = 'h-full flex-1 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors';
 
-// Ícones de cabeçalho no estilo iOS: degradê com brilho colorido (mesmo visual dos blocos do topo).
+// Ícone de cabeçalho: neutro, na cor do texto secundário. A cor fica para os dados.
+const ICON_NEUTRAL = 'bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-400 dark:border-zinc-700/60';
 export const iconBadge = {
-  blue: 'bg-sky-400 text-white border-white/30 shadow-lg',
-  emerald: 'bg-emerald-400 text-white border-white/30 shadow-lg',
-  amber: 'bg-amber-300 text-white border-white/30 shadow-lg',
-  red: 'bg-rose-400 text-white border-white/30 shadow-lg',
-  indigo: 'bg-blue-400 text-white border-white/30 shadow-lg',
-  violet: 'bg-rose-400 text-white border-white/30 shadow-lg',
+  blue: ICON_NEUTRAL, emerald: ICON_NEUTRAL, amber: ICON_NEUTRAL, red: ICON_NEUTRAL, indigo: ICON_NEUTRAL, violet: ICON_NEUTRAL,
 } as const;

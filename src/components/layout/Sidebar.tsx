@@ -14,12 +14,14 @@ import {
   BrainCircuit,
   Maximize2,
   ShieldHalf,
+  RefreshCw,
   type LucideIcon,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useApp } from '../../context/AppContext';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { toast } from 'sonner';
+import { useNewVersion } from '../../hooks/useNewVersion';
 
 interface NavItem {
   id: string;
@@ -115,6 +117,12 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
     setActiveTab(id);
   };
 
+  // Aviso de versão nova (deploy): toast uma vez + botão abaixo de Configurações
+  const newVersion = useNewVersion();
+  React.useEffect(() => {
+    if (newVersion) toast.info('Nova versão do sistema disponível', { duration: Infinity, action: { label: 'Atualizar', onClick: () => window.location.reload() } });
+  }, [newVersion]);
+
   const enterMonitor = () => {
     setIsMonitorMode(true);
     toast.info('Modo Monitor ativado: a tela selecionada agora ocupa 100% do display.');
@@ -198,7 +206,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
                       onClick={() => go(item.id)}
                       aria-current={active ? 'page' : undefined}
                       aria-label={isCollapsed ? `${item.label}${showCount ? ` (${item.count})` : ''}` : undefined}
-                      className={`relative flex h-11 w-full items-center rounded-xl text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
+                      className={`relative flex h-11 w-full items-center rounded-xl text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
                         isCollapsed ? 'justify-center px-1' : 'gap-3 px-2.5'
                       } ${
                         active
@@ -230,10 +238,8 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
                       )}
 
                       {showCount && !isCollapsed && (
-                        <span className={`relative ml-auto min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums ${
-                          item.tone === 'alert'
-                            ? 'bg-rose-500/12 text-rose-600 dark:text-rose-400'
-                            : 'bg-zinc-900/6 text-zinc-600 dark:bg-white/10 dark:text-zinc-300'
+                        <span className={`relative ml-auto min-w-[1.5rem] text-right font-mono text-[11px] tabular-nums ${
+                          item.tone === 'alert' ? 'text-red-600 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'
                         }`}>
                           {item.count! > 99 ? '99+' : item.count}
                         </span>
@@ -251,6 +257,33 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
             </ul>
           </div>
         ))}
+
+        <div className="group/item relative mt-2">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            aria-label={isCollapsed ? (newVersion ? 'Nova versão disponível: atualizar' : 'Atualizar') : undefined}
+            className={`relative flex h-11 w-full items-center rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
+              isCollapsed ? 'justify-center px-1' : 'gap-3 px-2.5'
+            } ${newVersion ? 'border border-blue-600/30 bg-blue-600/5 hover:bg-blue-600/10' : 'hover:bg-zinc-900/5 dark:hover:bg-white/5'}`}
+          >
+            <span className="relative flex h-8 w-8 shrink-0 items-center justify-center">
+              <RefreshCw size={18} strokeWidth={2} className={newVersion ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400'} aria-hidden="true" />
+              {newVersion && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white dark:bg-blue-400 dark:ring-zinc-950" aria-hidden="true" />}
+            </span>
+            {!isCollapsed && (
+              <span className="min-w-0 text-left leading-tight">
+                <span className={`block truncate ${newVersion ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400'}`}>{newVersion ? 'Nova versão disponível' : 'Atualizar'}</span>
+                {newVersion && <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">Clique para atualizar</span>}
+              </span>
+            )}
+          </button>
+          {isCollapsed && (
+            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover/item:opacity-100 dark:bg-zinc-800" role="tooltip">
+              {newVersion ? 'Nova versão disponível' : 'Atualizar'}
+            </span>
+          )}
+        </div>
       </nav>
 
       {/* Rodapé: cartão do usuário (foto, nome, e-mail, função) + sair */}

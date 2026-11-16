@@ -61,7 +61,7 @@ export const StockCoverage: React.FC<{ products: Product[]; transactions: Transa
               <Hourglass size={16} aria-hidden="true" />
             </span>
             <div>
-              <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Cobertura de Estoque</h2>
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-white">Cobertura de estoque</h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Quantos dias cada peça dura no ritmo de consumo dos últimos {WINDOW_DAYS} dias
               </p>

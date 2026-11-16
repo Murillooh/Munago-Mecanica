@@ -179,13 +179,13 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-700/60 dark:bg-zinc-800/60 dark:text-zinc-400">
                 <Activity size={17} aria-hidden="true" />
               </span>
               <div>
-                <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="text-base font-semibold text-zinc-900 dark:text-white flex flex-wrap items-center gap-x-2 gap-y-1">
                   Entradas e saídas
-                  <span className="whitespace-nowrap text-[11px] font-semibold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-full border border-blue-200/60 dark:border-blue-800/50">
+                  <span className="whitespace-nowrap font-mono text-[11px] font-normal text-zinc-500 dark:text-zinc-400">
                     Últimos {daysRange} dias
                   </span>
                 </h2>
@@ -265,20 +265,20 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
         {/* Números do período em blocos coloridos */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4 text-xs">
           {([
-            ['Entradas', `+${totalIn}`, 'unidades', ArrowDownLeft, 'border-zinc-200 dark:border-zinc-800', 'bg-emerald-500', 'text-emerald-600 dark:text-emerald-400'],
-            ['Saídas', `-${totalOut}`, 'unidades', ArrowUpRight, 'border-zinc-200 dark:border-zinc-800', 'bg-rose-500', 'text-rose-600 dark:text-rose-400'],
-            ['Saldo líquido', netBalance >= 0 ? `+${netBalance}` : `${netBalance}`, 'unidades', Scale, 'border-zinc-200 dark:border-zinc-800', 'bg-blue-500', netBalance >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'],
-            ['Média por dia', `${avgDailyVolume}`, 'un/dia', Gauge, 'border-zinc-200 dark:border-zinc-800', 'bg-zinc-500', 'text-slate-600 dark:text-slate-400'],
+            ['Entradas', `+${totalIn}`, 'unidades', ArrowDownLeft, 'border-zinc-200 dark:border-zinc-800', '', 'text-zinc-900 dark:text-white'],
+            ['Saídas', `-${totalOut}`, 'unidades', ArrowUpRight, 'border-zinc-200 dark:border-zinc-800', '', 'text-blue-600 dark:text-blue-400'],
+            ['Saldo líquido', netBalance >= 0 ? `+${netBalance}` : `${netBalance}`, 'unidades', Scale, 'border-zinc-200 dark:border-zinc-800', '', netBalance >= 0 ? 'text-zinc-900 dark:text-white' : 'text-red-600 dark:text-red-400'],
+            ['Média por dia', `${avgDailyVolume}`, 'un/dia', Gauge, 'border-zinc-200 dark:border-zinc-800', '', 'text-zinc-900 dark:text-white'],
           ] as const).map(([label, value, unit, Icon, tile, icon, tone]) => (
             <div key={label} className={`rounded-xl border p-3 ${tile}`}>
               <div className="flex items-center gap-2">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-white ${icon}`}>
+                <span className={`flex h-4 w-4 items-center justify-center text-zinc-400 ${icon}`}>
                   <Icon size={13} aria-hidden="true" />
                 </span>
                 <span className="font-medium text-zinc-600 dark:text-zinc-300">{label}</span>
               </div>
               <div className="mt-1.5 flex items-baseline gap-1.5">
-                <span className={`text-lg font-bold tabular-nums ${tone}`}>{value}</span>
+                <span className={`text-lg font-semibold tabular-nums ${tone}`}>{value}</span>
                 <span className="text-[10px] text-zinc-500 dark:text-zinc-400">{unit}</span>
               </div>
             </div>
@@ -293,12 +293,12 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor="#a1a1aa" stopOpacity={0.12} />
+                    <stop offset="95%" stopColor="#a1a1aa" stopOpacity={0.0} />
                   </linearGradient>
                   <linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.18} />
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-zinc-100 dark:text-zinc-800" />
@@ -320,7 +320,7 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
                   type="monotone" 
                   dataKey="entradas" 
                   name="Entradas" 
-                  stroke="#10b981" 
+                  stroke="#a1a1aa" 
                   strokeWidth={2.5}
                   fillOpacity={1} 
                   fill="url(#colorEntradas)" 
@@ -329,7 +329,7 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
                   type="monotone" 
                   dataKey="saidas" 
                   name="Saídas" 
-                  stroke="#ef4444" 
+                  stroke="#2563eb" 
                   strokeWidth={2.5}
                   fillOpacity={1} 
                   fill="url(#colorSaidas)" 
@@ -352,8 +352,8 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
                   tick={{ fill: '#71717a' }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="entradas" name="Entradas" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                <Bar dataKey="saidas" name="Saídas" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="entradas" name="Entradas" fill="#a1a1aa" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="saidas" name="Saídas" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={28} />
               </BarChart>
             ) : (
               <ComposedChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -372,8 +372,8 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
                   tick={{ fill: '#71717a' }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="entradas" name="Entradas" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={24} />
-                <Bar dataKey="saidas" name="Saídas" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                <Bar dataKey="entradas" name="Entradas" fill="#a1a1aa" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                <Bar dataKey="saidas" name="Saídas" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={24} />
                 <Line 
                   type="monotone" 
                   dataKey="saldo" 
@@ -392,10 +392,10 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-4 mt-4 border-t border-zinc-100 dark:border-zinc-800/80 text-xs text-zinc-500">
         <div className="flex items-center gap-4 flex-wrap">
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" /> Entradas de Compras
+            <span className="w-2.5 h-2.5 rounded-full bg-[#a1a1aa]" /> Entradas (compras)
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Saídas para Oficina / OS
+            <span className="w-2.5 h-2.5 rounded-full bg-[#2563eb]" /> Saídas (usadas nas OS)
           </span>
           {chartType === 'composed' && (
             <span className="flex items-center gap-1.5">
@@ -416,7 +416,7 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
             onClick={onSeeAllHistory}
             className="text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 self-end sm:self-auto"
           >
-            Histórico Integral <ChevronRight size={13} />
+            Histórico <ChevronRight size={13} />
           </button>
         )}
       </div>

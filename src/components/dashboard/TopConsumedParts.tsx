@@ -42,7 +42,7 @@ export const TopConsumedParts: React.FC<{ transactions: Transaction[]; products:
             <Flame size={16} aria-hidden="true" />
           </span>
           <div>
-            <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Peças Mais Consumidas</h2>
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-white">Peças mais consumidas</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Saídas nos últimos {WINDOW_DAYS} dias</p>
           </div>
         </div>
@@ -65,7 +65,7 @@ export const TopConsumedParts: React.FC<{ transactions: Transaction[]; products:
                     </span>
                   </div>
                   <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden" aria-hidden="true">
-                    <div className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.max(4, (item.qty / max) * 100)}%` }} />
+                    <div className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-[width] duration-500" style={{ width: `${Math.max(4, (item.qty / max) * 100)}%` }} />
                   </div>
                 </li>
               );

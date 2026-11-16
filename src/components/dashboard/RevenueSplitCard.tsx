@@ -38,7 +38,7 @@ export const RevenueSplitCard: React.FC<{ serviceOrders: ServiceOrder[] }> = ({ 
     <section aria-labelledby="split-card-title" className={cardClass}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 id="split-card-title" className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Repasses do mês</h2>
+          <h2 id="split-card-title" className="text-base font-semibold text-zinc-900 dark:text-white">Repasses do mês</h2>
           <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
             OS pagas em {monthName} · {cur.count} {cur.count === 1 ? 'ordem' : 'ordens'}
           </p>
