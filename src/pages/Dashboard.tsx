@@ -139,7 +139,7 @@ export const Dashboard = ({
       title: 'Reposição e valor por categoria',
       shortLabel: 'Reposição',
       tag: 'Itens Críticos & Categorias',
-      badge: 'Almoxarifado'
+      badge: 'Estoque'
     },
     {
       id: 'widget-section-coverage',
@@ -920,7 +920,7 @@ export const Dashboard = ({
               ) : (
                 <div className="py-10 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
                   <CheckCircle2 size={26} className="mx-auto text-emerald-500 mb-2" />
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Almoxarifado em Margem Segura</p>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Estoque em margem segura</p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                     Todos os itens cadastrados estão acima da reserva operacional mínima.
                   </p>
@@ -934,7 +934,7 @@ export const Dashboard = ({
                 onClick={onSeeAllLowStock}
                 className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
               >
-                Abrir almoxarifado
+                Abrir estoque
               </button>
             </div>
           </div>

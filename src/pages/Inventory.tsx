@@ -366,7 +366,7 @@ export const Inventory = () => {
     >
       <PageHero
         icon={Package}
-        title="Almoxarifado"
+        title="Estoque"
         subtitle="Catálogo completo de peças e controle de movimentações físicas."
         actions={<>
           <button onClick={handleExportPDF} className={heroBtn} title="Exportar Relatório Geral de Estoque em PDF">
@@ -1202,7 +1202,7 @@ export const Inventory = () => {
               <div className="p-4 sm:p-5 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/90 flex items-center justify-between shrink-0">
                 <div className="text-xs text-zinc-500 dark:text-zinc-400">
                   {selectedProduct && (
-                    <span>Registrado no almoxarifado</span>
+                    <span>Registrado no estoque</span>
                   )}
                 </div>
 
@@ -1256,7 +1256,7 @@ export const Inventory = () => {
                 Excluir Produto?
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 leading-relaxed">
-                Esta ação removerá este SKU e seus vínculos cadastrais permanentemente do almoxarifado.
+                Esta ação removerá este SKU e seus vínculos cadastrais permanentemente do estoque.
               </p>
               <div className="flex gap-2.5">
                 <button 

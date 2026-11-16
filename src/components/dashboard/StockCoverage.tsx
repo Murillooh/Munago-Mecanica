@@ -117,7 +117,7 @@ export const StockCoverage: React.FC<{ products: Product[]; transactions: Transa
         <span>Crítico: até {CRITICAL_DAYS} dias · Atenção: até {WARNING_DAYS} dias · Barra cheia = {BAR_SCALE_DAYS}+ dias</span>
         {onSeeAll && (
           <button type="button" onClick={onSeeAll} className="text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer shrink-0">
-            Almoxarifado <ChevronRight size={13} aria-hidden="true" />
+            Estoque <ChevronRight size={13} aria-hidden="true" />
           </button>
         )}
       </div>

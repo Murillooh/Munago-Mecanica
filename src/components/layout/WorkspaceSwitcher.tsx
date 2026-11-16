@@ -63,21 +63,21 @@ export const WorkspaceSwitcher: React.FC<{
         aria-expanded={open}
         aria-controls={listId}
         aria-label={`Base ativa: ${active?.name ?? fallbackName}. Trocar de Base`}
-        className="w-full rounded-xl border border-zinc-200 bg-white p-3 text-left text-zinc-900 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:hover:bg-white/[0.06]"
+        className="w-full rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3 text-left text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 cursor-pointer"
       >
-        <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">Base ativa</span>
+        <span className="block text-[10px] font-semibold uppercase tracking-wider text-blue-100/80">Base ativa</span>
         <span className="mt-1.5 flex items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15">
             <Building2 size={16} aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-sm font-semibold" title={active?.name ?? fallbackName}>{active?.name ?? fallbackName}</span>
-            <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-              {active?.id === myId && <span className="shrink-0 text-blue-600 dark:text-blue-400">minha</span>}
+            <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-blue-100/80">
+              {active?.id === myId && <span className="shrink-0 rounded bg-white/20 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-white">minha</span>}
               <span className="truncate">{users(active?.userCount)} · {workspaces.length} Bases</span>
             </span>
           </span>
-          <ChevronsUpDown size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
+          <ChevronsUpDown size={16} className="shrink-0 text-blue-100/80" aria-hidden="true" />
         </span>
       </button>
 

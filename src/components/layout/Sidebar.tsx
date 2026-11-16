@@ -83,7 +83,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       label: 'Operação',
       items: [
         ...(canViewReports ? [{ id: 'dashboard', label: 'Monitoramento', icon: BarChart3 }] : []),
-        ...(canViewInventory ? [{ id: 'inventory', label: 'Almoxarifado', icon: Boxes, count: lowStockCount, tone: 'alert' as const }] : []),
+        ...(canViewInventory ? [{ id: 'inventory', label: 'Estoque', icon: Boxes, count: lowStockCount, tone: 'alert' as const }] : []),
         ...(canCheckin || canManageOS || canApproveOS || canManageInventory || canViewReports ? [{ id: 'checkin', label: 'OS de motos', icon: ClipboardCheck }] : []),
         ...(canViewOS ? [{ id: 'os', label: 'Ordens de serviço', icon: ClipboardList, count: openOSCount, tone: 'neutral' as const }] : []),
         ...(canViewOS ? [{ id: 'services', label: 'Serviços', icon: Hammer }] : []),
