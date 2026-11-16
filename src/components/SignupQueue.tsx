@@ -24,15 +24,10 @@ function since(iso: string) {
 const fieldCls = 'rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs font-medium text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white';
 
 /**
- * Fila de quem criou conta e ainda não está em nenhuma mecânica.
- * - `super`: escolhe qualquer mecânica (ou cria uma nova) e pode recusar.
- * - `owner`: adiciona à própria mecânica (`workspaceId`).
- * Some quando não há ninguém esperando.
+ * Fila (só do admin geral) de quem criou conta e ainda não está em nenhuma mecânica:
+ * escolhe qualquer mecânica (ou cria uma nova) e pode recusar. Some quando não há ninguém esperando.
  */
-export const SignupQueue: React.FC<(
-  | { mode: 'super'; workspaces: { id: string; name: string }[] }
-  | { mode: 'owner'; workspaceId: string; workspaceName?: string }
-) & { onDone?: () => void }> = (props) => {
+export const SignupQueue: React.FC<{ workspaces: { id: string; name: string }[]; onDone?: () => void }> = (props) => {
   const [items, setItems] = useState<Signup[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [dest, setDest] = useState<Record<string, string>>({});
@@ -55,7 +50,7 @@ export const SignupQueue: React.FC<(
   if (items.length === 0) return null;
 
   const assign = async (s: Signup) => {
-    const target = props.mode === 'owner' ? props.workspaceId : (dest[s.id] ?? props.workspaces[0]?.id ?? NEW_WORKSPACE);
+    const target = dest[s.id] ?? props.workspaces[0]?.id ?? NEW_WORKSPACE;
     const isNew = target === NEW_WORKSPACE;
     const name = (newName[s.id] ?? `Oficina de ${s.name}`).trim();
     if (!target || (isNew && !name)) return toast.error('Escolha a mecânica.');
@@ -64,7 +59,7 @@ export const SignupQueue: React.FC<(
       await apiPost(`/signups/${s.id}/assign`, isNew
         ? { newWorkspaceName: name, role: 'admin' }
         : { workspaceId: target, role: roles[s.id] ?? 'editor' });
-      const where = isNew ? name : props.mode === 'owner' ? (props.workspaceName ?? 'sua mecânica') : props.workspaces.find(w => w.id === target)?.name;
+      const where = isNew ? name : props.workspaces.find(w => w.id === target)?.name;
       toast.success(`${s.name} agora faz parte de ${where}.`);
       setItems(prev => prev.filter(x => x.id !== s.id));
       props.onDone?.();
@@ -96,13 +91,13 @@ export const SignupQueue: React.FC<(
         <h2 id="signup-queue-title" className="text-sm font-semibold text-zinc-900 dark:text-white">Cadastros novos aguardando mecânica</h2>
         <span className="rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">{items.length}</span>
         <p className="ml-auto hidden text-xs text-zinc-500 sm:block dark:text-zinc-400">
-          {props.mode === 'super' ? 'Escolha a mecânica de cada pessoa e aprove.' : 'Se a pessoa trabalha com você, adicione à sua mecânica.'}
+          Escolha a mecânica de cada pessoa e aprove.
         </p>
       </div>
 
       <ul className="divide-y divide-amber-200/60 dark:divide-amber-900/30">
         {items.map(s => {
-          const target = props.mode === 'super' ? (dest[s.id] ?? props.workspaces[0]?.id ?? NEW_WORKSPACE) : props.workspaceId;
+          const target = dest[s.id] ?? props.workspaces[0]?.id ?? NEW_WORKSPACE;
           const isNew = target === NEW_WORKSPACE;
           const working = busy === s.id;
           return (
@@ -113,8 +108,7 @@ export const SignupQueue: React.FC<(
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {props.mode === 'super' && (
-                  <>
+                <>
                     <label htmlFor={`dest-${s.id}`} className="sr-only">Mecânica de {s.name}</label>
                     <select
                       id={`dest-${s.id}`}
@@ -137,8 +131,7 @@ export const SignupQueue: React.FC<(
                         />
                       </>
                     )}
-                  </>
-                )}
+                </>
 
                 {isNew ? (
                   <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">vira Administrador</span>
@@ -163,10 +156,9 @@ export const SignupQueue: React.FC<(
                   className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60 cursor-pointer"
                 >
                   {working ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Check size={13} aria-hidden="true" />}
-                  {props.mode === 'owner' ? 'Adicionar à minha mecânica' : 'Aprovar'}
+                  Aprovar
                 </button>
-                {props.mode === 'super' && (
-                  <button
+                <button
                     type="button"
                     onClick={() => reject(s)}
                     disabled={working}
@@ -176,7 +168,6 @@ export const SignupQueue: React.FC<(
                   >
                     <X size={16} aria-hidden="true" />
                   </button>
-                )}
               </div>
             </li>
           );

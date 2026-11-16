@@ -1,12 +1,12 @@
 import pg from 'pg';
 import { poolConfig } from '../db/client';
-import type { ChangeBus, Resource } from './events';
+import { ADMIN_SCOPE, type ChangeBus, type Resource } from './events';
 
 export const CHANGES_CHANNEL = 'mecanica_changes';
 
 const RESOURCES = new Set<Resource>([
   'products', 'categories', 'transactions', 'serviceOrders',
-  'notifications', 'users', 'settings', 'accessRequests', 'workspaces', 'services',
+  'notifications', 'users', 'settings', 'accessRequests', 'workspaces', 'services', 'motoCheckins', 'units',
 ]);
 
 interface Log {
@@ -46,8 +46,10 @@ export function startPgChangeListener(url: string, bus: ChangeBus, log: Log): ()
     c.on('error', onDown);
     c.on('end', () => onDown('conexão encerrada'));
     c.on('notification', (msg) => {
-      if (!down && msg.channel === CHANGES_CHANNEL && RESOURCES.has(msg.payload as Resource)) {
-        bus.emitChange(msg.payload as Resource);
+      // Payload "recurso:oficina" (migração 0009). Sem oficina, só o admin geral recebe.
+      const [resource, scope = ADMIN_SCOPE] = (msg.payload ?? '').split(':');
+      if (!down && msg.channel === CHANGES_CHANNEL && RESOURCES.has(resource as Resource)) {
+        bus.emitChange(scope, resource as Resource);
       }
     });
     try {

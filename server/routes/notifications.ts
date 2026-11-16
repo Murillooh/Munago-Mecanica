@@ -1,37 +1,48 @@
 import { Router, type RequestHandler } from 'express';
-import { and, desc, eq } from 'drizzle-orm';
-import { notifications } from '../db/schema';
-import { effectivePermissions, requirePermission, ws } from '../auth/middleware';
+import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { notifications, type Permissions } from '../db/schema';
+import { effectivePermissions, requirePermission, unitScope, ws, type AuthUser } from '../auth/middleware';
 import { asyncHandler } from '../middleware/errorHandler';
 import type { ApiDeps } from './deps';
 
-// Mesmo critério do firestore.rules: quem gerencia estoque ou OS.
-const canSeeNotifications: RequestHandler = (req, res, next) => {
-  const p = effectivePermissions(req.user!);
-  if (p.canManageInventory || p.canManageOS) return next();
-  res.status(403).json({ error: 'Você não tem permissão para esta ação.', code: 'FORBIDDEN' });
-};
+/** Avisos que a pessoa enxerga: os gerais (estoque baixo) se cuida de estoque/OS; os dirigidos, se é do setor e da unidade. */
+function visibleTo(u: AuthUser, workspaceId: string) {
+  const p = effectivePermissions(u);
+  const mine = (Object.keys(p) as (keyof Permissions)[]).filter(k => p[k]);
+  const scope = unitScope(u);
+  return and(
+    eq(notifications.workspaceId, workspaceId),
+    or(
+      p.canManageInventory || p.canManageOS ? isNull(notifications.target) : undefined,
+      mine.length ? and(inArray(notifications.target, mine), scope ? or(isNull(notifications.unitId), eq(notifications.unitId, scope)) : undefined) : undefined,
+    ),
+  );
+}
+
+// Todo usuário aprovado tem avisos (o filtro acima escolhe quais).
+const canSeeNotifications: RequestHandler = (_req, _res, next) => next();
 
 export function createNotificationsRouter({ db, bus }: ApiDeps) {
   const r = Router();
   const guard = [requirePermission(), canSeeNotifications];
 
-  const mine = (workspaceId: string, id: string) => and(eq(notifications.workspaceId, workspaceId), eq(notifications.id, id));
+  // Só mexe em aviso que a pessoa enxerga.
+  const mine = (req: Parameters<typeof ws>[0] & { user?: AuthUser }, id: string) => and(visibleTo(req.user!, ws(req)), eq(notifications.id, id));
 
   r.get('/notifications', ...guard, asyncHandler(async (req, res) => {
-    res.json(await db.select().from(notifications).where(eq(notifications.workspaceId, ws(req)))
+    res.json(await db.select().from(notifications).where(visibleTo(req.user!, ws(req)))
       .orderBy(desc(notifications.timestamp)).limit(500));
   }));
 
   r.patch('/notifications/:id/read', ...guard, asyncHandler(async (req, res) => {
-    await db.update(notifications).set({ read: true }).where(mine(ws(req), req.params.id));
-    bus.emitChange('notifications');
+    await db.update(notifications).set({ read: true }).where(mine(req, req.params.id));
+    bus.emitChange(ws(req), 'notifications');
     res.status(204).end();
   }));
 
   r.delete('/notifications/:id', ...guard, asyncHandler(async (req, res) => {
-    await db.delete(notifications).where(mine(ws(req), req.params.id));
-    bus.emitChange('notifications');
+    await db.delete(notifications).where(mine(req, req.params.id));
+    bus.emitChange(ws(req), 'notifications');
     res.status(204).end();
   }));
 

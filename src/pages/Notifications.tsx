@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import {
+import { Bike,
   Bell,
   AlertTriangle,
   Check,
   CheckCheck,
-  Loader2
-} from 'lucide-react';
+  Loader2, BellRing } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { HeroStat, PageHero, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
 import { parseDate } from '../components/dashboard/utils';
 
@@ -27,7 +27,8 @@ export const Notifications = () => {
   const {
     notifications,
     products,
-    markNotificationAsRead
+    markNotificationAsRead,
+    openMotoOS
   } = useApp();
 
   // Abre em "Todos": marcar como lido não tira o alerta da lista, só muda o visual.
@@ -75,24 +76,35 @@ export const Notifications = () => {
 
   return (
     <div className="w-full space-y-5">
-      {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-5 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Gestão de Alertas</h1>
-          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Avisos de estoque baixo e notificações do sistema.</p>
-        </div>
-        {unread.length > 0 && (
-          <button
-            type="button"
-            onClick={markAllRead}
-            disabled={markingAll}
-            className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-60 cursor-pointer"
-          >
+      {/* Topo + filtro rápido */}
+      <PageHero
+        icon={Bell}
+        title="Alertas"
+        subtitle="Avisos de estoque baixo e notificações do sistema."
+        actions={unread.length > 0 && (
+          <button type="button" onClick={markAllRead} disabled={markingAll} className={heroBtnPrimary}>
             {markingAll ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <CheckCheck size={15} aria-hidden="true" />}
             Marcar todos como lidos
           </button>
         )}
-      </div>
+        statsClassName="grid-cols-1 sm:grid-cols-3"
+      >
+        <HeroStat
+          icon={BellRing} iconClass="bg-rose-500" label="Não lidos"
+          alert={unread.length > 0 && filter !== 'unread'} selected={filter === 'unread'}
+          onClick={() => changeFilter('unread')}
+          value={unread.length} hint={unread.length === 0 ? 'Nenhum alerta pendente' : 'pendentes de leitura'}
+        />
+        <HeroStat
+          icon={CheckCheck} iconClass="bg-emerald-500" label="Lidos"
+          value={sorted.length - unread.length} hint="já vistos pela equipe"
+        />
+        <HeroStat
+          icon={Bell} iconClass="bg-blue-500" label="Todos"
+          selected={filter === 'all'} onClick={() => changeFilter('all')}
+          value={sorted.length} hint="histórico de alertas"
+        />
+      </PageHero>
 
       <div className="bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs overflow-hidden">
         {/* Filtro + resumo */}
@@ -136,7 +148,7 @@ export const Notifications = () => {
                       ? 'bg-zinc-50 dark:bg-zinc-800 text-zinc-400 border-zinc-200/70 dark:border-zinc-700'
                       : 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40'
                   }`}>
-                    <AlertTriangle size={15} aria-hidden="true" />
+                    {n.type === 'moto_os' ? <Bike size={15} aria-hidden="true" /> : <AlertTriangle size={15} aria-hidden="true" />}
                   </span>
 
                   <div className="flex-1 min-w-0">
@@ -162,6 +174,12 @@ export const Notifications = () => {
                     </div>
                   </div>
 
+                  {n.type === 'moto_os' && n.refId && (
+                    <button type="button" onClick={() => openMotoOS(n)}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-white rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer">
+                      Abrir OS
+                    </button>
+                  )}
                   {!n.read && (
                     <button
                       type="button"

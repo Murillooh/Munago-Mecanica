@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tag, X, Sparkles, Trash2, Edit2, Plus, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { macZoom, macZoomProps } from '../lib/motion';
 import { useApp, Category } from '../context/AppContext';
 import { toast } from 'sonner';
 import { authFetch } from '../lib/api';
@@ -130,9 +131,8 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
       />
       
       <motion.div 
-        initial={{ scale: 0.95, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+        {...macZoomProps()}
+        transition={macZoom}
         className="relative bg-white dark:bg-zinc-900 w-full max-w-4xl max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row"
       >
         {/* Left Side: List of Categories */}
@@ -177,7 +177,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={(e) => { e.stopPropagation(); setDeleteConfirm(cat); }}
                     className={`p-1.5 rounded-lg transition-colors ${
@@ -273,7 +273,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                           <button 
                             type="button" 
                             onClick={() => setImageUrl('')}
-                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 transition-opacity"
                           >
                             <X size={12} />
                           </button>
@@ -350,9 +350,8 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
         {deleteConfirm && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              {...macZoomProps()}
+              transition={macZoom}
               className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] shadow-2xl max-w-sm w-full text-center border border-zinc-100 dark:border-zinc-800"
             >
               <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
+import { iosSpring } from './lib/motion';
 import { 
   Mail, 
   Lock, 
@@ -16,6 +17,7 @@ import { toast, Toaster } from 'sonner';
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNav } from './components/layout/BottomNav';
 import { PendingApproval } from './components/PendingApproval';
+import { Preloader } from './components/Preloader';
 import { SupportChat } from './components/SupportChat';
 
 // Pages: cada uma vira um chunk próprio, baixado só quando a aba é aberta.
@@ -29,7 +31,16 @@ const Notifications = lazy(() => import('./pages/Notifications').then(m => ({ de
 const SettingsView = lazy(() => import('./pages/Settings').then(m => ({ default: m.SettingsView })));
 const Users = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
 const Login = lazy(() => import('./pages/Login'));
+const MotoCheckins = lazy(() => import('./pages/MotoCheckins').then(m => ({ default: m.MotoCheckins })));
 const AdminPanel = lazy(() => import('./pages/AdminPanel').then(m => ({ default: m.AdminPanel })));
+
+/** Baixa as telas em segundo plano logo depois de entrar: trocar de aba fica instantâneo, sem spinner. */
+const prefetchPages = () => [
+  () => import('./components/AIAssistant'), () => import('./pages/Inventory'), () => import('./pages/ServiceOrders'),
+  () => import('./pages/Services'), () => import('./pages/Transactions'), () => import('./pages/Notifications'),
+  () => import('./pages/Settings'), () => import('./pages/Users'), () => import('./pages/AdminPanel'),
+  () => import('./pages/MotoCheckins'),
+].forEach(load => load().catch(() => {}));
 
 const PageFallback = () => (
   <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite">
@@ -38,7 +49,8 @@ const PageFallback = () => (
   </div>
 );
 
-const AppContent = () => {
+const AppContent: React.FC<{ onPageReady: () => void }> = ({ onPageReady }) => {
+  useEffect(() => { const t = setTimeout(prefetchPages, 1500); return () => clearTimeout(t); }, []);
   const { 
     activeTab, 
     setActiveTab, 
@@ -47,17 +59,24 @@ const AppContent = () => {
     isMonitorMode, 
     setIsMonitorMode, 
     toggleMonitorMode,
-    isSuperAdmin
+    isSuperAdmin,
+    profile,
+    canViewReports,
+    canCheckin,
+    canManageInventory
   } = useApp();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    if (isViewer && activeTab !== 'dashboard') {
-      setActiveTab('dashboard');
-    }
-  }, [isViewer, activeTab, setActiveTab]);
+    // Visualizador antigo (sem perfil) só tem o painel.
+    // Só depois do perfil carregar: antes disso todo mundo parece visualizador e a tela voltaria ao painel.
+    if (!profile) return;
+    if (isViewer && !profile.profile && activeTab !== 'dashboard') setActiveTab('dashboard');
+    // Perfil sem painel (mecânico, recepção, CS, estoquista) começa na tela do seu trabalho.
+    else if (profile?.profile && activeTab === 'dashboard' && !canViewReports) setActiveTab('checkin'); // todos os setores do fluxo trabalham na OS de motos
+  }, [isViewer, profile, canViewReports, canCheckin, canManageInventory, activeTab, setActiveTab]);
 
   // Press ESC to exit monitor mode
   useEffect(() => {
@@ -91,6 +110,8 @@ const AppContent = () => {
         return <ServiceOrders />;
       case 'services':
         return <Services />;
+      case 'checkin':
+        return <MotoCheckins />;
       case 'alerts':
         return <Notifications />;
       case 'settings':
@@ -109,7 +130,7 @@ const AppContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 transition-colors selection:bg-blue-600/20 selection:text-blue-600">
+    <div className="ios-glass min-h-dvh bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 transition-colors selection:bg-blue-600/20 selection:text-blue-600">
       {/* Floating control when in Monitor Mode */}
       <AnimatePresence>
         {isMonitorMode && (
@@ -154,25 +175,24 @@ const AppContent = () => {
       <main 
         className={`transition-all duration-300 ${
           isMonitorMode 
-            ? 'w-full min-h-screen p-0 m-0 pb-6 lg:pl-0' 
-            // Espaço do menu inferior + barra de gestos do iPhone; no topo, o notch (viewport-fit=cover).
-            : `pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-0 pt-safe lg:pt-0 ${isCollapsed ? 'lg:pl-[4.25rem]' : 'lg:pl-64'}`
+            ? 'w-full min-h-dvh p-0 m-0 pb-6 lg:pl-0' 
+            // pb extra para a nova barra (h-16 ~64px + safe-area + margem)
+            : `pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0 pt-safe lg:pt-0 ${isCollapsed ? 'lg:pl-[4.25rem]' : 'lg:pl-64'}`
         }`}
       >
-        <div className={`w-full overflow-x-clip ${isMonitorMode ? 'px-4 sm:px-6 lg:px-8 2xl:px-12 py-5 max-w-none' : 'px-4 sm:px-6 lg:px-8 2xl:px-10 py-6 max-w-none'}`}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Suspense fallback={<PageFallback />}>
-                {renderContent()}
-              </Suspense>
-            </motion.div>
-          </AnimatePresence>
+        <div className={`w-full overflow-x-clip ${isMonitorMode ? 'px-3 sm:px-6 lg:px-8 2xl:px-12 py-5 max-w-none' : 'px-3 sm:px-5 lg:px-8 2xl:px-10 py-3 sm:py-5 lg:py-6 max-w-none'}`}>
+          {/* Troca de aba: a tela nova entra na hora, só esmaecendo e subindo 6px (sem escala: animar a página inteira pesa). */}
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Suspense fallback={<PageFallback />}>
+              {renderContent()}
+              <ReadySignal onReady={onPageReady} />
+            </Suspense>
+          </motion.div>
         </div>
       </main>
 
@@ -185,71 +205,81 @@ const AppContent = () => {
   );
 };
 
+/** Renderiza junto do conteúdo dentro do Suspense: só monta quando o código da página já carregou. */
+const ReadySignal: React.FC<{ onReady: () => void }> = ({ onReady }) => {
+  useEffect(onReady, [onReady]);
+  return null;
+};
+
+const PRELOAD_MIN_MS = 2200;
+const PRELOAD_MAX_MS = 12000;
+
+/**
+ * O sistema monta por baixo do preload; ele só sai (com fade) quando sessão, dados, código da página
+ * e fontes estão prontos, e nunca antes de PRELOAD_MIN_MS. PRELOAD_MAX_MS evita ficar preso.
+ */
 const RootApp = () => {
-  const { user, profile, loading, handleLogout, settings, refreshProfile } = useApp();
+  const { loading, dataReady } = useApp();
   const location = useLocation();
+  const [pageReady, setPageReady] = useState(false);
+  const [minElapsed, setMinElapsed] = useState(false);
+  const [fontsReady, setFontsReady] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+  const onPageReady = React.useCallback(() => setPageReady(true), []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 selection:bg-blue-600/20">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.25 }}
-          className="flex flex-col items-center max-w-xs text-center"
-        >
-          {/* Brand Mark */}
-          <div className="relative mb-5">
-            <img src="/brand/munago-mecanica-icon.svg" alt="" width={56} height={56} className="h-14 w-14 rounded-2xl shadow-sm" />
-            <div className="absolute -inset-1.5 rounded-2xl bg-blue-500/10 blur-md -z-10" />
-          </div>
+  useEffect(() => {
+    const min = setTimeout(() => setMinElapsed(true), Math.max(0, PRELOAD_MIN_MS - performance.now()));
+    const max = setTimeout(() => setTimedOut(true), PRELOAD_MAX_MS);
+    document.fonts.ready.then(() => setFontsReady(true), () => setFontsReady(true));
+    return () => { clearTimeout(min); clearTimeout(max); };
+  }, []);
 
-          <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">
-            {settings?.storeName || 'Munago Mecânica'}
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Carregando ambiente operacional...
-          </p>
+  const ready = timedOut || (!loading && dataReady && pageReady && minElapsed && fontsReady);
+  // ?preload em desenvolvimento: segura a tela de carregamento para revisar o visual.
+  const hold = import.meta.env.DEV && new URLSearchParams(location.search).has('preload');
 
-          {/* Smooth Linear Progress Track */}
-          <div className="w-48 h-1 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden mt-6 relative">
-            <motion.div 
-              className="h-full bg-blue-600 rounded-full absolute"
-              initial={{ left: '-40%', width: '30%' }}
-              animate={{ left: '100%', width: '45%' }}
-              transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
-            />
-          </div>
+  return (
+    <>
+      {!loading && <RootScreens onPageReady={onPageReady} />}
+      <AnimatePresence>
+        {(!ready || hold) && (
+          <motion.div key="preloader" initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.45, ease: 'easeOut' }}>
+            <Preloader />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
 
-          <div className="flex items-center gap-2 text-[11px] text-zinc-400 dark:text-zinc-500 mt-5 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Sincronizando dados</span>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
+const RootScreens: React.FC<{ onPageReady: () => void }> = ({ onPageReady }) => {
+  const { user, profile, handleLogout, settings, refreshProfile } = useApp();
 
   if (!user) return (
-    <Suspense fallback={<div className="min-h-screen bg-zinc-50 dark:bg-zinc-950"><PageFallback /></div>}>
+    <Suspense fallback={<div className="min-h-dvh bg-zinc-50 dark:bg-zinc-950"><PageFallback /></div>}>
       <Login />
+      <ReadySignal onReady={onPageReady} />
     </Suspense>
   );
   
   if (profile?.status === 'pending') {
     return (
+      <>
+      <ReadySignal onReady={onPageReady} />
       <PendingApproval
         storeName={settings?.storeName || 'Munago Mecânica'}
         email={profile?.email}
         onRefresh={refreshProfile}
         onLogout={handleLogout}
       />
+      </>
     );
   }
 
   if (profile?.status === 'denied') {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-6">
+      <div className="min-h-dvh bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-6">
+        <ReadySignal onReady={onPageReady} />
         <div className="max-w-md w-full bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 text-center shadow-lg">
           <div className="w-14 h-14 bg-red-50 dark:bg-red-950/40 text-red-500 rounded-xl flex items-center justify-center mx-auto mb-5 border border-red-200/60 dark:border-red-800/50">
             <LogIn size={26} />
@@ -279,7 +309,7 @@ const RootApp = () => {
     );
   }
 
-  return <AppContent />;
+  return <AppContent onPageReady={onPageReady} />;
 };
 
 // Sem este Toaster nenhum toast() do app aparece na tela.
@@ -290,10 +320,13 @@ const AppToaster = () => {
 
 const App = () => {
   return (
-    <BrowserRouter>
-      <RootApp />
-      <AppToaster />
-    </BrowserRouter>
+    // Mola macOS/iOS como padrão de todas as animações; "reduzir movimento" do aparelho desliga.
+    <MotionConfig transition={iosSpring} reducedMotion="user">
+      <BrowserRouter>
+        <RootApp />
+        <AppToaster />
+      </BrowserRouter>
+    </MotionConfig>
   );
 };
 

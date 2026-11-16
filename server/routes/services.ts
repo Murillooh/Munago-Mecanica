@@ -23,7 +23,10 @@ function checkRepasse(s: z.infer<typeof serviceFields>) {
   }
 }
 
-/** Catálogo de serviços da oficina (preço e repasse para a empresa). Quem gerencia OS gerencia o catálogo. */
+/**
+ * Catálogo de serviços da oficina. Quem gerencia OS cadastra nome e preço; o repasse para a empresa
+ * só o admin geral define (a oficina não pode reduzir o que ela mesma repassa).
+ */
 export function createServicesRouter({ db, bus }: ApiDeps) {
   const r = Router();
   const mine = (workspaceId: string, id: string) => and(eq(services.workspaceId, workspaceId), eq(services.id, id));
@@ -33,10 +36,11 @@ export function createServicesRouter({ db, bus }: ApiDeps) {
   }));
 
   r.post('/services', requirePermission('canManageOS'), asyncHandler(async (req, res) => {
-    const data = serviceFields.parse(req.body);
+    const parsed = serviceFields.parse(req.body);
+    const data = req.user!.isSuperAdmin ? parsed : { ...parsed, repasseType: 'fixed' as const, repasseValue: 0 };
     checkRepasse(data);
     const [row] = await db.insert(services).values({ id: newId(), workspaceId: ws(req), ...data }).returning();
-    bus.emitChange('services');
+    bus.emitChange(ws(req), 'services');
     res.status(201).json(row);
   }));
 
@@ -44,16 +48,21 @@ export function createServicesRouter({ db, bus }: ApiDeps) {
     const patch = serviceFields.partial().strict().parse(req.body);
     const [current] = await db.select().from(services).where(mine(ws(req), req.params.id));
     if (!current) throw new ApiError(404, 'NOT_FOUND', 'Serviço não encontrado.');
+    const repasseChanged = (patch.repasseType !== undefined && patch.repasseType !== current.repasseType)
+      || (patch.repasseValue !== undefined && patch.repasseValue !== current.repasseValue);
+    if (repasseChanged && !req.user!.isSuperAdmin) {
+      throw new ApiError(403, 'REPASSE_LOCKED', 'O repasse é definido pela administração da Munago.');
+    }
     checkRepasse({ ...current, ...patch });
     const [row] = await db.update(services).set({ ...patch, updatedAt: sql`now()` }).where(mine(ws(req), current.id)).returning();
-    bus.emitChange('services');
+    bus.emitChange(ws(req), 'services');
     res.json(row);
   }));
 
   // OS já criadas guardam uma cópia do serviço: excluir do catálogo não as afeta.
   r.delete('/services/:id', requirePermission('canManageOS'), asyncHandler(async (req, res) => {
     await db.delete(services).where(mine(ws(req), req.params.id));
-    bus.emitChange('services');
+    bus.emitChange(ws(req), 'services');
     res.status(204).end();
   }));
 

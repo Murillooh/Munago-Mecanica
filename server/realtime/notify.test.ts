@@ -5,8 +5,8 @@ import { migrate } from 'drizzle-orm/pglite/migrator';
 import * as schema from '../db/schema';
 import { CHANGES_CHANNEL } from './pgListener';
 
-describe('triggers de tempo real (0001_realtime_notify)', () => {
-  it('avisam o recurso certo, uma vez por comando', async () => {
+describe('triggers de tempo real (0001_realtime_notify, 0009_realtime_scope)', () => {
+  it('avisam recurso e oficina, uma vez por comando', async () => {
     const pglite = new PGlite();
     const db = drizzle(pglite, { schema });
     await migrate(db, { migrationsFolder: 'server/db/migrations' });
@@ -21,7 +21,7 @@ describe('triggers de tempo real (0001_realtime_notify)', () => {
     await db.insert(schema.serviceOrders).values({ id: 'os1', workspaceId: 'default', customerName: 'Ana', scheduledDate: '2026-10-06', createdBy: 'u1' });
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(got).toEqual(['products', 'serviceOrders']);
+    expect(got).toEqual(['products:default', 'serviceOrders:default']);
     await pglite.close();
   });
 });

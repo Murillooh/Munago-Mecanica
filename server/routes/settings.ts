@@ -4,7 +4,8 @@ import { eq, sql } from 'drizzle-orm';
 import { settings, workspaces } from '../db/schema';
 import type { DB } from '../db/client';
 import { requireAdmin, requirePermission, ws } from '../auth/middleware';
-import { asyncHandler } from '../middleware/errorHandler';
+import { ApiError, asyncHandler } from '../middleware/errorHandler';
+import logger from '../utils/logger.js';
 import type { ApiDeps } from './deps';
 
 export const DEFAULT_SETTINGS = {
@@ -23,9 +24,14 @@ export type SystemSettings = typeof DEFAULT_SETTINGS & {
   contactPhone?: string;
   contactEmail?: string;
   address?: string;
-  /** Carteira Asaas da oficina: recebe a parte dela no split das cobranças. */
+  /** Carteira Asaas da oficina: recebe a parte dela no split das cobranças. Só o admin geral altera. */
   asaasWalletId?: string;
+  /** Repasse mínimo da OS para a empresa, em % do total. Só o admin geral altera. */
+  repasseMinPercent?: number;
 };
+
+/** Campos que mexem no dinheiro da empresa: a própria oficina não pode alterar. */
+const SUPER_ADMIN_FIELDS = ['asaasWalletId', 'repasseMinPercent'] as const;
 
 const settingsPatch = z.object({
   storeName: z.string().min(1).max(100),
@@ -40,6 +46,7 @@ const settingsPatch = z.object({
   monitorAutoScrollEnabled: z.boolean(),
   monitorScrollIntervalSeconds: z.number().int().min(3).max(600),
   asaasWalletId: z.string().trim().max(100),
+  repasseMinPercent: z.number().min(0).max(100),
 }).partial().strict();
 
 /** Configurações de uma oficina (a linha de settings usa o id da oficina). */
@@ -66,13 +73,22 @@ export function createSettingsRouter({ db, bus }: ApiDeps) {
   // Antes qualquer aprovado podia alterar (firestore.rules); agora só admin.
   r.patch('/settings', requireAdmin, asyncHandler(async (req, res) => {
     const patch = settingsPatch.parse(req.body);
+    const current = await getSettings(db, ws(req));
+    // A tela manda o formulário inteiro: só recusa se o valor realmente mudou.
+    const changed = SUPER_ADMIN_FIELDS.filter((k) => k in patch && (patch[k] ?? '') !== (current[k] ?? ''));
+    if (changed.length && !req.user!.isSuperAdmin) {
+      throw new ApiError(403, 'SUPER_ADMIN_ONLY', 'Carteira e repasse mínimo só podem ser alterados pela administração da Munago.');
+    }
+    if (changed.includes('asaasWalletId')) {
+      logger.warn({ workspaceId: ws(req), by: req.user!.id }, 'Carteira Asaas da oficina alterada');
+    }
     await mergeSettings(db, ws(req), patch);
     // Nome da oficina aparece na lista do admin geral.
     if (patch.storeName) {
       await db.update(workspaces).set({ name: patch.storeName }).where(eq(workspaces.id, ws(req)));
-      bus.emitChange('workspaces');
+      bus.emitChange(ws(req), 'workspaces');
     }
-    bus.emitChange('settings');
+    bus.emitChange(ws(req), 'settings');
     res.json(await getSettings(db, ws(req)));
   }));
 

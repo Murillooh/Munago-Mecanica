@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
-import { AUTH_BG, AUTH_PANEL_GRID } from '../components/auth/authStyles';
+import { AUTH_BG, AUTH_CHARACTER_URL, AUTH_PANEL_GRID } from '../components/auth/authStyles';
 import { AuthFeatures } from '../components/auth/AuthFeatures';
 import { useApp } from '../context/AppContext';
 import {
@@ -50,7 +50,7 @@ const PasswordToggle: React.FC<{ visible: boolean; onToggle: () => void }> = ({ 
   </button>
 );
 
-const regInputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 dark:text-white font-medium transition-all";
+const regInputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 dark:text-white font-medium transition-all";
 const regPasswordInputClass = regInputClass.replace('pr-4', 'pr-12');
 const regLabelClass = "text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1";
 const regIconClass = "absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600";
@@ -208,8 +208,24 @@ const Login: React.FC = () => {
     return () => ro.disconnect();
   }, []);
   const swapped = view === 'request' && panelWidths.brand > 0;
-  const brandX = swapped ? panelWidths.form : 0;
-  const formX = swapped ? -panelWidths.brand : 0;
+  // Painel azul é um paralelogramo de formato fixo (diagonal dos dois lados): só desliza, não se deforma.
+  // Ele sobra SLANT px para fora do cartão à esquerda (lg:-ml-16, escondido pelo overflow) e avança
+  // OVERLAP px por baixo do formulário (lg:-mr-32). No login a divisa é a diagonal direita; no cadastro, a esquerda.
+  const SLANT = 64;
+  const OVERLAP = 128;
+  const lg = panelWidths.brand > 0;
+  const W = panelWidths.brand;
+  const brandClip = lg ? `polygon(0px 0px, ${W - SLANT}px 0px, ${W}px 100%, ${SLANT}px 100%)` : undefined;
+  const brandX = swapped ? panelWidths.form - OVERLAP + SLANT : 0;
+  const formX = swapped ? -(panelWidths.brand - OVERLAP - SLANT) : 0;
+  // Lado coberto pelo painel azul ganha padding extra; o cadastro usa menos padding vertical para caber na mesma altura.
+  const formAnim = lg ? {
+    x: formX,
+    paddingLeft: swapped ? 56 : 144,
+    paddingRight: swapped ? 144 : 56,
+    paddingTop: swapped ? 16 : 56,
+    paddingBottom: swapped ? 16 : 56,
+  } : { x: 0 };
 
   const goTo = (next: 'login' | 'request') => {
     if (next === view) return;
@@ -328,7 +344,7 @@ const Login: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`w-full max-w-6xl lg:min-h-[680px] flex flex-col lg:flex-row items-stretch relative justify-center gap-0 z-10 bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]`}
+        className={`w-full max-w-6xl lg:min-h-[680px] flex flex-col lg:flex-row items-stretch relative justify-center gap-0 z-10 bg-white dark:bg-zinc-900 backdrop-blur-2xl border border-white/10 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]`}
       >
         {/* Left Side: Branding & Info */}
         <motion.div
@@ -336,9 +352,22 @@ const Login: React.FC = () => {
           initial={false}
           animate={{ x: brandX }}
           transition={sideSwapTransition}
-          className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 to-indigo-700 p-16 flex-col justify-between relative overflow-hidden z-10"
+          style={{ clipPath: brandClip }}
+          className="hidden lg:flex flex-1 lg:-ml-16 lg:-mr-32 bg-gradient-to-br from-blue-600 to-indigo-700 p-16 lg:pl-32 flex-col justify-between relative overflow-hidden z-10"
         >
           <div aria-hidden="true" className="absolute inset-0" style={PANEL_GRID} />
+          {panelWidths.brand > 0 && (
+            <svg aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 h-full w-full" viewBox={`0 0 ${panelWidths.brand} 100`} preserveAspectRatio="none">
+              {[[W - SLANT, W], [0, SLANT]].map(([x1, x2]) => (
+                <line
+                  key={x1}
+                  x1={x1} y1={0} x2={x2} y2={100}
+                  stroke="#dbeafe" strokeWidth={4} vectorEffect="non-scaling-stroke"
+                  style={{ filter: 'drop-shadow(0 0 6px rgba(96,165,250,0.95)) drop-shadow(0 0 14px rgba(59,130,246,0.7))' }}
+                />
+              ))}
+            </svg>
+          )}
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-12">
@@ -382,13 +411,12 @@ const Login: React.FC = () => {
           <AuthFeatures />
 
           {/* Floating Character */}
-          <motion.img 
-            src="https://cdn3d.iconscout.com/3d/premium/thumb/man-standing-with-hand-on-waist-5691550-4741094.png" 
-            alt="3D Character" 
-            className="absolute bottom-[-50px] right-[-50px] w-[350px] h-auto drop-shadow-[0_35px_35px_rgba(0,0,0,0.5)] pointer-events-none"
-            animate={{ y: [0, -20, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            referrerPolicy="no-referrer"
+          <motion.img
+            src={AUTH_CHARACTER_URL}
+            alt=""
+            className="absolute bottom-[-24px] right-12 w-[240px] h-auto drop-shadow-[0_35px_35px_rgba(0,0,0,0.5)] pointer-events-none"
+            animate={{ y: [0, -20, 0], x: swapped ? -16 : 0 }}
+            transition={{ y: { duration: 4, repeat: Infinity, ease: "easeInOut" }, x: sideSwapTransition }}
           />
         </motion.div>
 
@@ -396,9 +424,9 @@ const Login: React.FC = () => {
         <motion.div
           ref={formPanelRef}
           initial={false}
-          animate={{ x: formX }}
+          animate={formAnim}
           transition={sideSwapTransition}
-          className="w-full lg:w-[450px] p-6 sm:p-8 md:p-12 lg:p-14 flex flex-col justify-center bg-white dark:bg-zinc-900 overflow-hidden"
+          className="w-full lg:w-[532px] p-6 sm:p-8 md:p-12 lg:p-14 lg:pl-36 flex flex-col justify-center bg-white dark:bg-zinc-900 overflow-hidden"
         >
           {/* Celular/tablet: o painel azul some, então a marca vem para o topo do formulário. */}
           <div className="lg:hidden mb-8 flex items-center gap-2.5">
@@ -610,7 +638,7 @@ const Login: React.FC = () => {
                 exit="exit"
                 transition={screenTransition}
               >
-                <div className="mb-8 flex items-start gap-3">
+                <div className="mb-5 flex items-start gap-3">
                   <button
                     type="button"
                     onClick={() => (signupStep === 'code' ? (setSignupStep('form'), setSignupError('')) : goTo('login'))}
@@ -626,14 +654,14 @@ const Login: React.FC = () => {
                     <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
                       {signupStep === 'code'
                         ? `Digite o código enviado para ${regForm.email}`
-                        : 'Preencha seus dados ou cadastre-se com o Google'}
+                        : 'Preencha seus dados ou use o Google'}
                     </p>
                   </div>
                 </div>
 
                 <form
                   onSubmit={signupStep === 'code' ? handleConfirmSignup : handleSignup}
-                  className="space-y-3"
+                  className="space-y-2"
                   aria-busy={registrationLoading}
                 >
                   {signupStep === 'form' ? (
@@ -769,7 +797,7 @@ const Login: React.FC = () => {
                       disabled={isLoggingIn || registrationLoading}
                     />
                     <LegalNotice />
-                    <p className="mt-6 text-center text-xs text-zinc-400">
+                    <p className="mt-3 text-center text-xs text-zinc-400">
                       Já tem uma conta?{' '}
                       <button
                         type="button"

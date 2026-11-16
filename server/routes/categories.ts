@@ -32,7 +32,7 @@ export function createCategoriesRouter({ db, bus }: ApiDeps) {
     const data = categoryInput.parse(req.body);
     try {
       const [row] = await db.insert(categories).values({ id: newId(), workspaceId: ws(req), ...data }).returning();
-      bus.emitChange('categories');
+      bus.emitChange(ws(req), 'categories');
       res.status(201).json(row);
     } catch (e) {
       throw isUniqueViolation(e) ? duplicate() : e;
@@ -53,7 +53,7 @@ export function createCategoriesRouter({ db, bus }: ApiDeps) {
         }
         return updated;
       });
-      bus.emitChange('categories', 'products');
+      bus.emitChange(ws(req), 'categories', 'products');
       res.json(row);
     } catch (e) {
       throw isUniqueViolation(e) ? duplicate() : e;
@@ -69,7 +69,7 @@ export function createCategoriesRouter({ db, bus }: ApiDeps) {
         throw new ApiError(409, 'CATEGORY_IN_USE', 'Não é possível excluir uma categoria que possui produtos vinculados.');
       }
       await db.delete(categories).where(eq(categories.id, cat.id));
-      bus.emitChange('categories');
+      bus.emitChange(ws(req), 'categories');
     }
     res.status(204).end();
   }));

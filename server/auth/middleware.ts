@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express';
 import { eq, sql } from 'drizzle-orm';
 import { UNASSIGNED_WORKSPACE, users, workspaces, type Permissions } from '../db/schema';
 import type { DB } from '../db/client';
+import { PROFILES, type Profile } from './profiles';
 
 export type Role = 'admin' | 'editor' | 'viewer';
 export type AuthUser = typeof users.$inferSelect & {
@@ -24,9 +25,9 @@ declare global {
 export const WORKSPACE_HEADER = 'x-workspace-id';
 
 export const ROLE_PERMISSIONS: Record<Role, Permissions> = {
-  admin:  { canManageInventory: true,  canPerformTransactions: true,  canManageOS: true,  canViewReports: true, canManageUsers: true },
-  editor: { canManageInventory: true,  canPerformTransactions: true,  canManageOS: true,  canViewReports: true, canManageUsers: false },
-  viewer: { canManageInventory: false, canPerformTransactions: false, canManageOS: false, canViewReports: true, canManageUsers: false },
+  admin:  { canManageInventory: true,  canPerformTransactions: true,  canManageOS: true,  canViewReports: true, canManageUsers: true,  canCheckin: true,  canApproveOS: true,  allUnits: true },
+  editor: { canManageInventory: true,  canPerformTransactions: true,  canManageOS: true,  canViewReports: true, canManageUsers: false, canCheckin: true,  canApproveOS: false, allUnits: true },
+  viewer: { canManageInventory: false, canPerformTransactions: false, canManageOS: false, canViewReports: true, canManageUsers: false, canCheckin: false, canApproveOS: false, allUnits: true },
 };
 
 export interface TokenClaims {
@@ -34,6 +35,8 @@ export interface TokenClaims {
   email?: unknown;
   email_verified?: unknown;
   name?: unknown;
+  /** Foto do Google (mapeamento de atributo picture no Cognito). */
+  picture?: unknown;
 }
 
 export interface TokenVerifier {
@@ -111,6 +114,12 @@ export function authMiddleware(opts: { db: DB; verifier: TokenVerifier; bootstra
       });
 
       if ('denied' in result && result.denied) return res.status(result.denied.status).json(result.denied.body);
+      // Foto do Google: grava quando chega uma nova (só https; login por senha não traz picture).
+      const picture = typeof claims.picture === 'string' && claims.picture.startsWith('https://') ? claims.picture : null;
+      if (picture && result.user!.photoUrl !== picture) {
+        await opts.db.update(users).set({ photoUrl: picture }).where(eq(users.id, result.user!.id));
+        result.user!.photoUrl = picture;
+      }
       const isSuperAdmin = emailVerified && admins.has(email);
       req.user = { ...result.user!, isSuperAdmin };
       req.workspaceId = result.user!.workspaceId;
@@ -131,10 +140,15 @@ export function authMiddleware(opts: { db: DB; verifier: TokenVerifier; bootstra
   };
 }
 
-export function effectivePermissions(u: Pick<AuthUser, 'role' | 'permissions' | 'isSuperAdmin'>): Permissions {
+export function effectivePermissions(u: Pick<AuthUser, 'role' | 'permissions' | 'isSuperAdmin'> & { profile?: string | null }): Permissions {
   if (u.role === 'admin' || u.isSuperAdmin) return ROLE_PERMISSIONS.admin;
-  return u.permissions && Object.keys(u.permissions).length ? u.permissions : ROLE_PERMISSIONS[u.role];
+  // Perfil manda; personalização salva por cima. Usuário antigo (sem perfil): cargo + o que foi salvo.
+  const base = u.profile && u.profile in PROFILES ? PROFILES[u.profile as Profile].permissions : ROLE_PERMISSIONS[u.role];
+  return { ...base, ...(u.permissions ?? {}) };
 }
+
+/** Unidade cujos dados o usuário enxerga; null = todas. */
+export const unitScope = (u: AuthUser): string | null => (effectivePermissions(u).allUnits ? null : u.unitId ?? '__sem_unidade__');
 
 /** Exige usuário aprovado (admin sempre passa) e, opcionalmente, uma permissão. Substitui firestore.rules. */
 export function requirePermission(perm?: keyof Permissions): RequestHandler {

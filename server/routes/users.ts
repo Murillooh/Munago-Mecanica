@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { and, asc, count, desc, eq, ne, sql } from 'drizzle-orm';
-import { UNASSIGNED_WORKSPACE, accessRequests, users, workspaces } from '../db/schema';
-import { ROLE_PERMISSIONS, effectivePermissions, requireAdmin, requirePermission, requireSuperAdmin, ws, type AuthUser, type Role } from '../auth/middleware';
+import { UNASSIGNED_WORKSPACE, accessRequests, units, users, workspaces } from '../db/schema';
+import { PROFILES, PROFILE_IDS } from '../auth/profiles';
+import { ROLE_PERMISSIONS, effectivePermissions, requirePermission, requireSuperAdmin, ws, type AuthUser, type Role } from '../auth/middleware';
 import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { newId, type ApiDeps } from './deps';
+import { ADMIN_SCOPE } from '../realtime/events';
 import { mergeSettings } from './settings';
 
 const role = z.enum(['admin', 'editor', 'viewer']);
@@ -14,20 +16,29 @@ const permissions = z.object({
   canManageUsers: z.boolean(),
   canViewReports: z.boolean(),
   canPerformTransactions: z.boolean(),
+  canCheckin: z.boolean().optional(),
+  canApproveOS: z.boolean().optional(),
+  allUnits: z.boolean().optional(),
 });
+const profile = z.enum(PROFILE_IDS);
+const unitId = z.string().trim().min(1).max(100).nullable();
 
 const newUserInput = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
   name: z.string().trim().min(1).max(100),
-  role,
+  role: role.optional(),
   permissions: permissions.optional(),
-});
+  profile: profile.optional(),
+  unitId: unitId.optional(),
+}).refine((v) => v.role || v.profile, { message: 'Informe o perfil.' });
 
 const userPatch = z.object({
   name: z.string().trim().min(1).max(100),
   role,
   permissions,
   status: z.enum(['pending', 'approved', 'denied']),
+  profile,
+  unitId,
 }).partial().strict();
 
 /** Destino do cadastro: uma oficina existente OU uma mecânica nova (só o admin geral cria). */
@@ -55,14 +66,25 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
 
   const isAdmin = (u: AuthUser) => u.role === 'admin' || !!u.isSuperAdmin;
 
+  /** A unidade precisa ser da mesma oficina. */
+  async function checkUnit(workspaceId: string, id: string | null | undefined) {
+    if (!id) return;
+    const [u] = await db.select({ id: units.id }).from(units).where(and(eq(units.workspaceId, workspaceId), eq(units.id, id)));
+    if (!u) throw new ApiError(400, 'INVALID_UNIT', 'Unidade não encontrada.');
+  }
+
   /** Cria no Cognito (convite por e-mail) e no banco, já aprovado, dentro da oficina indicada. */
   async function createUser(input: z.infer<typeof newUserInput>, actor: AuthUser, workspaceId: string) {
-    if (input.role === 'admin' && !isAdmin(actor)) {
+    // Com perfil, o cargo vem dele e as permissões ficam as do perfil.
+    const role = input.profile ? PROFILES[input.profile].role : input.role!;
+    if (role === 'admin' && !isAdmin(actor)) {
       throw new ApiError(403, 'ADMIN_ONLY', 'Apenas administradores podem criar outros administradores.');
     }
     const [existing] = await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = ${input.email}`);
     // Um e-mail pertence a uma oficina só; a mensagem não revela qual.
     if (existing) throw new ApiError(409, 'USER_EXISTS', 'Este e-mail já tem cadastro no sistema.');
+
+    await checkUnit(workspaceId, input.unitId);
 
     const sub = await cognito.createUser(input.email, input.name);
     const [row] = await db.insert(users).values({
@@ -70,11 +92,13 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
       workspaceId,
       email: input.email,
       name: input.name,
-      role: input.role,
+      role,
       status: 'approved',
-      permissions: input.permissions ?? ROLE_PERMISSIONS[input.role as Role],
+      profile: input.profile ?? null,
+      unitId: input.unitId ?? null,
+      permissions: input.profile ? null : input.permissions ?? ROLE_PERMISSIONS[role as Role],
     }).returning();
-    bus.emitChange('users');
+    bus.emitChange(workspaceId, 'users');
     return row;
   }
 
@@ -113,6 +137,8 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
     const [target] = await db.select().from(users).where(inWorkspace(ws(req), req.params.id));
     if (!target) throw new ApiError(404, 'NOT_FOUND', 'Usuário não encontrado.');
 
+    if (patch.profile) Object.assign(patch, { role: PROFILES[patch.profile].role });
+    await checkUnit(ws(req), patch.unitId);
     // Só admin mexe em admin ou promove a admin (evita escalada de privilégio).
     if (!isAdmin(actor) && (target.role === 'admin' || patch.role === 'admin')) {
       throw new ApiError(403, 'ADMIN_ONLY', 'Apenas administradores podem alterar administradores.');
@@ -122,9 +148,11 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
     }
 
     const set: Partial<typeof users.$inferInsert> = { ...patch };
-    if (patch.role && !patch.permissions) set.permissions = ROLE_PERMISSIONS[patch.role];
+    // Trocar o perfil zera a personalização (vale o perfil novo); trocar só o cargo usa o padrão dele.
+    if (patch.profile && !patch.permissions) set.permissions = null;
+    else if (patch.role && !patch.permissions) set.permissions = ROLE_PERMISSIONS[patch.role];
     const [row] = await db.update(users).set(set).where(eq(users.id, target.id)).returning();
-    bus.emitChange('users');
+    bus.emitChange(ws(req), 'users');
     res.json(withPermissions(row));
   }));
 
@@ -143,16 +171,16 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
       if ((e as { name?: string })?.name !== 'UserNotFoundException') throw e;
     }
     await db.delete(users).where(eq(users.id, target.id));
-    bus.emitChange('users');
+    bus.emitChange(ws(req), 'users');
     res.status(204).end();
   }));
 
-  // ---- Cadastros aguardando oficina: admin geral e donos de oficina atendem ----
+  // ---- Cadastros aguardando oficina: só o admin geral (a fila tem nome e e-mail de todos) ----
 
   const pendingSignup = (id: string) =>
     and(eq(users.id, id), eq(users.workspaceId, UNASSIGNED_WORKSPACE), eq(users.status, 'pending'));
 
-  r.get('/signups', requireAdmin, asyncHandler(async (_req, res) => {
+  r.get('/signups', requireSuperAdmin, asyncHandler(async (_req, res) => {
     const rows = await db.select({ id: users.id, name: users.name, email: users.email, createdAt: users.createdAt })
       .from(users)
       .where(and(eq(users.workspaceId, UNASSIGNED_WORKSPACE), eq(users.status, 'pending')))
@@ -161,15 +189,11 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
   }));
 
   /**
-   * Coloca o cadastro numa oficina e aprova. Dono: só na própria. Admin geral: em qualquer uma
-   * ou numa mecânica nova (`newWorkspaceName`), da qual a pessoa vira admin.
+   * Coloca o cadastro numa oficina e aprova: em qualquer uma ou numa mecânica nova
+   * (`newWorkspaceName`), da qual a pessoa vira admin.
    */
-  r.post('/signups/:id/assign', requireAdmin, asyncHandler(async (req, res) => {
+  r.post('/signups/:id/assign', requireSuperAdmin, asyncHandler(async (req, res) => {
     const input = assignInput.parse(req.body);
-    const actor = req.user!;
-    if (!actor.isSuperAdmin && (input.newWorkspaceName || input.workspaceId !== actor.workspaceId)) {
-      throw new ApiError(403, 'OWN_WORKSPACE_ONLY', 'Você só pode adicionar pessoas à sua própria oficina.');
-    }
     if (input.workspaceId) {
       const [w] = input.workspaceId === UNASSIGNED_WORKSPACE
         ? []
@@ -196,14 +220,14 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
       return updated;
     });
     if (input.newWorkspaceName) await mergeSettings(db, row.workspaceId, { storeName: input.newWorkspaceName });
-    bus.emitChange('users', 'workspaces');
+    bus.emitChange(row.workspaceId, 'users', 'workspaces');
     res.json(withPermissions(row));
   }));
 
   r.post('/signups/:id/reject', requireSuperAdmin, asyncHandler(async (req, res) => {
     const [row] = await db.update(users).set({ status: 'denied' }).where(pendingSignup(req.params.id)).returning();
     if (!row) throw new ApiError(409, 'ALREADY_ASSIGNED', 'Este cadastro já foi atendido.');
-    bus.emitChange('users');
+    bus.emitChange(ADMIN_SCOPE, 'users');
     res.json(withPermissions(row));
   }));
 
@@ -230,9 +254,9 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
       await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
       throw e;
     }
-    bus.emitChange('workspaces');
+    bus.emitChange(workspaceId, 'workspaces');
     await db.update(accessRequests).set({ status: 'approved' }).where(eq(accessRequests.id, request.id));
-    bus.emitChange('accessRequests');
+    bus.emitChange(ADMIN_SCOPE, 'accessRequests');
     res.json({ user: withPermissions(user) });
   }));
 
@@ -240,7 +264,7 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
     const [row] = await db.update(accessRequests).set({ status: 'rejected' })
       .where(eq(accessRequests.id, req.params.id)).returning();
     if (!row) throw new ApiError(404, 'NOT_FOUND', 'Solicitação não encontrada.');
-    bus.emitChange('accessRequests');
+    bus.emitChange(ADMIN_SCOPE, 'accessRequests');
     res.json(row);
   }));
 
@@ -253,7 +277,7 @@ export function createPublicAccessRequestRouter({ db, bus }: Pick<ApiDeps, 'db' 
   r.post('/access-requests', asyncHandler(async (req, res) => {
     const data = accessRequestInput.parse(req.body);
     await db.insert(accessRequests).values({ id: newId(), ...data, status: 'pending' });
-    bus.emitChange('accessRequests');
+    bus.emitChange(ADMIN_SCOPE, 'accessRequests');
     // Não devolve o registro: rota pública.
     res.status(201).json({ ok: true });
   }));

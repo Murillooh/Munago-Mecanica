@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Loader2, Pencil, Plus, Trash2, Wrench, X } from 'lucide-react';
+import { DollarSign, Loader2, Pencil, Percent, Plus, Trash2, Wrench, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApp, type Service } from '../context/AppContext';
 import { apiDelete, apiPatch, apiPost } from '../lib/api';
 import { serviceRepasse } from '../../server/services/revenueSplit';
+import { HeroStat, PageHero, heroBtnPrimary } from '../components/PageHero';
+import { macZoomStyle } from '../lib/motion';
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const fieldClass = 'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100';
@@ -16,7 +18,7 @@ const repasseLabel = (s: Pick<Service, 'repasseType' | 'repasseValue'>) =>
 
 /** Catálogo de serviços da mecânica: preço cobrado e repasse para a empresa (R$ fixo ou %). */
 export const Services = () => {
-  const { services, canManageOS } = useApp();
+  const { services, canManageOS, isSuperAdmin } = useApp();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Service | null>(null);
@@ -56,25 +58,29 @@ export const Services = () => {
 
   return (
     <div className="w-full space-y-5 pb-24 lg:pb-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 pb-5 dark:border-zinc-800/80">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-            <Wrench size={22} className="text-blue-600" aria-hidden="true" /> Serviços
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Valor de cada serviço e quanto vai para a empresa. Na OS, tudo entra automático.
-          </p>
-        </div>
-        {canManageOS && (
-          <button
-            type="button"
-            onClick={() => setDraft({ ...EMPTY })}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700 cursor-pointer"
-          >
-            <Plus size={16} aria-hidden="true" /> Novo serviço
+      <PageHero
+        icon={Wrench}
+        title="Serviços"
+        subtitle="Valor de cada serviço e quanto vai para a empresa. Na OS, tudo entra automático."
+        actions={canManageOS && (
+          <button type="button" onClick={() => setDraft({ ...EMPTY })} className={heroBtnPrimary}>
+            <Plus size={15} aria-hidden="true" /> Novo serviço
           </button>
         )}
-      </div>
+        statsClassName="grid-cols-1 sm:grid-cols-3"
+      >
+        <HeroStat icon={Wrench} iconClass="bg-blue-500" label="Serviços cadastrados" value={services.length} hint="no catálogo da oficina" />
+        <HeroStat
+          icon={DollarSign} iconClass="bg-emerald-500" label="Valor médio"
+          value={brl.format(services.length ? services.reduce((a, s) => a + s.price, 0) / services.length : 0)}
+          hint="cobrado do cliente por serviço"
+        />
+        <HeroStat
+          icon={Percent} iconClass="bg-violet-500" label="Repasse médio"
+          value={brl.format(services.length ? services.reduce((a, s) => a + serviceRepasse(s.price, 1, s.repasseType, s.repasseValue), 0) / services.length : 0)}
+          hint="para a empresa por serviço"
+        />
+      </PageHero>
 
       {services.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-zinc-300 px-6 py-14 text-center dark:border-zinc-700">
@@ -112,8 +118,8 @@ export const Services = () => {
       )}
 
       {draft && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="service-form-title">
-          <form onSubmit={save} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        <div className="ios-fade fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="service-form-title">
+          <form onSubmit={save} style={macZoomStyle()} className="ios-pop w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
             <div className="flex items-center justify-between">
               <h2 id="service-form-title" className="text-lg font-bold text-zinc-900 dark:text-white">{draft.id ? 'Editar serviço' : 'Novo serviço'}</h2>
               <button type="button" onClick={() => setDraft(null)} aria-label="Fechar" className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"><X size={18} /></button>
@@ -129,8 +135,11 @@ export const Services = () => {
               <input id="svc-price" required type="number" min={0} step="0.01" inputMode="decimal" value={draft.price} onChange={e => setDraft({ ...draft, price: e.target.value })} placeholder="100,00" className={`${fieldClass} font-mono`} />
             </div>
 
-            <fieldset className="space-y-1">
-              <legend className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Repasse para a empresa</legend>
+            {/* Repasse: só o admin geral edita; a oficina vê o valor travado. */}
+            <fieldset className="space-y-1" disabled={!isSuperAdmin}>
+              <legend className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Repasse para a empresa{!isSuperAdmin && <span className="ml-1.5 font-normal text-zinc-400">definido pela administração da Munago</span>}
+              </legend>
               <div className="flex gap-2">
                 <div role="radiogroup" aria-label="Tipo de repasse" className="flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
                   {([['fixed', 'R$'], ['percent', '%']] as const).map(([t, label]) => (
@@ -179,8 +188,8 @@ export const Services = () => {
       )}
 
       {toDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="service-delete-title">
-          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        <div className="ios-fade fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="service-delete-title">
+          <div style={macZoomStyle()} className="ios-pop w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
             <h2 id="service-delete-title" className="text-lg font-bold text-zinc-900 dark:text-white">Excluir "{toDelete.name}"?</h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">As OS que já usaram este serviço não mudam.</p>
             <div className="flex justify-end gap-2">

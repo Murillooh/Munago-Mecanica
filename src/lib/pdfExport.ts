@@ -73,32 +73,35 @@ const newDoc = () => new jsPDF({ orientation: 'landscape', unit: 'mm', format: '
 const pageW = (doc: jsPDF) => doc.internal.pageSize.getWidth();
 const pageH = (doc: jsPDF) => doc.internal.pageSize.getHeight();
 
-/** Cabeçalho completo da primeira página. Devolve o Y onde o conteúdo começa. */
+/** Cabeçalho da primeira página, estilo papel timbrado. Devolve o Y onde o conteúdo começa. */
 const drawHeader = (doc: jsPDF, store: StoreInfo, title: string, filterLabel?: string) => {
   const W = pageW(doc);
   const name = store.storeName || 'Munago Mecânica';
+  const half = (W - 2 * M) / 2 - 6;
 
+  // Filete azul no topo da folha
+  doc.setFillColor(...C.blue);
+  doc.rect(0, 0, W, 1.6, 'F');
+
+  // Esquerda: oficina e contatos
   setText(doc, 15, 'bold', C.text);
-  doc.text(name, M, 14);
-  setText(doc, 9, 'normal', C.muted);
-  doc.text(title, M, 19.5);
-
+  doc.text(fit(doc, name, half), M, 12);
   setText(doc, 7.5, 'normal', C.muted);
-  doc.text(`Emitido em ${new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`, W - M, 11.5, { align: 'right' });
-  const contact = [store.contactPhone, store.contactEmail].filter(Boolean).join('  ·  ');
-  if (contact) doc.text(fit(doc, contact, 110), W - M, 16, { align: 'right' });
-  if (store.address) doc.text(fit(doc, store.address.replace(/\s+/g, ' '), 110), W - M, 20.5, { align: 'right' });
+  const contact = [store.address?.replace(/\s+/g, ' '), store.contactPhone, store.contactEmail].filter(Boolean).join('   ·   ');
+  if (contact) doc.text(fit(doc, contact, half), M, 17.5);
 
-  doc.setDrawColor(...C.blue);
-  doc.setLineWidth(0.8);
-  doc.line(M, 24, W - M, 24);
+  // Direita: qual documento é, quando saiu e o filtro usado
+  setText(doc, 11, 'bold', C.text);
+  doc.text(fit(doc, title, half), W - M, 12, { align: 'right' });
+  const now = new Date();
+  setText(doc, 7.5, 'normal', C.muted);
+  doc.text(`Emitido em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`, W - M, 17.5, { align: 'right' });
+  if (filterLabel) doc.text(fit(doc, `Filtro: ${filterLabel}`, half), W - M, 21.5, { align: 'right' });
 
-  if (filterLabel) {
-    setText(doc, 7.5, 'normal', C.muted);
-    doc.text(fit(doc, `Filtro: ${filterLabel}`, W - 2 * M), M, 29);
-    return 33;
-  }
-  return 29;
+  doc.setDrawColor(...C.border);
+  doc.setLineWidth(0.3);
+  doc.line(M, 24.5, W - M, 24.5);
+  return 30;
 };
 
 /** Cabeçalho reduzido das páginas seguintes. */
@@ -128,7 +131,7 @@ const finalize = (doc: jsPDF, store: StoreInfo, label: string, filePrefix: strin
     doc.text(`Página ${i} de ${total}`, W - M, H - 6, { align: 'right' });
   }
   const slug = (store.storeName || 'munago').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_');
-  doc.save(`${filePrefix}_${slug}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`${filePrefix}_${slug}_${new Date().toLocaleDateString('sv-SE')}.pdf`);
 };
 
 /** Estilo de tabela "planilha": linhas finas, cabeçalho cinza, zebra leve. */
@@ -678,11 +681,12 @@ export const exportExecutiveReportToPDF = ({ store, products, transactions, serv
   }
 
   if (openOS.length) {
-    y = sectionTitle(doc, store, title, y, 'Ordens de serviço em aberto', `${openOS.length} OS · ${brl(openValue)}`);
+    const preventivas = openOS.filter(os => os.maintenanceType === 'preventiva').length;
+    y = sectionTitle(doc, store, title, y, 'Ordens de serviço em aberto', `${openOS.length} OS · ${openOS.length - preventivas} corretivas · ${preventivas} preventivas · ${brl(openValue)}`);
     table(doc, {
       ...tableBase(doc, store, title),
       startY: y,
-      head: [['OS', 'Cliente', 'Veículo', 'Placa', 'Etapa', 'Entrada', 'Itens', 'Total']],
+      head: [['OS', 'Cliente', 'Veículo', 'Placa', 'Tipo', 'Etapa', 'Entrada', 'Itens', 'Total']],
       body: [...openOS]
         .sort((a, b) => (b.scheduledDate || '').localeCompare(a.scheduledDate || ''))
         .map(os => [
@@ -690,6 +694,7 @@ export const exportExecutiveReportToPDF = ({ store, products, transactions, serv
           os.customerName || '-',
           os.vehicleModel || '-',
           os.vehiclePlate || '-',
+          os.maintenanceType === 'preventiva' ? 'Preventiva' : 'Corretiva',
           OS_STEPS.find(s => s.value === os.status)?.label || os.status,
           dateTime(os.scheduledDate),
           String(os.items?.length || 0),
@@ -698,12 +703,13 @@ export const exportExecutiveReportToPDF = ({ store, products, transactions, serv
       columnStyles: {
         0: { cellWidth: 20, textColor: C.muted },
         1: { cellWidth: 'auto', fontStyle: 'bold' },
-        2: { cellWidth: 46 },
+        2: { cellWidth: 36 },
         3: { cellWidth: 22 },
-        4: { cellWidth: 32 },
-        5: { cellWidth: 32 },
-        6: { cellWidth: 14, halign: 'right' },
-        7: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
+        4: { cellWidth: 22 },
+        5: { cellWidth: 28 },
+        6: { cellWidth: 30 },
+        7: { cellWidth: 14, halign: 'right' },
+        8: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
       },
     });
     y = lastY(doc) + 8;
@@ -719,4 +725,134 @@ export const exportExecutiveReportToPDF = ({ store, products, transactions, serv
   }
 
   finalize(doc, store, title, 'relatorio_executivo');
+};
+
+// ---------------------------------------------------------------------------
+// Diagnóstico da IA (texto em markdown simples, A4 retrato)
+// ---------------------------------------------------------------------------
+
+export interface ExportDiagnosticPdfOptions {
+  store: StoreInfo;
+  text: string;
+  products?: Product[];
+}
+
+export const exportDiagnosticToPDF = ({ store, text, products = [] }: ExportDiagnosticPdfOptions) => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const title = 'Diagnóstico Operacional & Riscos de Ruptura';
+  const W = pageW(doc) - 2 * M;
+  const bottom = pageH(doc) - 16;
+  const LH = 4.6; // altura da linha do corpo
+  const plain = (s: string) => s.replace(/`/g, '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*\s][^*]*)\*/g, '$1');
+  let y = drawHeader(doc, store, title) + 2;
+
+  const ensure = (h: number) => {
+    if (y + h <= bottom) return;
+    doc.addPage();
+    drawCompactHeader(doc, store, title);
+    y = TOP_CONT + 4;
+  };
+
+  // Faixa de indicadores calculada dos dados reais, não do texto da IA
+  if (products.length) {
+    const out = products.filter(p => (p.quantity || 0) <= 0).length;
+    const risk = products.filter(p => (p.quantity || 0) <= (p.minQuantity || 0)).length;
+    const restock = products.reduce((s, p) => s + Math.max(0, (p.minQuantity || 0) - (p.quantity || 0)) * (p.price || 0), 0);
+    const cw = (W - 8) / 3;
+    card(doc, M, y, cw, 20, 'Esgotados', num(out), 'itens sem saldo', out ? 'alert' : 'default');
+    card(doc, M + cw + 4, y, cw, 20, 'Risco de ruptura', num(risk), `de ${num(products.length)} itens cadastrados`, 'default', C.amber);
+    card(doc, M + 2 * (cw + 4), y, cw, 20, 'Custo para repor', brl(restock), 'até o estoque mínimo', 'default', C.green);
+    y += 28;
+  } else {
+    y += 4;
+  }
+
+  let kind: 'critical' | 'action' | 'default' = 'default';
+
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    // a IA alterna entre "**1. TÍTULO**", "## Título" e "1. TÍTULO" (só maiúsculas)
+    const caps = plain(line);
+    const heading = line.match(/^\*\*([^*]+)\*\*:?$/) ?? line.match(/^#{1,4}\s+(.*)$/)
+      ?? (/\p{Lu}{3}/u.test(caps) && caps === caps.toUpperCase() ? [line, caps] : null);
+    const bullet = line.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+
+    if (heading) {
+      const h = plain(heading[1]).replace(/:$/, '');
+      const [, n, t] = h.match(/^(\d+)[.)]\s*(.*)$/) ?? [, '', h];
+      kind = /CR[IÍ]TIC|RUPTURA|REPOSI/i.test(t) ? 'critical' : /RECOMENDA|A[CÇ][AÃ]O|PLANO/i.test(t) ? 'action' : 'default';
+      y += 3;
+      ensure(22);
+      let x = M;
+      if (n) {
+        doc.setFillColor(...C.blue);
+        doc.circle(M + 2.8, y - 1.3, 2.8, 'F');
+        setText(doc, 8, 'bold', [255, 255, 255]);
+        doc.text(n, M + 2.8, y - 0.2, { align: 'center' });
+        x = M + 8;
+      }
+      setText(doc, 10.5, 'bold', C.text);
+      doc.text(fit(doc, t.toUpperCase(), M + W - x), x, y);
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.3);
+      doc.line(M, y + 2.5, M + W, y + 2.5);
+      y += 8.5;
+    } else if (bullet) {
+      // "**Rótulo:** texto" vira o rótulo em negrito e o texto logo abaixo
+      const label = bullet[1].match(/^\*\*([^*]+)\*\*:?\s*(.*)$/)
+        ?? (kind === 'critical' ? bullet[1].match(/^([^:]{3,60}):\s+(.*)$/) : null);
+      const tw = W - 12;
+      setText(doc, 9.5, 'bold', C.text);
+      const hl = label ? (doc.splitTextToSize(plain(label[1]).replace(/:$/, ''), tw) as string[]) : [];
+      setText(doc, 9, 'normal', C.muted);
+      const body = plain(label ? label[2] : bullet[1]);
+      const bl = body ? (doc.splitTextToSize(body, tw) as string[]) : [];
+      const h = (hl.length + bl.length) * LH + 2;
+      ensure(h + 2);
+
+      if (kind === 'critical') {
+        doc.setFillColor(...C.redBg);
+        doc.setDrawColor(...C.redBorder);
+        doc.setLineWidth(0.25);
+        doc.roundedRect(M, y - 4.2, W, h + 1.5, 1.5, 1.5, 'FD');
+        doc.setFillColor(...C.red);
+        doc.rect(M, y - 2.7, 0.9, h - 1.5, 'F');
+      } else if (kind === 'action') {
+        // caixinha para marcar no papel o que já foi feito
+        doc.setDrawColor(...C.muted);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(M + 2, y - 3, 3.2, 3.2, 0.5, 0.5, 'S');
+      } else {
+        doc.setFillColor(...C.blue);
+        doc.circle(M + 3.5, y - 1.3, 0.8, 'F');
+      }
+
+      let ly = y;
+      setText(doc, 9.5, 'bold', kind === 'critical' ? C.red : C.text);
+      for (const l of hl) { doc.text(l, M + 8, ly); ly += LH; }
+      setText(doc, 9, 'normal', hl.length ? C.muted : C.text);
+      for (const l of bl) { doc.text(l, M + 8, ly); ly += LH; }
+      y += h + (kind === 'critical' ? 3.5 : 1.5);
+    } else {
+      setText(doc, 9.5, 'normal', C.text);
+      for (const l of doc.splitTextToSize(plain(line), W) as string[]) {
+        ensure(LH);
+        doc.text(l, M, y);
+        y += LH;
+      }
+      y += 1.5;
+    }
+  }
+
+  const note = 'Análise gerada por IA a partir dos dados do estoque. Confira antes de tomar decisões de compra.';
+  y += 2;
+  ensure(12);
+  doc.setFillColor(...C.bg);
+  doc.setDrawColor(...C.border);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(M, y, W, 9, 1.5, 1.5, 'FD');
+  setText(doc, 7.5, 'normal', C.muted);
+  doc.text(note, M + 4, y + 5.6);
+  finalize(doc, store, 'Diagnóstico de estoque', 'diagnostico_estoque');
 };

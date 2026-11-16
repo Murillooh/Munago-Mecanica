@@ -108,7 +108,7 @@ export const OSRevenueChart: React.FC<{ serviceOrders: ServiceOrder[]; darkMode:
 
   return (
     <div className={cardClass}>
-      <div>
+      <div className="flex flex-1 flex-col">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2.5">
             <span className={`p-1.5 rounded-xl border ${iconBadge.blue}`}>
@@ -161,7 +161,7 @@ export const OSRevenueChart: React.FC<{ serviceOrders: ServiceOrder[]; darkMode:
           </div>
         </div>
 
-        <div className="h-[200px] w-full" role="img" aria-label={`Gráfico de faturamento: ${formatBRL(total)} em ${count} OS`}>
+        <div className="min-h-[200px] w-full flex-1" role="img" aria-label={`Gráfico de faturamento: ${formatBRL(total)} em ${count} OS`}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={buckets} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>

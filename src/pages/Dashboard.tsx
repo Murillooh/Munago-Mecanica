@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { macZoom, macZoomProps } from '../lib/motion';
 import { 
   Package, 
   History, 
   FileText, 
   AlertTriangle, 
   Plus, 
-  Sparkles, 
+  ClipboardList, 
   Loader2, 
   Calendar, 
   Clock, 
@@ -48,6 +49,7 @@ import { TopConsumedParts } from '../components/dashboard/TopConsumedParts';
 import { CategoryDonut } from '../components/dashboard/CategoryDonut';
 import { StockCoverage } from '../components/dashboard/StockCoverage';
 import { Sparkline } from '../components/dashboard/Sparkline';
+import { HeroStat, PageHero, heroBtn, heroBtnPrimary } from '../components/PageHero';
 import { iconBadge, isBilledOS, osAmount, osBilledDate, startOfDayAgo, DAY_MS } from '../components/dashboard/utils';
 import { authFetch } from '../lib/api';
 
@@ -113,43 +115,43 @@ export const Dashboard = ({
   const MONITOR_SECTIONS = useMemo(() => [
     {
       id: 'widget-section-kpis',
-      title: 'Indicadores Gerais & Alertas de Ruptura',
+      title: 'Resumo do dia',
       shortLabel: 'Indicadores',
       tag: 'Kpis & Estoque',
       badge: 'Visão Geral'
     },
     {
       id: 'widget-section-logistics-os',
-      title: 'Balanço Logístico & Pátio de Ordens de Serviço',
-      shortLabel: 'Balanço & Oficina',
+      title: 'Movimento de peças e carros na oficina',
+      shortLabel: 'Oficina',
       tag: 'Movimentações & OS',
       badge: 'Operação'
     },
     {
       id: 'widget-section-revenue',
-      title: 'Faturamento de OS & Peças Mais Consumidas',
-      shortLabel: 'Faturamento & Consumo',
+      title: 'Faturamento e peças mais usadas',
+      shortLabel: 'Faturamento',
       tag: 'Receita & Giro',
       badge: 'Financeiro'
     },
     {
       id: 'widget-section-replenishment-cat',
-      title: 'Central de Reposição & Valor por Categoria',
-      shortLabel: 'Reposição & Categorias',
+      title: 'Reposição e valor por categoria',
+      shortLabel: 'Reposição',
       tag: 'Itens Críticos & Categorias',
       badge: 'Almoxarifado'
     },
     {
       id: 'widget-section-coverage',
-      title: 'Cobertura de Estoque em Dias',
+      title: 'Quantos dias o estoque dura',
       shortLabel: 'Cobertura',
       tag: 'Dias de Estoque',
       badge: 'Planejamento'
     },
     {
       id: 'widget-section-audit',
-      title: 'Auditoria Operacional de Movimentações',
-      shortLabel: 'Auditoria em Tempo Real',
+      title: 'Últimas movimentações',
+      shortLabel: 'Movimentações',
       tag: 'Logs & Histórico',
       badge: 'Auditoria'
     }
@@ -387,11 +389,11 @@ export const Dashboard = ({
         .sort((a, b) => ((b.minQuantity || 0) - (b.quantity || 0)) - ((a.minQuantity || 0) - (a.quantity || 0)))
         .slice(0, 40)
         .map(p => ({
-          n: p.name,
-          q: p.quantity,
-          m: p.minQuantity,
-          c: p.category,
-          v: p.price
+          nome: p.name,
+          estoque: p.quantity,
+          minimo: p.minQuantity,
+          categoria: p.category,
+          preco: p.price
         }));
 
       const res = await authFetch('/api/gemini/generate', {
@@ -403,7 +405,7 @@ export const Dashboard = ({
           1. DIAGNÓSTICO GERAL (2 linhas sobre a saúde do estoque e índice de ruptura).
           2. TOP 3 ITENS CRÍTICOS PARA REPOSIÇÃO IMEDIATA (com justificativa de impacto).
           3. RECOMENDAÇÃO LOGÍSTICA PARA ESTA SEMANA (plano de ação direto para o almoxarifado).
-          Mantenha linguagem profissional, enxuta e sem clichês.`,
+          Mantenha linguagem profissional, enxuta e sem clichês. Escreva números com algarismos (ex.: "estoque 0, mínimo 1", "38%"), sem LaTeX, sem crases e sem nomes de campos do JSON.`,
           config: {
             maxOutputTokens: 600,
             temperature: 0.2,
@@ -429,8 +431,19 @@ export const Dashboard = ({
     if (!summary) return;
     navigator.clipboard.writeText(summary);
     setCopiedSummary(true);
-    toast.success("Diagnóstico copiado para a área de transferência!");
+    toast.success("Resumo copiado.");
     setTimeout(() => setCopiedSummary(false), 2000);
+  };
+
+  const handleDiagnosticPDF = async () => {
+    if (!summary) return;
+    try {
+      const { exportDiagnosticToPDF } = await import('../lib/pdfExport');
+      exportDiagnosticToPDF({ store: settings, text: summary, products });
+      toast.success("PDF baixado.");
+    } catch {
+      toast.error("Erro ao gerar o PDF do diagnóstico.");
+    }
   };
 
   const handleExportPDF = async () => {
@@ -450,69 +463,77 @@ export const Dashboard = ({
 
   return (
     <div className="w-full space-y-5">
-      {/* Top Operational Command Bar with Generous Spacing */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 pb-6 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div>
-          <div className="flex items-center gap-2.5 text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">{settings.storeName || 'Munago Mecânica'}</span>
-            <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">/</span>
-            <span className="text-zinc-900 dark:text-zinc-200 font-medium">Monitoramento Operacional</span>
-            <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-700">·</span>
-            <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Sincronizado
-            </span>
-          </div>
-
-          <div className="flex items-baseline gap-4 mt-2 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
-              Painel de Monitoramento
-            </h1>
-            <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
-              {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Export PDF Button */}
-          <button
-            onClick={handleExportPDF}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-xs"
-          >
-            <Download size={14} className="text-zinc-500" />
+      {/* Topo: saudação, ações e indicadores em vidro sobre o degradê azul (estilo iOS) */}
+      <PageHero
+        titleAside={<>
+          <Calendar size={14} aria-hidden="true" />
+          <span className="first-letter:uppercase tabular-nums">
+            {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })} · {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          <span aria-hidden="true" className="text-blue-200/50">·</span>
+          <span className="inline-flex items-center gap-1.5 font-medium text-emerald-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            Sincronizado
+          </span>
+        </>}
+        title={<>Olá{profile?.name ? `, ${profile.name.trim().split(/\s+/)[0]}` : ''}</>}
+        subtitle={settings.storeName || 'Munago Mecânica'}
+        actions={<>
+          <button onClick={handleExportPDF} className={heroBtn}>
+            <Download size={14} aria-hidden="true" />
             <span>Relatório PDF</span>
           </button>
-
-          {/* AI Diagnostic Button */}
           {!isViewer && (
-            <button
-              onClick={generateSummary}
-              disabled={isGeneratingSummary}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200/80 dark:hover:bg-zinc-700/80 rounded-lg transition-colors border border-zinc-200/70 dark:border-zinc-700 shadow-xs"
-            >
-              {isGeneratingSummary ? (
-                <Loader2 size={14} className="animate-spin text-blue-600" />
-              ) : (
-                <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
-              )}
-              <span>Diagnóstico Executivo</span>
+            <button onClick={generateSummary} disabled={isGeneratingSummary} className={heroBtn}>
+              {isGeneratingSummary ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <ClipboardList size={14} aria-hidden="true" />}
+              <span>Resumo da IA</span>
             </button>
           )}
-
-          {/* New Service Order Primary CTA */}
           {canManageOS && (
-            <button
-              onClick={onNewOS}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
-            >
-              <Plus size={15} />
+            <button onClick={onNewOS} className={heroBtnPrimary}>
+              <Plus size={15} aria-hidden="true" />
               <span>Nova OS</span>
             </button>
           )}
-        </div>
-      </div>
+        </>}
+        statsId="widget-section-kpis"
+        statsClassName={`grid-cols-1 @sm:grid-cols-2 @3xl:grid-cols-4 rounded-3xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
+      >
+        <HeroStat
+          icon={Package} iconClass="bg-blue-500" label="Valor em estoque"
+          value={formatBRL(totalStockValue)}
+          hint={`${totalItems} referências · média ${formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}`}
+        />
+        <HeroStat
+          icon={TrendingUp} iconClass="bg-emerald-500" label="Faturado em 30 dias"
+          value={formatBRL(revenue30.total)}
+          aside={<Sparkline id="spark-revenue" data={revenue30.daily} color="#ffffff" />}
+          hint={<span className="flex items-center gap-1.5">
+            {revenue30.delta !== null && (
+              <span className={`inline-flex items-center gap-0.5 font-semibold ${revenue30.delta >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {revenue30.delta >= 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownLeft size={13} aria-hidden="true" />}
+                {revenue30.delta >= 0 ? '+' : ''}{revenue30.delta}%
+              </span>
+            )}
+            {revenue30.count} OS concluídas
+          </span>}
+        />
+        <HeroStat
+          icon={Boxes} iconClass="bg-violet-500" label="Peças com estoque ok"
+          value={`${healthyRate}%`}
+          aside={<Sparkline id="spark-out" data={outDaily14} color="#c4b5fd" />}
+          hint={`${new Intl.NumberFormat('pt-BR').format(totalUnits)} un · ${healthyItemsCount} acima do mínimo`}
+        />
+        <HeroStat
+          icon={lowStockProducts.length > 0 ? AlertTriangle : CheckCircle2}
+          iconClass={lowStockProducts.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}
+          label="Peças acabando"
+          alert={lowStockProducts.length > 0}
+          onClick={onSeeAllLowStock}
+          value={<>{lowStockProducts.length} <span className="text-base font-normal text-blue-100/80">itens</span></>}
+          hint={lowStockProducts.length > 0 ? 'Abaixo do mínimo, repor logo' : 'Nada faltando agora'}
+        />
+      </PageHero>
 
       {/* ========================================================================= */}
       {/* WALL MONITOR AUTO-SCROLL CONTROL BAR (Ativo apenas com Modo Monitor ligado) */}
@@ -530,12 +551,12 @@ export const Dashboard = ({
               {/* Left: Monitor Status & Active Widget Name */}
               <div className="flex items-center gap-3 min-w-0 flex-wrap">
                 <div className="flex items-center gap-2 px-2.5 py-1 bg-blue-600/25 text-blue-400 border border-blue-500/40 rounded-lg text-xs font-bold">
-                  <Tv size={14} className="animate-pulse text-blue-400" />
+                  <Tv size={14} className="text-blue-400" />
                   <span className="tracking-wide uppercase text-[10px]">Painel de Parede</span>
                 </div>
 
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
                   <span className="text-xs font-semibold text-zinc-300">
                     Widget {activeWidgetIndex + 1}/{MONITOR_SECTIONS.length}:
                   </span>
@@ -665,7 +686,7 @@ export const Dashboard = ({
               <div
                 className={`h-full transition-all ease-linear ${
                   isAutoScrollActive && !isUserInteracting
-                    ? 'bg-gradient-to-r from-blue-500 via-indigo-400 to-emerald-400'
+                    ? 'bg-blue-500'
                     : 'bg-zinc-600'
                 }`}
                 style={{
@@ -684,121 +705,6 @@ export const Dashboard = ({
       <div className="space-y-4">
 
         {/* ----------------------------------------------------------------------- */}
-        {/* SEÇÃO 1: INDICADORES GERAIS & RUPTURA (BENTO 1, 2, 3)                   */}
-        {/* ----------------------------------------------------------------------- */}
-        <div
-          id="widget-section-kpis"
-          className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-kpis')}`}
-        >
-          {/* KPI 1: PATRIMÔNIO VALORADO */}
-          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Patrimônio em Estoque</span>
-                <span className={`p-1.5 rounded-xl border ${iconBadge.blue}`}>
-                  <Package size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
-                {formatBRL(totalStockValue)}
-              </p>
-              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">{totalItems} referências cadastradas</p>
-            </div>
-            <div className="pt-4 mt-5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-              <span className="text-zinc-500">Valor médio / item</span>
-              <span className="font-semibold text-zinc-800 dark:text-zinc-200 tabular-nums">
-                {formatBRL(totalItems > 0 ? totalStockValue / totalItems : 0)}
-              </span>
-            </div>
-          </div>
-
-          {/* KPI 2: FATURAMENTO DE OS (30 DIAS) */}
-          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Faturamento 30 dias</span>
-                <span className={`p-1.5 rounded-xl border ${iconBadge.emerald}`}>
-                  <TrendingUp size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
-                {formatBRL(revenue30.total)}
-              </p>
-              <div className="mt-1.5 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                {revenue30.delta !== null && (
-                  <span className={`inline-flex items-center gap-0.5 font-semibold ${revenue30.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {revenue30.delta >= 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownLeft size={13} aria-hidden="true" />}
-                    {revenue30.delta >= 0 ? '+' : ''}{revenue30.delta}%
-                  </span>
-                )}
-                <span>{revenue30.count} OS concluídas</span>
-              </div>
-            </div>
-            <div className="pt-3 mt-3">
-              <Sparkline id="spark-revenue" data={revenue30.daily} color={darkMode ? '#3987e5' : '#2a78d6'} />
-            </div>
-          </div>
-
-          {/* KPI 3: DISPONIBILIDADE & VOLUME */}
-          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Disponibilidade</span>
-                <span className={`p-1.5 rounded-xl border ${iconBadge.indigo}`}>
-                  <Boxes size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white tabular-nums">
-                {healthyRate}%
-              </p>
-              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                {new Intl.NumberFormat('pt-BR').format(totalUnits)} un · {healthyItemsCount} itens acima do mínimo
-              </p>
-            </div>
-            <div className="pt-3 mt-3 space-y-2">
-              <Sparkline id="spark-out" data={outDaily14} color={darkMode ? '#d95926' : '#eb6834'} />
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Saídas diárias · últimos 14 dias</p>
-            </div>
-          </div>
-
-          {/* KPI 4: MONITOR DE RUPTURA */}
-          <button
-            type="button"
-            onClick={onSeeAllLowStock}
-            className={`text-left p-6 rounded-2xl border shadow-xs transition-colors cursor-pointer flex flex-col justify-between ${
-              lowStockProducts.length > 0
-                ? 'bg-red-50/60 dark:bg-red-950/20 border-red-200/90 dark:border-red-900/60 hover:border-red-300 dark:hover:border-red-800'
-                : 'bg-white dark:bg-zinc-900/90 border-zinc-200/70 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700'
-            }`}
-          >
-            <div className="w-full">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold tracking-wide uppercase text-[11px] text-zinc-500 dark:text-zinc-400">Risco de Ruptura</span>
-                <span className={`p-2 rounded-xl border ${lowStockProducts.length > 0 ? iconBadge.red : iconBadge.emerald}`}>
-                  {lowStockProducts.length > 0 ? <AlertTriangle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
-                </span>
-              </div>
-              <p className={`mt-2 text-2xl font-bold tracking-tight tabular-nums ${
-                lowStockProducts.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-white'
-              }`}>
-                {lowStockProducts.length} <span className="text-lg font-normal text-zinc-500">itens</span>
-              </p>
-              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                {lowStockProducts.length > 0
-                  ? 'Abaixo do estoque mínimo: risco de parar OS'
-                  : 'Nenhuma ruptura no catálogo agora'}
-              </p>
-            </div>
-            <div className="w-full pt-4 mt-5 border-t border-zinc-200/70 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-              <span className="text-zinc-500">Ação requerida</span>
-              <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                Ver itens <ChevronRight size={13} aria-hidden="true" />
-              </span>
-            </div>
-          </button>
-        </div>
-
-        {/* ----------------------------------------------------------------------- */}
         {/* SEÇÃO 2: BALANÇO LOGÍSTICO & PÁTIO DE OS (BENTO 4, 5)                  */}
         {/* ----------------------------------------------------------------------- */}
         <div 
@@ -806,7 +712,7 @@ export const Dashboard = ({
           className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
         >
           {/* BENTO 4: VISUALIZAÇÃO DE TENDÊNCIA DE ENTRADAS E SAÍDAS (RECHARTS) - col-span-12 xl:col-span-8 */}
-          <div className="col-span-12 xl:col-span-8 flex flex-col justify-between">
+          <div className="col-span-12 xl:col-span-8 flex flex-col">
             <ProductMovementTrendChart 
               transactions={transactions || []} 
               onSeeAllHistory={onSeeAllHistory}
@@ -814,104 +720,90 @@ export const Dashboard = ({
             />
           </div>
 
-          {/* BENTO 5: PÁTIO DE SERVIÇOS & OFICINA (TOWER CELL) - col-span-12 xl:col-span-4 */}
-          <div className="col-span-12 xl:col-span-4 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
+          {/* BENTO 5: PÁTIO DE ORDENS DE SERVIÇO */}
+          <div className="col-span-12 xl:col-span-4 flex flex-col p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+                  <Car size={17} aria-hidden="true" />
+                </span>
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
-                    Pátio de Ordens de Serviço
-                  </h2>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Fluxo operacional da oficina
-                  </p>
-                </div>
-
-                {canManageOS && (
-                  <button
-                    onClick={onNewOS}
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                  >
-                    Todas ({serviceOrders?.length || 0}) <ChevronRight size={13} />
-                  </button>
-                )}
-              </div>
-
-              {/* Structured Pipeline Counters */}
-              <div className="grid grid-cols-3 gap-2 p-1.5 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-5 text-center">
-                <div className="py-2">
-                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-semibold uppercase">Triagem</span>
-                  <span className="text-base font-bold text-zinc-900 dark:text-white tabular-nums">
-                    {(serviceOrders || []).filter(os => os.status === 'draft').length}
-                  </span>
-                </div>
-                <div className="py-2 border-x border-zinc-200/80 dark:border-zinc-700/80">
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-semibold uppercase">Execução</span>
-                  <span className="text-base font-bold text-amber-600 dark:text-amber-400 tabular-nums">
-                    {inProgressOS.length}
-                  </span>
-                </div>
-                <div className="py-2">
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold uppercase">Concluídas</span>
-                  <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                    {completedOS.length}
-                  </span>
+                  <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">Carros na oficina</h2>
+                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">OS abertas agora</p>
                 </div>
               </div>
-
-              {/* Active OS List */}
-              <div className="space-y-3">
-                {activeOS.length > 0 ? (
-                  activeOS.slice(0, 3).map((os) => (
-                    <div 
-                      key={os.id}
-                      onClick={onNewOS}
-                      className="p-3.5 bg-zinc-50/70 dark:bg-zinc-800/40 rounded-xl border border-zinc-200/60 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-bold text-zinc-900 dark:text-white">
-                          OS #{os.id.substring(0, 6)}
-                        </span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                          os.status === 'in_progress' 
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' 
-                            : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
-                        }`}>
-                          {os.status === 'in_progress' ? 'Em Andamento' : 'Rascunho'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-300 mt-2">
-                        <span className="truncate max-w-[170px] font-semibold">
-                          {os.customerName || 'Cliente sem nome'}
-                        </span>
-                        <span className="font-bold text-zinc-900 dark:text-white tabular-nums">
-                          {formatBRL(os.finalAmount || os.totalAmount || 0)}
-                        </span>
-                      </div>
-
-                      {(os.vehicleModel || os.licensePlate) && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-1.5">
-                          <Car size={12} className="text-zinc-400" />
-                          <span>{os.vehicleModel || 'Veículo'} {os.licensePlate ? `(${os.licensePlate})` : ''}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-7 text-center text-xs text-zinc-500 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
-                    Nenhuma ordem em andamento no pátio.
-                  </div>
-                )}
-              </div>
+              {canManageOS && (
+                <button onClick={onNewOS} className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 cursor-pointer">
+                  Todas ({serviceOrders?.length || 0}) <ChevronRight size={13} aria-hidden="true" />
+                </button>
+              )}
             </div>
+
+            {/* Contadores do pátio em blocos coloridos */}
+            <div className="mb-4 grid grid-cols-3 gap-2 text-center">
+              {([
+                ['Orçamento', (serviceOrders || []).filter(os => os.status === 'draft').length, 'border-zinc-200 dark:border-zinc-800', 'text-zinc-700 dark:text-zinc-200'],
+                ['Em serviço', inProgressOS.length, 'border-zinc-200 dark:border-zinc-800', 'text-amber-600 dark:text-amber-400'],
+                ['Prontas', completedOS.length, 'border-zinc-200 dark:border-zinc-800', 'text-emerald-600 dark:text-emerald-400'],
+              ] as const).map(([label, count, tile, tone]) => (
+                <div key={label} className={`rounded-xl border py-2.5 ${tile}`}>
+                  <span className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">{label}</span>
+                  <span className={`text-xl font-bold tabular-nums ${tone}`}>{count}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Tipo de manutenção das OS em aberto */}
+            {activeOS.length > 0 && (() => {
+              const preventivas = activeOS.filter(os => os.maintenanceType === 'preventiva').length;
+              return (
+                <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-orange-500" aria-hidden="true" />Corretivas <b className="tabular-nums text-zinc-800 dark:text-zinc-200">{activeOS.length - preventivas}</b></span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal-500" aria-hidden="true" />Preventivas <b className="tabular-nums text-zinc-800 dark:text-zinc-200">{preventivas}</b></span>
+                  <span className="text-zinc-400">em aberto</span>
+                </p>
+              );
+            })()}
+
+            {/* OS em andamento: faixa colorida pela etapa */}
+            {/* Lista simples: carro e placa primeiro (é assim que a oficina chama), cliente e etapa embaixo */}
+            {activeOS.length > 0 ? (
+              <ul className="flex-1 divide-y divide-zinc-100 dark:divide-zinc-800">
+                {activeOS.slice(0, 4).map((os) => {
+                  const running = os.status === 'in_progress';
+                  return (
+                    <li key={os.id}>
+                      <button
+                        type="button"
+                        onClick={onNewOS}
+                        className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{os.vehicleModel || os.customerName || 'Sem veículo'}</span>
+                            {os.licensePlate && <span className="shrink-0 font-mono text-[11px] uppercase text-zinc-500">{os.licensePlate}</span>}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${running ? 'bg-amber-500' : 'bg-zinc-400'}`} aria-hidden="true" />
+                            <span className="truncate">{running ? 'Em serviço' : 'Orçamento'}{os.vehicleModel && os.customerName ? ` · ${os.customerName}` : ''}</span>
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-900 dark:text-white">{formatBRL(os.finalAmount || os.totalAmount || 0)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="flex-1 py-7 text-center text-xs text-zinc-500">Nenhum carro em serviço agora.</p>
+            )}
 
             {canManageOS && (
               <button
                 onClick={onNewOS}
-                className="w-full mt-5 py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 cursor-pointer"
               >
-                <Plus size={14} /> Abrir Painel de Ordens
+                Ver todas as OS <ChevronRight size={14} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -949,10 +841,10 @@ export const Dashboard = ({
                 <div>
                   <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
                     <ShieldAlert size={16} className={lowStockProducts.length > 0 ? "text-red-500" : "text-zinc-400"} />
-                    Central de Reposição & Itens Críticos
+                    Peças para repor
                   </h2>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Produtos que atingiram o limite mínimo de segurança cadastrado
+                    Chegaram no estoque mínimo que você definiu
                   </p>
                 </div>
 
@@ -1074,10 +966,10 @@ export const Dashboard = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
                 <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
-                  Auditoria de Movimentações Recentes
+                  Últimas movimentações
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Log contínuo de entradas, devoluções e requisições para a oficina
+                  Entradas, saídas e devoluções de peças
                 </p>
               </div>
               <button
@@ -1151,22 +1043,21 @@ export const Dashboard = ({
         {isDiagnosticOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              {...macZoomProps()}
+              transition={macZoom}
               className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden"
             >
               <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                    <Sparkles size={16} />
+                    <ClipboardList size={16} aria-hidden="true" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
-                      Diagnóstico Operacional & Riscos de Ruptura
+                      Resumo do estoque
                     </h3>
                     <p className="text-xs text-zinc-500">
-                      Análise automatizada de conformidade e giro de estoque
+                      Feito pela IA com base no seu estoque e nas OS
                     </p>
                   </div>
                 </div>
@@ -1183,10 +1074,10 @@ export const Dashboard = ({
                   <div className="py-12 text-center space-y-3">
                     <Loader2 size={24} className="animate-spin mx-auto text-blue-600" />
                     <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                      Processando telemetria do estoque...
+                      Lendo seu estoque…
                     </p>
                     <p className="text-xs text-zinc-500 max-w-md mx-auto">
-                      Avaliando níveis de reserva, histórico recente de saídas e calculando pontos críticos de reposição.
+                      Leva alguns segundos.
                     </p>
                   </div>
                 ) : summary ? (
@@ -1195,14 +1086,14 @@ export const Dashboard = ({
                   </div>
                 ) : (
                   <p className="text-sm text-zinc-500 text-center py-8">
-                    Nenhum diagnóstico gerado ainda. Clique em atualizar para calcular.
+                    Nenhum resumo ainda.
                   </p>
                 )}
               </div>
 
               <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <span className="text-xs text-zinc-400">
-                  Munago Mecânica · Análise Executiva
+                  Gerado por IA. Confira antes de decidir.
                 </span>
                 <div className="flex items-center gap-2">
                   {summary && (
@@ -1211,7 +1102,16 @@ export const Dashboard = ({
                       className="px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors inline-flex items-center gap-1.5"
                     >
                       {copiedSummary ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                      {copiedSummary ? "Copiado!" : "Copiar Diagnóstico"}
+                      {copiedSummary ? "Copiado!" : "Copiar"}
+                    </button>
+                  )}
+                  {summary && !isGeneratingSummary && (
+                    <button
+                      onClick={handleDiagnosticPDF}
+                      className="px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors inline-flex items-center gap-1.5"
+                    >
+                      <Download size={14} aria-hidden="true" />
+                      Baixar PDF
                     </button>
                   )}
                   <button

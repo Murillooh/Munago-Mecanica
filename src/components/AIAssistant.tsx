@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from "../context/AppContext";
+import { PageHero, heroBtnPrimary } from './PageHero';
 import { apiDelete, apiGet, apiPost, authFetch, hydrateDates, type AppTimestamp } from "../lib/api";
 import { parseDate } from './dashboard/utils';
 import {
@@ -16,9 +17,14 @@ import {
   Package,
   Truck,
   TrendingUp,
-  FileText
+  FileText,
+  Mic,
+  Square
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Ditado por voz do navegador (Chrome, Edge, Safari). Firefox não tem: o botão some.
+const SpeechRec: any = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
 interface Message {
   role: 'user' | 'assistant';
@@ -169,6 +175,28 @@ const AIAssistant = () => {
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<any>(null);
+  useEffect(() => () => recRef.current?.abort(), []);
+
+  /** Fala vira texto no campo e, ao terminar de falar, já envia (como áudio no WhatsApp). */
+  const toggleMic = () => {
+    if (recRef.current) { recRef.current.stop(); return; }
+    const rec = new SpeechRec();
+    rec.lang = 'pt-BR';
+    rec.interimResults = true;
+    let text = '';
+    rec.onresult = (e: any) => { text = Array.from(e.results, (res: any) => res[0].transcript).join(''); setInput(text); };
+    rec.onerror = (e: any) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast.error('Permita o microfone no navegador para mandar áudio.');
+      else if (e.error !== 'no-speech' && e.error !== 'aborted') toast.error('Não consegui ouvir. Tente de novo.');
+    };
+    rec.onend = () => { recRef.current = null; setListening(false); if (text.trim()) void sendRef.current(text); };
+    recRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
+
   const send = async (text?: string) => {
     const userQuery = (text ?? input).trim();
     if (!userQuery || isLoading) return;
@@ -291,6 +319,8 @@ const AIAssistant = () => {
       setIsLoading(false);
     }
   };
+  const sendRef = useRef(send);
+  sendRef.current = send;
 
   const openHistory = (item: SavedSearch) => {
     setMessages([
@@ -320,37 +350,30 @@ const AIAssistant = () => {
   return (
     // Celular: desconta o menu inferior, as margens da página e as áreas seguras do iPhone.
     <div className="w-full flex flex-col gap-4 h-[calc(100dvh-10rem-env(safe-area-inset-bottom)-env(safe-area-inset-top))] lg:h-[calc(100dvh-3rem)]">
-      {/* Cabeçalho: no celular quebra em duas linhas (título em cima, controles embaixo) */}
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Assistente IA</h1>
-          <p className="hidden md:block truncate text-sm text-zinc-500 dark:text-zinc-400">Analisa seu estoque e suas OS e pesquisa preços e fornecedores na web.</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="lg:hidden flex items-center gap-0.5 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200/70 dark:border-zinc-700" role="group" aria-label="Painel">
+      {/* Topo compacto (sem indicadores: a conversa precisa da altura) */}
+      <PageHero
+        icon={Sparkles}
+        title="Assistente IA"
+        subtitle="Analisa seu estoque e suas OS e pesquisa preços e fornecedores na web."
+        actions={<>
+          <div className="lg:hidden flex items-center gap-0.5 rounded-xl border border-white/25 bg-white/10 p-0.5" role="group" aria-label="Painel">
             {([['chat', 'Conversa', MessageSquare], ['history', 'Histórico', History]] as const).map(([v, label, Icon]) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => setMobilePane(v)}
                 aria-pressed={mobilePane === v}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${mobilePane === v ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500 dark:text-zinc-400'}`}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${mobilePane === v ? 'bg-white text-blue-700 shadow-xs' : 'text-blue-50'}`}
               >
                 <Icon size={13} aria-hidden="true" /> {label}
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={newConversation}
-            aria-label="Nova conversa"
-            title="Nova conversa"
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-          >
+          <button type="button" onClick={newConversation} aria-label="Nova conversa" title="Nova conversa" className={heroBtnPrimary}>
             <Plus size={15} aria-hidden="true" /> <span className="hidden sm:inline">Nova conversa</span>
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="flex-1 min-h-0 flex gap-4">
         {/* Histórico */}
@@ -397,7 +420,7 @@ const AIAssistant = () => {
                       type="button"
                       onClick={() => setDeleteConfirmId(item.id)}
                       aria-label={`Excluir conversa: ${item.query}`}
-                      className="mt-1.5 mr-1 p-1 rounded-md text-zinc-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition cursor-pointer"
+                      className="mt-1.5 mr-1 p-1 rounded-md text-zinc-400 opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition cursor-pointer"
                     >
                       <Trash2 size={13} aria-hidden="true" />
                     </button>
@@ -508,9 +531,22 @@ const AIAssistant = () => {
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
                 }}
-                placeholder="Pergunte sobre preços, fornecedores ou seu estoque…"
+                placeholder={listening ? 'Ouvindo… fale sua pergunta' : 'Pergunte sobre preços, fornecedores ou seu estoque…'}
                 className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none"
               />
+              {SpeechRec && (
+                <button
+                  type="button"
+                  onClick={toggleMic}
+                  disabled={isLoading}
+                  aria-label={listening ? 'Parar e enviar áudio' : 'Mandar áudio'}
+                  aria-pressed={listening}
+                  title={listening ? 'Parar e enviar' : 'Mandar áudio'}
+                  className={`shrink-0 p-2 rounded-lg transition-colors disabled:opacity-40 cursor-pointer ${listening ? 'bg-rose-600 text-white motion-safe:animate-pulse' : 'text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >
+                  {listening ? <Square size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}

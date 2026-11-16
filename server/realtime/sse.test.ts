@@ -22,7 +22,7 @@ describe('GET /events (SSE)', () => {
     expect(res.headers.get('content-type')).toContain('text/event-stream');
 
     const reader = res.body!.getReader();
-    h.bus.emitChange('products');
+    h.bus.emitChange('default', 'products');
     let text = '';
     while (!text.includes('data: products')) {
       const { value, done } = await reader.read();
@@ -39,9 +39,9 @@ describe('GET /events (SSE)', () => {
     const res = await fetch(`${base}/events?token=${encodeURIComponent(TOKENS.viewer)}`, { signal: ctrl.signal });
     const reader = res.body!.getReader();
     await reader.read(); // ': connected'
-    h.bus.emitChange('products');
-    h.bus.emitChange('products');
-    h.bus.emitChange('transactions');
+    h.bus.emitChange('default', 'products');
+    h.bus.emitChange('default', 'products');
+    h.bus.emitChange('default', 'transactions');
     let text = '';
     while (!text.includes('data: transactions')) {
       const { value, done } = await reader.read();
@@ -49,6 +49,37 @@ describe('GET /events (SSE)', () => {
       text += new TextDecoder().decode(value);
     }
     expect(text.match(/data: products/g)).toHaveLength(1);
+    ctrl.abort();
+  });
+
+  it('só entrega avisos da oficina do usuário; admin geral recebe todos', async () => {
+    const { h, base } = await listen();
+    const open = async (who: keyof typeof TOKENS, ctrl: AbortController) => {
+      const reader = (await fetch(`${base}/events?token=${encodeURIComponent(TOKENS[who])}`, { signal: ctrl.signal })).body!.getReader();
+      await reader.read(); // ': connected'
+      return reader;
+    };
+    const readUntil = async (reader: ReadableStreamDefaultReader<Uint8Array>, marker: string) => {
+      let text = '';
+      while (!text.includes(marker)) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        text += new TextDecoder().decode(value);
+      }
+      return text;
+    };
+    const ctrl = new AbortController();
+    const viewer = await open('viewer', ctrl);
+    const boss = await open('boss', ctrl);
+    h.bus.emitChange('other', 'serviceOrders');
+    h.bus.emitChange('*', 'accessRequests');
+    h.bus.emitChange('default', 'products');
+    const seenByViewer = await readUntil(viewer, 'data: products');
+    expect(seenByViewer).not.toContain('serviceOrders');
+    expect(seenByViewer).not.toContain('accessRequests');
+    const seenByBoss = await readUntil(boss, 'data: products');
+    expect(seenByBoss).toContain('data: serviceOrders');
+    expect(seenByBoss).toContain('data: accessRequests');
     ctrl.abort();
   });
 

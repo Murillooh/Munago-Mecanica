@@ -51,7 +51,7 @@ export function createProductsRouter({ db, bus }: ApiDeps) {
     const data = productInput.parse(req.body);
     await assertQuantityAllowed(ws(req), data.quantity);
     const [row] = await db.insert(products).values({ id: newId(), workspaceId: ws(req), ...data }).returning();
-    bus.emitChange('products');
+    bus.emitChange(ws(req), 'products');
     res.status(201).json(row);
   }));
 
@@ -59,7 +59,7 @@ export function createProductsRouter({ db, bus }: ApiDeps) {
     const list = z.array(productInput).min(1).max(1000).parse(req.body);
     for (const p of list) await assertQuantityAllowed(ws(req), p.quantity);
     const rows = await db.insert(products).values(list.map((p) => ({ id: newId(), workspaceId: ws(req), ...p }))).returning();
-    bus.emitChange('products');
+    bus.emitChange(ws(req), 'products');
     res.status(201).json(rows);
   }));
 
@@ -68,7 +68,7 @@ export function createProductsRouter({ db, bus }: ApiDeps) {
     await assertQuantityAllowed(ws(req), updates.quantity);
     await db.update(products).set({ ...updates, updatedAt: sql`now()` })
       .where(and(eq(products.workspaceId, ws(req)), inArray(products.id, ids)));
-    bus.emitChange('products');
+    bus.emitChange(ws(req), 'products');
     res.status(204).end();
   }));
 
@@ -78,13 +78,13 @@ export function createProductsRouter({ db, bus }: ApiDeps) {
     const [row] = await db.update(products).set({ ...updates, updatedAt: sql`now()` })
       .where(mine(ws(req), req.params.id)).returning();
     if (!row) throw new ApiError(404, 'NOT_FOUND', 'Produto não encontrado.');
-    bus.emitChange('products');
+    bus.emitChange(ws(req), 'products');
     res.json(row);
   }));
 
   r.delete('/products/:id', requirePermission('canManageInventory'), asyncHandler(async (req, res) => {
     await db.delete(products).where(mine(ws(req), req.params.id));
-    bus.emitChange('products');
+    bus.emitChange(ws(req), 'products');
     res.status(204).end();
   }));
 

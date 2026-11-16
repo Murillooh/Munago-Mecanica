@@ -29,7 +29,9 @@ export function sseHandler(bus: ChangeBus): RequestHandler {
     // para o cliente refazer cada GET uma vez só.
     const pending = new Set<Resource>();
     let flush: ReturnType<typeof setTimeout> | undefined;
-    const onChange = (r: Resource) => {
+    const user = req.user!;
+    const onChange = (r: Resource, scope: string) => {
+      if (!user.isSuperAdmin && scope !== user.workspaceId) return;
       pending.add(r);
       flush ??= setTimeout(() => {
         flush = undefined;

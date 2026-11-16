@@ -11,6 +11,7 @@ import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { applyMovement } from '../services/stock';
 import { NO_SPLIT, freezeSplit, serviceRepasse } from '../services/revenueSplit';
 import { getSettings } from './settings';
+import logger from '../utils/logger.js';
 import { newId, type ApiDeps } from './deps';
 
 const money = z.number().nonnegative();
@@ -37,6 +38,7 @@ const osFields = z.object({
   totalPartsCost: money,
   totalAmount: money,
   status: z.enum(['draft', 'in_progress', 'completed', 'paid']),
+  maintenanceType: z.enum(['corretiva', 'preventiva']),
   scheduledDate: z.string().min(1).max(40),
   completionDate: optText(40),
   observations: optText(2000),
@@ -51,6 +53,7 @@ const osInput = osFields.extend({
   totalPartsCost: money.default(0),
   totalAmount: money.default(0),
   status: osFields.shape.status.default('draft'),
+  maintenanceType: osFields.shape.maintenanceType.default('corretiva'),
   serviceItems: osFields.shape.serviceItems.default([]),
 });
 
@@ -80,32 +83,56 @@ async function resolveServices(db: DB, workspaceId: string, wanted: { serviceId:
   return { serviceItems, repasseAmount };
 }
 
+/** Repasse da OS: soma dos serviços, nunca abaixo do mínimo (% do total) que o admin geral definiu para a oficina. */
+const osRepasse = (servicesRepasse: number, totalAmount: number, minPercent = 0) =>
+  Math.max(servicesRepasse, Math.round(totalAmount * minPercent) / 100);
+
+const sumRepasse = (items: ServiceOrderService[]) => Math.round(items.reduce((a, i) => a + i.repasseAmount * 100, 0)) / 100;
+
+/** Pagamento só pelo Asaas (webhook ou "Verificar"): assim o repasse sempre sai na divisão automática. */
+const PAID_BY_ASAAS_ONLY = 'O pagamento é confirmado automaticamente quando o cliente paga pelo Asaas. Use "Cobrar" na OS.';
+
 const checkTotal = (totalAmount: number, repasseAmount: number) => {
   if (totalAmount < repasseAmount) throw new ApiError(400, 'INVALID_TOTAL', 'O total da OS não pode ser menor que o repasse dos serviços.');
 };
 
-/** Marca como paga a OS da cobrança, congelando o repasse dos serviços. Idempotente. */
-export async function markServiceOrderPaid(db: DB, bus: ChangeBus, asaasPaymentId: string) {
+/**
+ * Marca como paga a OS da cobrança, congelando o repasse. Idempotente.
+ * `paidValue` vem da consulta ao Asaas (nunca do corpo do webhook): valor diferente do total da OS não baixa.
+ */
+export async function markServiceOrderPaid(db: DB, bus: ChangeBus, asaasPaymentId: string, paidValue: number) {
   const [os] = await db.select().from(serviceOrders).where(eq(serviceOrders.asaasPaymentId, asaasPaymentId));
   if (!os || os.status === 'paid') return;
+  if (Math.round(paidValue * 100) !== Math.round(os.totalAmount * 100)) {
+    logger.warn({ osId: os.id, asaasPaymentId, paidValue, totalAmount: os.totalAmount }, 'Asaas: valor pago diferente do total da OS; não marcada como paga');
+    return;
+  }
   await db.update(serviceOrders)
     .set({ status: 'paid', ...freezeSplit(os.totalAmount, os.repasseAmount), paidAt: new Date(), updatedAt: sql`now()` })
     .where(eq(serviceOrders.id, os.id));
-  bus.emitChange('serviceOrders');
+  bus.emitChange(os.workspaceId, 'serviceOrders');
 }
 
 /** Webhook público do Asaas: autenticado pelo token configurado no painel (header asaas-access-token). */
-export function createAsaasWebhookRouter({ db, bus }: ApiDeps, token?: string) {
+export function createAsaasWebhookRouter({ db, bus, payments }: ApiDeps, token?: string) {
   const r = Router();
   r.post('/asaas/webhook', asyncHandler(async (req, res) => {
     const sent = req.get('asaas-access-token') ?? '';
     const ok = !!token && sent.length === token.length && timingSafeEqual(Buffer.from(sent), Buffer.from(token));
     if (!ok) return res.status(401).json({ error: 'Token inválido.', code: 'INVALID_TOKEN' });
     const { event, payment } = req.body ?? {};
-    if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(event) && typeof payment?.id === 'string') {
-      await markServiceOrderPaid(db, bus, payment.id);
+    if (payments && ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(event) && typeof payment?.id === 'string') {
+      // Não confia no corpo: confirma status e valor direto no Asaas antes de baixar a OS.
+      try {
+        const charge = await payments.getCharge(payment.id);
+        if (PAID_STATUSES.has(charge.status)) await markServiceOrderPaid(db, bus, payment.id, charge.value);
+      } catch (err) {
+        // Consulta ao Asaas falhou: 503 para o Asaas reenviar o evento (a tela "Verificar" também baixa).
+        logger.error({ err: err instanceof Error ? err.message : err, paymentId: payment.id }, 'Asaas: webhook não confirmado');
+        return res.status(503).json({ error: 'Tente novamente.', code: 'GATEWAY_UNAVAILABLE' });
+      }
     }
-    // 200 sempre (inclusive para eventos ignorados): senão o Asaas reenvia e pausa a fila.
+    // 200 para eventos tratados ou ignorados: erro repetido faz o Asaas pausar a fila.
     res.json({ received: true });
   }));
   return r;
@@ -124,9 +151,12 @@ export function createServiceOrdersRouter({ db, bus, payments }: ApiDeps) {
     const { serviceItems: wanted, ...data } = osInput.parse(req.body);
     const user = req.user!;
     const workspaceId = ws(req);
-    const { allowNegativeStock } = await getSettings(db, workspaceId);
-    const { serviceItems, repasseAmount } = await resolveServices(db, workspaceId, wanted);
-    checkTotal(data.totalAmount, repasseAmount);
+    // Admin geral pode lançar manualmente para corrigir casos excepcionais.
+    if (data.status === 'paid' && !user.isSuperAdmin) throw new ApiError(403, 'PAYMENT_VIA_ASAAS', PAID_BY_ASAAS_ONLY);
+    const { allowNegativeStock, repasseMinPercent } = await getSettings(db, workspaceId);
+    const { serviceItems, repasseAmount: servicesRepasse } = await resolveServices(db, workspaceId, wanted);
+    checkTotal(data.totalAmount, servicesRepasse);
+    const repasseAmount = osRepasse(servicesRepasse, data.totalAmount, repasseMinPercent);
     const id = newId();
     const reason = `Ordem de Serviço #${id.slice(-6).toUpperCase()}`;
     const split = data.status === 'paid' ? { ...freezeSplit(data.totalAmount, repasseAmount), paidAt: new Date() } : NO_SPLIT;
@@ -145,7 +175,7 @@ export function createServiceOrdersRouter({ db, bus, payments }: ApiDeps) {
       return { row, notified };
     });
 
-    bus.emitChange('serviceOrders', 'products', 'transactions', ...(notified ? ['notifications' as const] : []));
+    bus.emitChange(ws(req), 'serviceOrders', 'products', 'transactions', ...(notified ? ['notifications' as const] : []));
     res.status(201).json(row);
   }));
 
@@ -160,6 +190,13 @@ export function createServiceOrdersRouter({ db, bus, payments }: ApiDeps) {
     const { serviceItems: wanted, ...data } = parsed.data;
     const [current] = await db.select().from(serviceOrders).where(mine(ws(req), req.params.id));
     if (!current) throw new ApiError(404, 'NOT_FOUND', 'Ordem de serviço não encontrada.');
+    // Entrar ou sair de "paga" só pelo Asaas (o admin geral pode corrigir manualmente).
+    const statusChange = data.status !== undefined && data.status !== current.status;
+    if (statusChange && (data.status === 'paid' || current.status === 'paid') && !req.user!.isSuperAdmin) {
+      throw new ApiError(403, 'PAYMENT_VIA_ASAAS', current.status === 'paid'
+        ? 'Esta OS foi paga pelo Asaas e não pode voltar de etapa.'
+        : PAID_BY_ASAAS_ONLY);
+    }
     // A cobrança no Asaas foi emitida com o valor e o split antigos.
     const charged = !!current.asaasPaymentId && current.status !== 'paid';
     if (charged && ((data.totalAmount !== undefined && data.totalAmount !== current.totalAmount) || wanted)) {
@@ -170,9 +207,15 @@ export function createServiceOrdersRouter({ db, bus, payments }: ApiDeps) {
     }
 
     const resolved = wanted ? await resolveServices(db, ws(req), wanted) : null;
-    const repasseAmount = resolved?.repasseAmount ?? current.repasseAmount;
+    const servicesRepasse = resolved?.repasseAmount ?? sumRepasse(current.serviceItems);
     const totalAmount = data.totalAmount ?? current.totalAmount;
-    checkTotal(totalAmount, repasseAmount);
+    // Só recalcula quando total ou serviços mudam, e nunca em OS paga ou com cobrança emitida
+    // (o split do Asaas já saiu com o repasse antigo; o mínimo novo não vale retroativo).
+    const amountsChanged = !!resolved || (data.totalAmount !== undefined && data.totalAmount !== current.totalAmount);
+    const repasseAmount = amountsChanged && current.status !== 'paid' && !current.asaasPaymentId
+      ? osRepasse(servicesRepasse, totalAmount, (await getSettings(db, ws(req))).repasseMinPercent)
+      : current.repasseAmount;
+    checkTotal(totalAmount, Math.max(servicesRepasse, repasseAmount));
 
     // Repasse: congelado ao virar 'paid' (mantido enquanto continuar paga); limpo se sair de 'paid'.
     const status = data.status ?? current.status;
@@ -181,9 +224,9 @@ export function createServiceOrdersRouter({ db, bus, payments }: ApiDeps) {
       split = current.status === 'paid' ? {} : { ...freezeSplit(totalAmount, repasseAmount), paidAt: new Date() };
     }
 
-    const [row] = await db.update(serviceOrders).set({ ...data, ...(resolved ?? {}), ...split, updatedAt: sql`now()` })
+    const [row] = await db.update(serviceOrders).set({ ...data, ...(resolved ? { serviceItems: resolved.serviceItems } : {}), repasseAmount, ...split, updatedAt: sql`now()` })
       .where(mine(ws(req), req.params.id)).returning();
-    bus.emitChange('serviceOrders');
+    bus.emitChange(ws(req), 'serviceOrders');
     res.json(row);
   }));
 
@@ -225,7 +268,7 @@ export function createServiceOrdersRouter({ db, bus, payments }: ApiDeps) {
     });
     const [row] = await db.update(serviceOrders).set({ asaasPaymentId: charge.id, paymentUrl: charge.invoiceUrl, updatedAt: sql`now()` })
       .where(mine(ws(req), os.id)).returning();
-    bus.emitChange('serviceOrders');
+    bus.emitChange(ws(req), 'serviceOrders');
     res.status(201).json(await chargeView(row, 'PENDING'));
   }));
 
@@ -233,15 +276,15 @@ export function createServiceOrdersRouter({ db, bus, payments }: ApiDeps) {
   r.get('/service-orders/:id/charge', requirePermission(), asyncHandler(async (req, res) => {
     const [os] = await db.select().from(serviceOrders).where(mine(ws(req), req.params.id));
     if (!os?.asaasPaymentId) throw new ApiError(404, 'NOT_FOUND', 'Esta OS não tem cobrança.');
-    const { status } = await gateway().getCharge(os.asaasPaymentId);
-    if (PAID_STATUSES.has(status)) await markServiceOrderPaid(db, bus, os.asaasPaymentId);
+    const { status, value } = await gateway().getCharge(os.asaasPaymentId);
+    if (PAID_STATUSES.has(status)) await markServiceOrderPaid(db, bus, os.asaasPaymentId, value);
     res.json(await chargeView(os, status));
   }));
 
   // Igual ao comportamento atual: excluir não devolve estoque.
   r.delete('/service-orders/:id', requirePermission('canManageOS'), asyncHandler(async (req, res) => {
     await db.delete(serviceOrders).where(mine(ws(req), req.params.id));
-    bus.emitChange('serviceOrders');
+    bus.emitChange(ws(req), 'serviceOrders');
     res.status(204).end();
   }));
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { macZoom, macZoomProps } from '../lib/motion';
 import { 
   X, 
   Sparkles, 
@@ -289,9 +290,8 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
 
       <div className="flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8">
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          {...macZoomProps()}
+          transition={macZoom}
           className="relative w-full max-w-5xl transform overflow-hidden rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl transition-all"
         >
           {/* Header */}
@@ -463,8 +463,8 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                   </div>
 
                   {/* Products list with computed status */}
-                  <div className="overflow-hidden border border-zinc-100 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-950/20">
-                    <table className="w-full text-left border-collapse">
+                  <div className="overflow-x-auto border border-zinc-100 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-950/20">
+                    <table className="w-full min-w-[560px] text-left border-collapse">
                       <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900/30 text-[9px] uppercase tracking-widest font-black text-zinc-400 border-b border-zinc-100 dark:border-zinc-800">
                           <th className="py-4 px-6">Produto</th>

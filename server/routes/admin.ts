@@ -92,7 +92,7 @@ export function createAdminRouter({ db, bus, cognito }: ApiDeps) {
     const w = await findWorkspace(req.params.id);
     await db.update(workspaces).set({ name }).where(eq(workspaces.id, w.id));
     await mergeSettings(db, w.id, { storeName: name });
-    bus.emitChange('workspaces', 'settings');
+    bus.emitChange(w.id, 'workspaces', 'settings');
     res.json({ ...w, name });
   }));
 
@@ -126,7 +126,7 @@ export function createAdminRouter({ db, bus, cognito }: ApiDeps) {
       // FK ON DELETE CASCADE apaga usuários, produtos, categorias, OS, movimentações, alertas e backups.
       await tx.delete(workspaces).where(eq(workspaces.id, w.id));
     });
-    bus.emitChange('workspaces', 'users', 'products', 'categories', 'serviceOrders', 'transactions', 'notifications', 'settings');
+    bus.emitChange(w.id, 'workspaces', 'users', 'products', 'categories', 'serviceOrders', 'transactions', 'notifications', 'settings');
     res.status(204).end();
   }));
 

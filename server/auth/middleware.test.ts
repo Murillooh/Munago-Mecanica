@@ -7,12 +7,12 @@ import { authMiddleware, requirePermission, requireAdmin, effectivePermissions, 
 import { UNASSIGNED_WORKSPACE, users, workspaces } from '../db/schema';
 import type { DB } from '../db/client';
 
-// Token fake: "sub|email|verified"
+// Token fake: "sub|email|verified|picture"
 const fakeVerifier = {
   verify: async (token: string) => {
     if (token === 'bad') throw new Error('invalid');
-    const [sub, email, verified = 'true'] = token.split('|');
-    return { sub, email, email_verified: verified === 'true', name: 'Fulano' };
+    const [sub, email, verified = 'true', picture] = token.split('|');
+    return { sub, email, email_verified: verified === 'true', name: 'Fulano', picture };
   },
 };
 
@@ -62,6 +62,17 @@ describe('authMiddleware', () => {
   it('admin geral não "entra" na área de cadastros sem oficina', async () => {
     const res = await request(buildApp(db)).get('/me').set(auth('s2|boss@x.com')).set('X-Workspace-Id', UNASSIGNED_WORKSPACE).expect(404);
     expect(res.body.code).toBe('WORKSPACE_NOT_FOUND');
+  });
+
+  it('grava a foto do Google (só https) e atualiza quando muda', async () => {
+    const app = buildApp(db);
+    const photo = (await request(app).get('/me').set(auth('s1|a@x.com|true|https://lh3.googleusercontent.com/a'))).body.photoUrl;
+    expect(photo).toBe('https://lh3.googleusercontent.com/a');
+    await request(app).get('/me').set(auth('s1|a@x.com|true|https://lh3.googleusercontent.com/b'));
+    await request(app).get('/me').set(auth('s1|a@x.com|true|javascript:alert(1)'));
+    // Login por senha (sem picture) mantém a foto.
+    await request(app).get('/me').set(auth('s1|a@x.com'));
+    expect((await db.select().from(users))[0].photoUrl).toBe('https://lh3.googleusercontent.com/b');
   });
 
   it('segundo acesso reaproveita o mesmo usuário', async () => {

@@ -1,22 +1,24 @@
 import React from 'react';
 import {
-  LayoutDashboard,
-  Package,
-  FileText,
-  Wrench,
-  History,
-  Bell,
-  Users,
-  Settings,
+  BarChart3,
+  Boxes,
+  ClipboardList,
+  ClipboardCheck,
+  Hammer,
+  ArrowLeftRight,
+  BellDot,
+  UsersRound,
+  SlidersHorizontal,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Sparkles,
+  ChevronLeft,
+  BrainCircuit,
   Maximize2,
-  ShieldCheck,
+  ShieldHalf,
   type LucideIcon,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useApp } from '../../context/AppContext';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { toast } from 'sonner';
 
 interface NavItem {
@@ -58,7 +60,11 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
     setIsMonitorMode,
     isSuperAdmin,
     workspaces,
-    switchWorkspace
+    switchWorkspace,
+    canCheckin,
+    canManageOS,
+    canManageInventory,
+    canApproveOS
   } = useApp();
 
   if (isMonitorMode) {
@@ -69,35 +75,53 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
   const lowStockCount = (products || []).filter(p => (p.quantity || 0) < (p.minQuantity || 0)).length;
   const openOSCount = (serviceOrders || []).filter(os => os.status === 'draft' || os.status === 'in_progress').length;
 
+  // Gradientes iOS por item
+  const iconColors: Record<string, string> = {
+    dashboard:    'from-blue-500 to-blue-600',
+    inventory:    'from-orange-400 to-orange-500',
+    os:           'from-red-500 to-rose-600',
+    services:     'from-green-500 to-emerald-600',
+    transactions: 'from-purple-500 to-violet-600',
+    ai:           'from-pink-500 to-fuchsia-600',
+    alerts:       'from-yellow-400 to-amber-500',
+    users:        'from-teal-500 to-cyan-600',
+    admin:        'from-slate-600 to-slate-700',
+    settings:     'from-zinc-500 to-zinc-600',
+  };
+
   const groups: NavGroup[] = [
     {
       label: 'Operação',
       items: [
-        ...(canViewReports ? [{ id: 'dashboard', label: 'Monitoramento', icon: LayoutDashboard }] : []),
-        ...(canViewInventory ? [{ id: 'inventory', label: 'Almoxarifado', icon: Package, count: lowStockCount, tone: 'alert' as const }] : []),
-        ...(canViewOS ? [{ id: 'os', label: 'Ordens de serviço', icon: FileText, count: openOSCount, tone: 'neutral' as const }] : []),
-        ...(canViewOS ? [{ id: 'services', label: 'Serviços', icon: Wrench }] : []),
-        ...(canPerformTransactions || canViewReports ? [{ id: 'transactions', label: 'Movimentações', icon: History }] : []),
+        ...(canViewReports ? [{ id: 'dashboard', label: 'Monitoramento', icon: BarChart3 }] : []),
+        ...(canViewInventory ? [{ id: 'inventory', label: 'Almoxarifado', icon: Boxes, count: lowStockCount, tone: 'alert' as const }] : []),
+        ...(canCheckin || canManageOS || canApproveOS || canManageInventory || canViewReports ? [{ id: 'checkin', label: 'OS de motos', icon: ClipboardCheck }] : []),
+        ...(canViewOS ? [{ id: 'os', label: 'Ordens de serviço', icon: ClipboardList, count: openOSCount, tone: 'neutral' as const }] : []),
+        ...(canViewOS ? [{ id: 'services', label: 'Serviços', icon: Hammer }] : []),
+        ...(canPerformTransactions || canViewReports ? [{ id: 'transactions', label: 'Movimentações', icon: ArrowLeftRight }] : []),
       ],
     },
     {
       label: 'Inteligência',
-      items: !isViewer ? [{ id: 'ai', label: 'Assistente IA', icon: Sparkles }] : [],
+      items: !isViewer ? [{ id: 'ai', label: 'Assistente IA', icon: BrainCircuit }] : [],
     },
     {
       label: 'Gestão',
       items: [
-        ...(isAdmin ? [{ id: 'alerts', label: 'Alertas', icon: Bell, count: unreadCount, tone: 'alert' as const }] : []),
-        ...(canManageUsers ? [{ id: 'users', label: 'Equipe e acessos', icon: Users }] : []),
-        ...(isSuperAdmin ? [{ id: 'admin', label: 'Painel geral', icon: ShieldCheck }] : []),
-        ...(isAdmin ? [{ id: 'settings', label: 'Configurações', icon: Settings }] : []),
+        { id: 'alerts', label: 'Alertas', icon: BellDot, count: unreadCount, tone: 'alert' as const },
+        ...(canManageUsers ? [{ id: 'users', label: 'Equipe e acessos', icon: UsersRound }] : []),
+        ...(isSuperAdmin ? [{ id: 'admin', label: 'Painel geral', icon: ShieldHalf }] : []),
+        ...(isAdmin ? [{ id: 'settings', label: 'Configurações', icon: SlidersHorizontal }] : []),
       ],
     },
   ].filter(g => g.items.length > 0);
 
   const storeName = (!settings?.storeName || settings.storeName.toLowerCase().includes('loc')) ? 'Munago Mecânica' : settings.storeName;
   const roleLabel = isAdmin ? 'Administrador' : profile?.role === 'editor' ? 'Operador' : profile?.role === 'viewer' ? 'Visualizador' : 'Colaborador';
-  const initials = (profile?.name || 'US').substring(0, 2).toUpperCase();
+  // Iniciais do primeiro e do último nome ("Murillo Silva" → "MS"); nome único → só a primeira letra.
+  const nameParts = (profile?.name || 'Usuário').trim().split(/\s+/);
+  const initials = (nameParts[0][0] + (nameParts.length > 1 ? nameParts[nameParts.length - 1][0] : '')).toUpperCase();
+  const activeWorkspaceId = profile?.workspace?.id ?? profile?.workspaceId ?? '';
 
   const go = (id: string) => {
     if (id === 'inventory') setInventoryLowStockFilter(false);
@@ -109,6 +133,20 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
     toast.info('Modo Monitor ativado: a tela selecionada agora ocupa 100% do display.');
   };
 
+  const logoutIcon = 'flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 dark:hover:bg-red-950/40 cursor-pointer';
+
+  // Foto (Google) ou iniciais, com contorno e o ponto verde de online.
+  const avatar = (size: string) => (
+    <span className="relative inline-flex shrink-0">
+      {profile?.photoURL ? (
+        <img src={profile.photoURL} alt="" className={`${size} rounded-full object-cover ring-2 ring-zinc-900/10 dark:ring-white/15`} referrerPolicy="no-referrer" />
+      ) : (
+        <span className={`${size} flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white ring-2 ring-zinc-900/10 dark:ring-white/15`} aria-hidden="true">{initials}</span>
+      )}
+      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950" aria-label="Online" />
+    </span>
+  );
+
   const iconButton = 'flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer';
 
   return (
@@ -117,51 +155,44 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       className={`hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 ${isCollapsed ? 'w-[4.25rem]' : 'w-64'} border-r border-zinc-200 bg-white text-zinc-600 transition-[width] duration-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400`}
     >
       {/* Marca + recolher */}
-      <div className={`flex h-14 shrink-0 items-center border-b border-zinc-200 dark:border-zinc-800 ${isCollapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-2'}`}>
-        {!isCollapsed && (
-          <div className="flex min-w-0 items-center gap-2.5">
-            <img src="/brand/munago-mecanica-icon.svg" alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-md" />
+      <div className={`flex h-16 shrink-0 items-center ${isCollapsed ? 'justify-center px-2' : 'pl-4 pr-2'}`}>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <img src="/brand/munago-mecanica-icon.svg" alt="" width={32} height={32} className="h-8 w-8 shrink-0 rounded-xl shadow-sm" />
+          {!isCollapsed && (
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{storeName}</p>
               <p className="truncate text-[11px] text-zinc-500">Gestão da oficina</p>
             </div>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
-          aria-expanded={!isCollapsed}
-          title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
-          className={iconButton}
-        >
-          {isCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
-        </button>
+          )}
+        </div>
       </div>
+      {/* Recolher/expandir: botão redondo em cima da borda do menu */}
+      <button
+        type="button"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+        aria-expanded={!isCollapsed}
+        title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+        className="absolute -right-3.5 top-16 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 shadow-sm transition-colors hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        <ChevronLeft size={15} aria-hidden="true" className={`transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`} />
+      </button>
 
       {/* Admin geral: escolhe qual oficina está administrando */}
       {isSuperAdmin && !isCollapsed && workspaces.length > 0 && (
-        <div className="shrink-0 border-b border-zinc-200 px-3 py-2.5 dark:border-zinc-800">
-          <label htmlFor="workspace-switcher" className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-            Oficina ({workspaces.length})
-          </label>
-          <select
-            id="workspace-switcher"
-            value={profile?.workspace?.id ?? profile?.workspaceId ?? ''}
-            onChange={(e) => switchWorkspace(e.target.value)}
-            className="w-full cursor-pointer rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs font-medium text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
-          >
-            {workspaces.map(w => (
-              <option key={w.id} value={w.id}>
-                {w.name}{w.id === profile?.workspaceId ? ' (minha)' : ''} · {w.userCount ?? 0} usuário(s)
-              </option>
-            ))}
-          </select>
+        <div className="shrink-0 px-3 pt-3">
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            activeId={activeWorkspaceId}
+            myId={profile?.workspaceId}
+            fallbackName={storeName}
+            onSwitch={switchWorkspace}
+          />
         </div>
       )}
 
       {/* Navegação */}
-      <nav className="flex-1 overflow-y-auto px-2.5 py-3" aria-label="Menu principal">
+      <nav className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 py-3" aria-label="Menu principal">
         {groups.map((group, gi) => (
           <div key={group.label} className={gi > 0 ? 'mt-4' : ''}>
             {isCollapsed ? (
@@ -173,6 +204,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
               {group.items.map(item => {
                 const active = activeTab === item.id;
                 const showCount = !!item.count && item.count > 0;
+                const gradient = iconColors[item.id] ?? 'from-zinc-500 to-zinc-600';
                 return (
                   <li key={item.id} className="group/item relative">
                     <button
@@ -180,28 +212,46 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
                       onClick={() => go(item.id)}
                       aria-current={active ? 'page' : undefined}
                       aria-label={isCollapsed ? `${item.label}${showCount ? ` (${item.count})` : ''}` : undefined}
-                      className={`relative flex h-9 w-full items-center rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
-                        isCollapsed ? 'justify-center' : 'gap-2.5 px-2.5'
+                      className={`relative flex h-11 w-full items-center rounded-xl text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 cursor-pointer ${
+                        isCollapsed ? 'justify-center px-1' : 'gap-3 px-2.5'
                       } ${
                         active
-                          ? 'bg-zinc-100 font-semibold text-zinc-900 dark:bg-zinc-800/80 dark:text-white'
-                          : 'font-medium hover:bg-zinc-50 hover:text-zinc-900 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
+                          ? 'font-semibold'
+                          : 'font-medium hover:bg-zinc-900/5 dark:hover:bg-white/5'
                       }`}
                     >
-                      {active && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-blue-600" aria-hidden="true" />}
-                      <item.icon size={18} strokeWidth={active ? 2.25 : 1.75} className={`shrink-0 ${active ? 'text-blue-600 dark:text-blue-400' : ''}`} aria-hidden="true" />
-                      {!isCollapsed && <span className="truncate">{item.label}</span>}
+                      {/* Fundo sutil no item ativo */}
+                      {active && (
+                        <motion.span
+                          layoutId="sidebar-active-pill"
+                          className="absolute inset-0 rounded-xl bg-zinc-100 dark:bg-white/8"
+                          aria-hidden="true"
+                        />
+                      )}
+
+                      {/* Ícone estilo iOS: container colorido com gradiente */}
+                      <span className={`relative shrink-0 flex items-center justify-center w-8 h-8 rounded-[10px] bg-gradient-to-br ${gradient} shadow-sm`}>
+                        <item.icon size={16} strokeWidth={2} className="text-white" aria-hidden="true" />
+                        {/* Badge de alerta no canto do ícone (modo colapsado) */}
+                        {showCount && isCollapsed && item.tone === 'alert' && (
+                          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-zinc-950" aria-hidden="true" />
+                        )}
+                      </span>
+
+                      {!isCollapsed && (
+                        <span className={`relative truncate text-sm ${
+                          active ? 'text-zinc-900 dark:text-white font-semibold' : 'text-zinc-600 dark:text-zinc-400'
+                        }`}>{item.label}</span>
+                      )}
+
                       {showCount && !isCollapsed && (
-                        <span className={`ml-auto rounded px-1.5 py-px font-mono text-[11px] tabular-nums ${
+                        <span className={`relative ml-auto min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums ${
                           item.tone === 'alert'
-                            ? 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400'
-                            : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'
+                            ? 'bg-rose-500/12 text-rose-600 dark:text-rose-400'
+                            : 'bg-zinc-900/6 text-zinc-600 dark:bg-white/10 dark:text-zinc-300'
                         }`}>
                           {item.count! > 99 ? '99+' : item.count}
                         </span>
-                      )}
-                      {showCount && isCollapsed && item.tone === 'alert' && (
-                        <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-zinc-950" aria-hidden="true" />
                       )}
                     </button>
 
@@ -218,38 +268,44 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
         ))}
       </nav>
 
-      {/* Rodapé: usuário + ações */}
-      <div className="shrink-0 border-t border-zinc-200 p-2.5 dark:border-zinc-800">
-        <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1.5' : 'gap-2.5 px-1'}`}>
-          <div className="relative shrink-0" title={isCollapsed ? `${profile?.name || 'Usuário'} · ${roleLabel}` : undefined}>
-            {profile?.photoURL ? (
-              <img src={profile.photoURL} alt="" className="h-8 w-8 rounded-md object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-200 font-mono text-[11px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200" aria-hidden="true">{initials}</span>
-            )}
-            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950" aria-label="Online" />
-          </div>
-          {!isCollapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">{profile?.name || 'Usuário'}</p>
-              <p className="truncate text-[11px] text-zinc-500">{roleLabel}</p>
-            </div>
-          )}
-          <div className={`flex ${isCollapsed ? 'flex-col' : ''} items-center gap-0.5`}>
+      {/* Rodapé: cartão do usuário (foto, nome, e-mail, função) + sair */}
+      <div className="shrink-0 p-3">
+        {isCollapsed ? (
+          <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-zinc-900/5 bg-zinc-900/[0.03] p-1.5 dark:border-white/10 dark:bg-white/5">
+            <span title={`${profile?.name || 'Usuário'} · ${roleLabel}`}>{avatar('h-9 w-9')}</span>
             <button type="button" onClick={enterMonitor} aria-label="Modo Monitor" title="Modo Monitor: tela cheia, sem menu" className={iconButton}>
               <Maximize2 size={16} aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Sair"
-              title="Sair"
-              className="flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 dark:hover:bg-red-950/40 cursor-pointer"
-            >
+            <button type="button" onClick={handleLogout} aria-label="Sair da conta" title="Sair da conta" className={logoutIcon}>
               <LogOut size={16} aria-hidden="true" />
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="relative rounded-2xl border border-zinc-900/10 bg-zinc-900/[0.03] p-3 dark:border-white/10 dark:bg-white/[0.04]">
+            <button type="button" onClick={enterMonitor} aria-label="Modo Monitor" title="Modo Monitor: tela cheia, sem menu" className={`absolute right-2 top-2 ${iconButton}`}>
+              <Maximize2 size={14} aria-hidden="true" />
+            </button>
+            <div className="flex items-center gap-3 pr-6">
+              {avatar('h-11 w-11')}
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{profile?.name || 'Usuário'}</p>
+                {profile?.email && <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">{profile.email}</p>}
+                <span className="mt-1 inline-block rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+                  {roleLabel}
+                </span>
+              </div>
+            </div>
+            <div className="mt-3 border-t border-zinc-900/10 pt-2 dark:border-white/10">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 dark:text-red-400 cursor-pointer"
+              >
+                <LogOut size={16} aria-hidden="true" /> Sair da conta
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );

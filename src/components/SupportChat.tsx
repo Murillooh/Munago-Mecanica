@@ -1,12 +1,59 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { MessageCircleQuestion, RotateCcw, Send, X } from 'lucide-react';
+import { macZoom } from '../lib/motion';
+import { ArrowLeft, BatteryFull, CheckCheck, History, MessageCircleQuestion, RotateCcw, SendHorizontal, Signal, Trash2, Wifi } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { authFetch } from '../lib/api';
 
-type Msg = { role: 'user' | 'model'; text: string; error?: boolean };
+/** `at`: horário (ms) mostrado no balão, como no WhatsApp. */
+type Msg = { role: 'user' | 'model'; text: string; error?: boolean; at?: number };
+
+const hhmm = (at?: number) => (at ? new Date(at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+
+/** A saudação já abre a conversa: tira o "Oi, Fulano!" que a IA às vezes repete no começo da resposta. */
+const dropGreeting = (text: string) => text.replace(/^\s*(oi|olá|ola)(?!\p{L})[^.!?\n]{0,40}[!.,]\s*/iu, '') || text;
+
+/** Resposta longa vira vários balões, um por parágrafo (separados por linha em branco). */
+const splitBubbles = (text: string) => dropGreeting(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+
+/**
+ * Balão no estilo WhatsApp: só o primeiro de uma sequência do mesmo lado tem a "pontinha";
+ * horário (e tiques, nas suas) no canto inferior direito, dentro do balão.
+ */
+const Bubble: React.FC<{ mine?: boolean; first: boolean; time?: string; error?: boolean; children: React.ReactNode }> = ({ mine, first, time, error, children }) => (
+  <div className={`flex ${mine ? 'justify-end' : ''} ${first ? 'mt-2' : 'mt-0.5'}`}>
+    <div
+      // O último parágrafo fica "inline" para o horário poder dividir a linha com ele.
+      className={`relative max-w-[82%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[14px] leading-snug shadow-sm [&>p:has(+[data-spacer])]:inline ${
+        mine
+          ? `bg-blue-600 text-white ${first ? 'rounded-tr-none' : ''}`
+          : `${error ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'} ${first ? 'rounded-tl-none' : ''}`
+      }`}
+    >
+      {children}
+      {time && (
+        <>
+          {/* Espaço reservado no fim do texto: o horário cabe na última linha ou desce sozinho */}
+          <span data-spacer className={`inline-block h-3 ${mine ? 'w-16' : 'w-11'}`} aria-hidden="true" />
+          <span className={`absolute bottom-1 right-2 inline-flex items-center gap-1 text-[10px] leading-none ${mine ? 'text-blue-100' : 'text-slate-400'}`}>
+            {time}
+            {mine && <CheckCheck size={13} className="text-sky-200" aria-label="Lida" />}
+          </span>
+        </>
+      )}
+    </div>
+  </div>
+);
 
 const STORAGE_KEY = 'munago_support_chat';
+const CONV_KEY = 'munago_support_chat_id';
+const HISTORY_MAX = 20;
+
+/** Conversa guardada no histórico (localStorage, por usuário, só neste aparelho). */
+type Conv = { id: string; at: number; title: string; messages: Msg[] };
+const newId = () => String(Date.now());
+const shortDate = (at: number) =>
+  new Date(at).toDateString() === new Date().toDateString() ? hhmm(at) : new Date(at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
 /** Sugestões de pergunta conforme a tela em que a pessoa está. */
 const SUGGESTIONS: Record<string, string[]> = {
@@ -66,13 +113,13 @@ const TypingDots = () => (
   </span>
 );
 
+/** Retrato da Ana (imagem 3D gerada por IA, em public/). */
+const ANA_IMG = '/ana.webp';
+
 const AnaAvatar: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' }) => (
-  <span
-    className={`relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white ${size === 'md' ? 'h-10 w-10 text-sm' : 'h-7 w-7 text-[11px]'}`}
-    aria-hidden="true"
-  >
-    A
-    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900" />}
+  <span className={`relative flex shrink-0 ${size === 'md' ? 'h-10 w-10' : 'h-7 w-7'}`} aria-hidden="true">
+    <img src={ANA_IMG} alt="" className={`h-full w-full rounded-full bg-sky-200 object-cover ${size === 'md' ? 'ring-2 ring-white/40' : ''}`} />
+    {size === 'md' && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-blue-600 bg-emerald-400" />}
   </span>
 );
 
@@ -87,13 +134,45 @@ export const SupportChat: React.FC = () => {
   const [messages, setMessages] = useState<Msg[]>(() => {
     try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]') as Msg[]; } catch { return []; }
   });
+  const [convId, setConvId] = useState(() => {
+    try { return sessionStorage.getItem(CONV_KEY) || newId(); } catch { return newId(); }
+  });
+  const [history, setHistory] = useState<Conv[]>([]);
+  const [view, setView] = useState<'chat' | 'history'>('chat');
+  const historyKey = profile ? `munago_support_history_${profile.uid}` : '';
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-40))); } catch { /* armazenamento indisponível */ }
   }, [messages]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(CONV_KEY, convId); } catch { /* armazenamento indisponível */ }
+  }, [convId]);
+
+  useEffect(() => {
+    if (!historyKey) return;
+    try { setHistory(JSON.parse(localStorage.getItem(historyKey) || '[]') as Conv[]); } catch { setHistory([]); }
+  }, [historyKey]);
+
+  // Salva a conversa atual no histórico a cada resposta concluída (precisa vir depois do carregamento acima).
+  useEffect(() => {
+    if (busy || !historyKey) return;
+    const kept = messages.filter((m) => !m.error && m.text);
+    const title = kept.find((m) => m.role === 'user')?.text;
+    if (!title) return;
+    setHistory((prev) => {
+      const next = [
+        { id: convId, at: kept[kept.length - 1].at ?? Date.now(), title: title.slice(0, 80), messages: kept.slice(-40) },
+        ...prev.filter((c) => c.id !== convId),
+      ].slice(0, HISTORY_MAX);
+      try { localStorage.setItem(historyKey, JSON.stringify(next)); } catch { /* armazenamento indisponível */ }
+      return next;
+    });
+  }, [messages, busy, convId, historyKey]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -115,9 +194,11 @@ export const SupportChat: React.FC = () => {
 
   const send = async (text: string) => {
     const question = text.trim();
-    if (!question || busy) return;
+    // Ref além do estado: dois cliques rápidos chegam antes do re-render e mandariam a pergunta duas vezes.
+    if (!question || busy || sendingRef.current) return;
+    sendingRef.current = true;
     setInput('');
-    const history: Msg[] = [...messages.filter((m) => !m.error), { role: 'user', text: question }];
+    const history: Msg[] = [...messages.filter((m) => !m.error), { role: 'user', text: question, at: Date.now() }];
     setMessages([...history, { role: 'model', text: '' }]);
     setBusy(true);
 
@@ -164,11 +245,13 @@ export const SupportChat: React.FC = () => {
         }
       }
       if (!answer.trim()) throw new Error('Fiquei sem resposta agora. Pode perguntar de novo?');
+      update({ at: Date.now() });
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       update({ text: err instanceof Error ? err.message : 'Algo deu errado. Tente de novo.', error: true });
     } finally {
       setBusy(false);
+      sendingRef.current = false;
       abortRef.current = null;
     }
   };
@@ -184,9 +267,27 @@ export const SupportChat: React.FC = () => {
     abortRef.current?.abort();
     setMessages([]);
     setBusy(false);
+    setConvId(newId());
+    setView('chat');
+  };
+
+  const openConv = (c: Conv) => {
+    abortRef.current?.abort();
+    setMessages(c.messages);
+    setBusy(false);
+    setConvId(c.id);
+    setView('chat');
+  };
+
+  const removeConv = (id: string) => {
+    const next = history.filter((c) => c.id !== id);
+    setHistory(next);
+    try { localStorage.setItem(historyKey, JSON.stringify(next)); } catch { /* armazenamento indisponível */ }
+    if (id === convId) { abortRef.current?.abort(); setMessages([]); setBusy(false); setConvId(newId()); }
   };
 
   const showSuggestions = messages.length === 0;
+  const clock = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   return (
     <>
@@ -201,9 +302,28 @@ export const SupportChat: React.FC = () => {
             onClick={() => setOpen(true)}
             aria-label="Abrir chat de ajuda com a Ana"
             title="Precisa de ajuda? Fale com a Ana"
-            className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-600/30 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 cursor-pointer"
+            style={{ transformOrigin: 'bottom right' }}
+            className="group fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6 z-[60] rounded-[15px] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 cursor-pointer"
           >
-            <MessageCircleQuestion size={26} aria-hidden="true" />
+            {/* Balão de mensagem acima do celular, até a primeira conversa */}
+            {messages.length === 0 && (
+              <span className="absolute bottom-full right-0 mb-2.5 whitespace-nowrap rounded-[1.1rem] rounded-br-[0.35rem] bg-white px-3 py-2 text-left text-xs font-medium text-zinc-800 shadow-lg shadow-black/15 ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-white/10" aria-hidden="true">
+                Oi! Precisa de ajuda?
+                <span className="block text-[10px] font-normal text-zinc-500 dark:text-zinc-400">Fale com a Ana</span>
+              </span>
+            )}
+            {/* Mini iPhone: moldura, ilha e a Ana como papel de parede */}
+            <span className="relative flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg shadow-blue-900/30 ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
+              <span className="relative flex-1 overflow-hidden rounded-[12px] bg-gradient-to-br from-blue-500 to-indigo-600">
+                <img src={ANA_IMG} alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_20%]" />
+                <span className="absolute left-1/2 top-1 h-1 w-3.5 -translate-x-1/2 rounded-full bg-black" />
+                <span className="absolute bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-white/70" />
+              </span>
+              {/* Selo de notificação com o ícone do chat */}
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow ring-2 ring-white dark:ring-zinc-900">
+                <MessageCircleQuestion size={12} aria-hidden="true" />
+              </span>
+            </span>
           </motion.button>
         )}
       </AnimatePresence>
@@ -213,103 +333,183 @@ export const SupportChat: React.FC = () => {
           <motion.section
             role="dialog"
             aria-label="Chat de ajuda com a Ana"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed z-[70] flex flex-col overflow-hidden bg-white shadow-2xl dark:bg-zinc-900 inset-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(600px,calc(100dvh-3rem))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-zinc-200 sm:pt-0 sm:pb-0 dark:sm:border-zinc-800"
+            // Nasce do botão redondo (canto inferior direito) e cresce, como abrir um app no macOS.
+            initial={{ opacity: 0, scale: 0.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.1 }}
+            transition={macZoom}
+            style={{ transformOrigin: 'bottom right' }}
+            // No celular ocupa a tela; do sm para cima vira um iPhone (moldura, ilha, barra de status).
+            className="fixed z-[70] inset-0 flex sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[min(720px,calc(100dvh-3rem))] sm:w-[360px] sm:rounded-[3.25rem] sm:bg-zinc-900 sm:p-[11px] sm:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.55),inset_0_0_0_1.5px_rgba(255,255,255,0.14),0_0_0_1px_rgba(0,0,0,0.6)]"
           >
-            {/* Cabeçalho */}
-            <header className="flex items-center gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-              <AnaAvatar size="md" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">Ana</p>
-                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">Assistente virtual · responde na hora</p>
-              </div>
-              {messages.length > 0 && (
-                <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer">
-                  <RotateCcw size={16} aria-hidden="true" />
-                </button>
-              )}
-              <button type="button" onClick={() => setOpen(false)} aria-label="Fechar chat" className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer">
-                <X size={18} aria-hidden="true" />
-              </button>
-            </header>
-
-            {/* Conversa */}
-            <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
-              <div className="flex items-end gap-2">
-                <AnaAvatar />
-                <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-zinc-100 px-3.5 py-2.5 text-sm leading-relaxed text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
-                  {greeting}
+            {/* Tela no estilo WhatsApp com as cores do sistema: cabeçalho azul, papel de parede azulado, balões com "rabinho" */}
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#eef2fb] pb-[env(safe-area-inset-bottom)] dark:bg-[#0b1220] sm:rounded-[2.6rem] sm:pb-0">
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 pt-[env(safe-area-inset-top)] text-white sm:pt-0">
+                {/* Barra de status + Dynamic Island (só na moldura; no celular real o sistema já mostra) */}
+                <div className="relative hidden h-11 items-center justify-between px-7 text-[13px] font-semibold sm:flex" aria-hidden="true">
+                  <span className="tabular-nums">{clock}</span>
+                  <span className="absolute left-1/2 top-2.5 h-[26px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
+                  <span className="flex items-center gap-1">
+                    <Signal size={14} strokeWidth={2.5} />
+                    <Wifi size={14} strokeWidth={2.5} />
+                    <BatteryFull size={20} strokeWidth={2} />
+                  </span>
                 </div>
+
+                <header className="flex items-center gap-2 px-1.5 pb-2 pt-1">
+                  <button type="button" onClick={() => (view === 'history' ? setView('chat') : setOpen(false))} aria-label={view === 'history' ? 'Voltar para a conversa' : 'Fechar chat'} className="rounded-full p-1.5 transition-colors hover:bg-white/10 cursor-pointer">
+                    <ArrowLeft size={22} aria-hidden="true" />
+                  </button>
+                  <AnaAvatar size="md" />
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <p className="truncate text-[15px] font-semibold">Ana <span className="font-normal text-white/80">· Assistente IA</span></p>
+                    <p className="truncate text-[11px] text-white/80">{busy ? 'digitando…' : 'online'}</p>
+                  </div>
+                  {view === 'chat' && history.length > 0 && (
+                    <button type="button" onClick={() => setView('history')} title="Conversas anteriores" aria-label="Conversas anteriores" className="rounded-full p-2 transition-colors hover:bg-white/10 cursor-pointer">
+                      <History size={18} aria-hidden="true" />
+                    </button>
+                  )}
+                  {view === 'chat' && messages.length > 0 && (
+                    <button type="button" onClick={reset} title="Começar nova conversa" aria-label="Começar nova conversa" className="rounded-full p-2 transition-colors hover:bg-white/10 cursor-pointer">
+                      <RotateCcw size={18} aria-hidden="true" />
+                    </button>
+                  )}
+                </header>
               </div>
 
-              {messages.map((m, i) =>
-                m.role === 'user' ? (
-                  <div key={i} className="flex justify-end">
-                    <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-blue-600 px-3.5 py-2.5 text-sm leading-relaxed text-white">{m.text}</div>
+              {view === 'history' ? (
+                <div className="flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Conversas anteriores</h2>
+                    <button type="button" onClick={reset} className="rounded-full px-2 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-800 cursor-pointer">
+                      Nova conversa
+                    </button>
                   </div>
-                ) : (
-                  <div key={i} className="flex items-end gap-2">
-                    <AnaAvatar />
-                    <div className={`max-w-[85%] rounded-2xl rounded-bl-md px-3.5 py-2.5 text-sm leading-relaxed ${m.error ? 'border border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300' : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'}`}>
-                      {m.text ? renderRich(m.text) : <TypingDots />}
-                      {m.error && (
-                        <button type="button" onClick={retry} className="mt-2 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
+                  {history.length === 0 ? (
+                    <p className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">Nenhuma conversa guardada ainda.</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm dark:divide-slate-700/60 dark:bg-slate-800">
+                      {history.map((c) => {
+                        const last = c.messages[c.messages.length - 1];
+                        return (
+                          <li key={c.id} className="flex items-center">
+                            <button type="button" onClick={() => openConv(c)} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer">
+                              <AnaAvatar />
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-baseline justify-between gap-2">
+                                  <span className="truncate text-[14px] font-medium text-slate-900 dark:text-slate-100">{c.title}</span>
+                                  <span className="shrink-0 text-[11px] text-slate-400">{c.id === convId ? 'atual' : shortDate(c.at)}</span>
+                                </span>
+                                <span className="block truncate text-[12px] text-slate-500 dark:text-slate-400">
+                                  {last.role === 'user' ? 'Você: ' : ''}{dropGreeting(last.text).replace(/\*\*/g, '')}
+                                </span>
+                              </span>
+                            </button>
+                            <button type="button" onClick={() => removeConv(c.id)} title="Apagar conversa" aria-label={`Apagar conversa: ${c.title}`} className="mr-1.5 rounded-full p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 cursor-pointer">
+                              <Trash2 size={15} aria-hidden="true" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  <p className="mt-3 px-2 text-center text-[11px] text-slate-400">Guardadas só neste aparelho, até {HISTORY_MAX} conversas.</p>
+                </div>
+              ) : (
+              <>
+              {/* Conversa */}
+              <div
+                ref={listRef}
+                className="flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [background-image:radial-gradient(rgba(37,99,235,0.08)_1px,transparent_1px)] [background-size:14px_14px] dark:[background-image:radial-gradient(rgba(96,165,250,0.07)_1px,transparent_1px)]"
+                aria-live="polite"
+              >
+                <p className="mx-auto mb-1 w-fit rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">Hoje</p>
+                <p className="mx-auto mb-2 max-w-[90%] rounded-md bg-white/90 px-3 py-1.5 text-center text-[11px] leading-snug text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
+                  A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.
+                </p>
+                <Bubble first>{greeting}</Bubble>
+
+                {messages.map((m, i) => {
+                  // A saudação conta como mensagem da Ana: a primeira resposta continua a sequência dela.
+                  const first = (i === 0 ? 'model' : messages[i - 1].role) !== m.role;
+                  if (m.role === 'user') {
+                    return (
+                      <Bubble key={i} mine first={first} time={hhmm(m.at)}>
+                        <span className="whitespace-pre-wrap">{m.text}</span>
+                      </Bubble>
+                    );
+                  }
+                  if (!m.text) return <Bubble key={i} first={first}><TypingDots /></Bubble>;
+                  if (m.error) {
+                    return (
+                      <Bubble key={i} first={first} error>
+                        {m.text}
+                        <button type="button" onClick={retry} className="mt-1.5 block text-xs font-semibold underline underline-offset-2 cursor-pointer">
                           Tentar de novo
                         </button>
-                      )}
-                    </div>
-                  </div>
-                ),
-              )}
+                      </Bubble>
+                    );
+                  }
+                  const parts = splitBubbles(m.text);
+                  return parts.map((part, j) => (
+                    <Bubble key={`${i}-${j}`} first={first && j === 0} time={j === parts.length - 1 ? hhmm(m.at) : undefined}>
+                      {renderRich(part)}
+                    </Bubble>
+                  ));
+                })}
 
-              {showSuggestions && (
-                <div className="flex flex-wrap gap-2 pl-9">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => send(s)}
-                      className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-left text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-950/60 cursor-pointer"
-                    >
-                      {s}
-                    </button>
-                  ))}
+                {showSuggestions && (
+                  <div className="flex flex-col items-center gap-1.5 pt-3">
+                    {suggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => send(s)}
+                        className="w-full max-w-[85%] rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-blue-600 shadow-sm transition-colors hover:bg-blue-50 dark:bg-slate-800 dark:text-blue-400 dark:hover:bg-slate-700 cursor-pointer"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Caixa de mensagem */}
+              <form
+                onSubmit={(e) => { e.preventDefault(); void send(input); }}
+                className="shrink-0 px-2 pb-2 pt-1"
+              >
+                <div className="flex items-end gap-1.5">
+                  <div className="flex min-h-[2.75rem] flex-1 items-center rounded-[1.4rem] bg-white px-4 py-1.5 shadow-sm dark:bg-slate-800">
+                    <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
+                    <textarea
+                      id="support-input"
+                      ref={inputRef}
+                      rows={1}
+                      value={input}
+                      maxLength={2000}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
+                      placeholder="Mensagem"
+                      className="max-h-28 min-h-[1.5rem] flex-1 resize-none bg-transparent py-0.5 text-[15px] text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={busy || !input.trim()}
+                    aria-label="Enviar"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-600/30 transition-opacity hover:brightness-110 disabled:opacity-50 cursor-pointer"
+                  >
+                    <SendHorizontal size={19} aria-hidden="true" />
+                  </button>
                 </div>
+                {/* Barra de gestos do iPhone */}
+                <span className="mx-auto mt-2 hidden h-[5px] w-28 rounded-full bg-zinc-900 dark:bg-white sm:block" aria-hidden="true" />
+              </form>
+              </>
               )}
             </div>
-
-            {/* Caixa de mensagem */}
-            <form
-              onSubmit={(e) => { e.preventDefault(); void send(input); }}
-              className="border-t border-zinc-200 p-3 dark:border-zinc-800"
-            >
-              <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20 dark:border-zinc-700 dark:bg-zinc-800/60">
-                <label htmlFor="support-input" className="sr-only">Escreva sua dúvida</label>
-                <textarea
-                  id="support-input"
-                  ref={inputRef}
-                  rows={1}
-                  value={input}
-                  maxLength={2000}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(input); } }}
-                  placeholder="Escreva sua dúvida…"
-                  className="max-h-32 min-h-[1.5rem] flex-1 resize-none bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-white"
-                />
-                <button
-                  type="submit"
-                  disabled={busy || !input.trim()}
-                  aria-label="Enviar"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-40 cursor-pointer"
-                >
-                  <Send size={16} aria-hidden="true" />
-                </button>
-              </div>
-              <p className="mt-1.5 text-center text-[11px] text-zinc-400">A Ana é uma IA e pode errar. Para análises do estoque, use o Assistente IA.</p>
-            </form>
           </motion.section>
         )}
       </AnimatePresence>
