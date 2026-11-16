@@ -62,10 +62,10 @@ export const WorkspaceSwitcher: React.FC<{
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
-        aria-label={`Oficina ativa: ${active?.name ?? fallbackName}. Trocar de oficina`}
-        className="w-full rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3 text-left text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 cursor-pointer"
+        aria-label={`Base ativa: ${active?.name ?? fallbackName}. Trocar de Base`}
+        className="w-full rounded-xl bg-blue-600 p-3 text-left text-white shadow-lg transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 cursor-pointer"
       >
-        <span className="block text-[10px] font-semibold uppercase tracking-wider text-blue-100/80">Oficina ativa</span>
+        <span className="block text-[10px] font-semibold text-blue-100/80">Base ativa</span>
         <span className="mt-1.5 flex items-center gap-2.5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15">
             <Building2 size={16} aria-hidden="true" />
@@ -73,8 +73,8 @@ export const WorkspaceSwitcher: React.FC<{
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-sm font-semibold" title={active?.name ?? fallbackName}>{active?.name ?? fallbackName}</span>
             <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-blue-100/80">
-              {active?.id === myId && <span className="rounded bg-white/20 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-white">minha</span>}
-              <span className="truncate">{users(active?.userCount)} · {workspaces.length} oficinas</span>
+              {active?.id === myId && <span className="rounded bg-white/20 px-1 py-px text-[9px] font-semibold text-white">minha</span>}
+              <span className="truncate">{users(active?.userCount)} · {workspaces.length} Bases</span>
             </span>
           </span>
           <ChevronsUpDown size={16} className="shrink-0 text-blue-100/80" aria-hidden="true" />
@@ -86,12 +86,12 @@ export const WorkspaceSwitcher: React.FC<{
           <motion.ul
             id={listId}
             role="listbox"
-            aria-label="Oficinas"
+            aria-label="Bases"
             initial={{ opacity: 0, scale: 0.96, y: -6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -6 }}
             style={{ transformOrigin: 'top center' }}
-            className="absolute inset-x-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-zinc-200/80 bg-white/90 p-1.5 shadow-2xl shadow-black/20 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/90"
+            className="absolute inset-x-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-xl border border-zinc-200/80 bg-white/90 p-1.5 shadow-2xl shadow-black/20 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/90"
           >
             {workspaces.map((w, i) => {
               const selected = w.id === activeId;
@@ -104,13 +104,13 @@ export const WorkspaceSwitcher: React.FC<{
                   onClick={() => choose(w.id)}
                   className={`flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 ${focused === i ? 'bg-zinc-900/5 dark:bg-white/10' : ''}`}
                 >
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm ${selected ? 'bg-gradient-to-br from-blue-500 to-indigo-600' : 'bg-gradient-to-br from-zinc-400 to-zinc-600'}`}>
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm ${selected ? 'bg-blue-500' : 'bg-zinc-400'}`}>
                     <Building2 size={14} aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1 leading-tight">
                     <span className="block break-words text-sm font-medium text-zinc-900 dark:text-white">{w.name}</span>
                     <span className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                      {w.id === myId && <span className="rounded bg-blue-500/15 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-300">minha</span>}
+                      {w.id === myId && <span className="rounded bg-blue-500/15 px-1 py-px text-[9px] font-semibold text-blue-600 dark:text-blue-300">minha</span>}
                       {users(w.userCount)}
                     </span>
                   </span>

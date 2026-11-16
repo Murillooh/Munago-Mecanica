@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, X, Sparkles, Trash2, Edit2, Plus, Loader2 } from 'lucide-react';
+import { Tag, X, Lightbulb, Trash2, Edit2, Plus, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { macZoom, macZoomProps } from '../lib/motion';
 import { useApp, Category } from '../context/AppContext';
@@ -151,9 +151,9 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                 key={cat.id}
                 layout
                 onClick={() => setSelectedCategory(cat)}
-                className={`group flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all border ${
+                className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${
                   selectedCategory?.id === cat.id 
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/20' 
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg' 
                     : 'bg-white dark:bg-zinc-800 border-zinc-100 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-900/50 hover:shadow-md'
                 }`}
               >
@@ -203,7 +203,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
           <div className="p-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
             <button 
               onClick={resetForm}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg"
             >
               <Plus size={18} />
               Nova Categoria
@@ -225,40 +225,40 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
             <div className="grid grid-cols-1 gap-6">
               <div>
-                <label className="block text-xs font-black text-zinc-400 uppercase tracking-widest mb-2">Nome da Categoria</label>
+                <label className="block text-xs font-bold text-zinc-400 mb-2">Nome da Categoria</label>
                 <div className="flex gap-2">
                   <input 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
                     placeholder="Ex: Pneus, Acessórios..."
-                    className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all dark:text-white"
+                    className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all dark:text-white"
                   />
                   <button
                     type="button"
                     onClick={handleGenerateAI}
                     disabled={isGenerating || !name.trim()}
-                    className="px-4 bg-blue-600 text-white rounded-2xl flex items-center gap-2 font-bold hover:bg-blue-700 disabled:opacity-50 disabled:grayscale transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                    className="px-4 bg-blue-600 text-white rounded-xl flex items-center gap-2 font-bold hover:bg-blue-700 disabled:opacity-50 disabled:grayscale transition-all shadow-lg active:scale-95"
                   >
-                    {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                    {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Lightbulb size={18} />}
                     <span className="hidden sm:inline">IA Assist</span>
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-black text-zinc-400 uppercase tracking-widest mb-2">Descrição</label>
+                <label className="block text-xs font-bold text-zinc-400 mb-2">Descrição</label>
                 <textarea 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Descreva o propósito desta categoria..."
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all dark:text-white min-h-[100px]"
+                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all dark:text-white min-h-[100px]"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-black text-zinc-400 uppercase tracking-widest mb-2">Ícone da Categoria</label>
+                  <label className="block text-xs font-bold text-zinc-400 mb-2">Ícone da Categoria</label>
                   <div className="space-y-3">
                     <input 
                       value={imageUrl}
@@ -266,7 +266,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                       placeholder="URL da imagem ou ícone"
                       className="w-full px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 outline-none transition-all dark:text-white text-sm"
                     />
-                    <div className="w-32 h-32 mx-auto rounded-3xl overflow-hidden border-2 border-dashed border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center group relative">
+                    <div className="w-32 h-32 mx-auto rounded-xl overflow-hidden border-2 border-dashed border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center group relative">
                       {imageUrl ? (
                         <>
                           <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -289,8 +289,8 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-zinc-400 uppercase tracking-widest mb-2">Sugestão da IA</label>
-                  <div className={`p-4 rounded-2xl border min-h-[160px] flex flex-col ${
+                  <label className="block text-xs font-bold text-zinc-400 mb-2">Sugestão da IA</label>
+                  <div className={`p-4 rounded-xl border min-h-[160px] flex flex-col ${
                     aiSuggestion 
                       ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30' 
                       : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-700 border-dashed'
@@ -298,8 +298,8 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                     {aiSuggestion ? (
                       <>
                         <div className="flex items-center gap-2 mb-2">
-                          <Sparkles size={14} className="text-blue-600 dark:text-blue-400" />
-                          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Recomendação Estratégica</span>
+                          <Lightbulb size={14} className="text-blue-600 dark:text-blue-400" />
+                          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 ">Recomendação Estratégica</span>
                         </div>
                         <p className="text-xs text-zinc-600 dark:text-zinc-300 italic leading-relaxed">
                           {aiSuggestion}
@@ -314,8 +314,8 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                       </>
                     ) : (
                       <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40">
-                        <Sparkles size={24} className="mb-2" />
-                        <p className="text-[10px] font-bold uppercase tracking-widest">Sem sugestão</p>
+                        <Lightbulb size={24} className="mb-2" />
+                        <p className="text-[10px] font-bold ">Sem sugestão</p>
                         <p className="text-[10px] mt-1">Use o botão "IA Assist" acima para preencher</p>
                       </div>
                     )}
@@ -329,14 +329,14 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="flex-1 py-4 px-6 rounded-2xl font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95"
+                  className="flex-1 py-4 px-6 rounded-xl font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95"
                 >
                   Descartar Alterações
                 </button>
               )}
               <button
                 type="submit"
-                className="flex-[2] py-4 px-6 rounded-2xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/30 active:scale-95"
+                className="flex-[2] py-4 px-6 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-lg active:scale-95"
               >
                 {isEditing ? 'Salvar Alterações' : 'Criar Categoria'}
               </button>
@@ -370,7 +370,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                 </button>
                 <button 
                   onClick={() => handleDelete(deleteConfirm.id)}
-                  className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/30"
+                  className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg"
                 >
                   Confirmar
                 </button>

@@ -43,7 +43,7 @@ const ACCENT_COLORS = [
 ];
 
 // Campos de texto que só são gravados ao clicar em "Salvar"
-const FORM_KEYS = ['storeName', 'contactPhone', 'contactEmail', 'address', 'asaasWalletId', 'repasseMinPercent'] as const;
+const FORM_KEYS = ['storeName', 'contactPhone', 'contactEmail', 'address', 'asaasWalletId', 'repasseMinPercent', 'franchiseeName', 'franchiseeEmail', 'franchiseePhone'] as const;
 
 const fieldClass =
   'w-full rounded-lg border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50 dark:bg-zinc-800/60 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none transition-colors focus:border-blue-600 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-blue-600/20';
@@ -218,7 +218,7 @@ export const SettingsView = () => {
       <PageHero
         icon={SettingsIcon}
         title="Configurações"
-        subtitle="Dados da oficina, recebimentos, aparência, alertas e backups."
+        subtitle="Dados da Base, recebimentos, aparência, alertas e backups."
         actions={<>
           {isDirty && <span className="rounded-full border border-amber-300/50 bg-amber-400/20 px-2.5 py-1 text-xs font-medium text-amber-100">Alterações não salvas</span>}
           <button type="submit" form="settings-form" disabled={isSaving || !isDirty} className={heroBtnPrimary}>
@@ -231,10 +231,10 @@ export const SettingsView = () => {
       {/* Em linhas: as seções lado a lado ficam com a mesma altura (Backup ocupa a largura toda). */}
       <form id="settings-form" onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Oficina */}
-        <Section id="sec-store" icon={Store} title="Oficina" description="Aparece no menu, nos relatórios em PDF e nas ordens de serviço.">
+        <Section id="sec-store" icon={Store} title="Base" description="Aparece no menu, nos relatórios em PDF e nas ordens de serviço.">
           <div className="p-4 space-y-3">
             <div className="space-y-1">
-              <label htmlFor="store-name" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Nome da oficina</label>
+              <label htmlFor="store-name" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Nome da Base</label>
               <input
                 id="store-name"
                 type="text"
@@ -281,6 +281,14 @@ export const SettingsView = () => {
                 placeholder="Av. das Américas, 1000 - São Paulo, SP"
               />
             </div>
+            <fieldset className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+              <legend className="px-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300">Franqueado (autoriza as manutenções)</legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <input aria-label="Nome do franqueado" value={form.franchiseeName || ''} onChange={e => setForm({ ...form, franchiseeName: e.target.value })} className={fieldClass} placeholder="Nome" maxLength={100} />
+                <input aria-label="E-mail do franqueado" type="email" value={form.franchiseeEmail || ''} onChange={e => setForm({ ...form, franchiseeEmail: e.target.value })} className={fieldClass} placeholder="email@franqueado.com" maxLength={200} />
+                <input aria-label="WhatsApp do franqueado" type="tel" value={form.franchiseePhone || ''} onChange={e => setForm({ ...form, franchiseePhone: e.target.value })} className={fieldClass} placeholder="WhatsApp (11) 98888-7777" maxLength={30} />
+              </div>
+            </fieldset>
           </div>
         </Section>
 
@@ -317,7 +325,7 @@ export const SettingsView = () => {
                 <p className="text-sm font-medium text-zinc-900 dark:text-white">Cor de destaque</p>
                 <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">Botões e indicadores do sistema.</p>
               </div>
-              <span className="inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 font-mono text-[11px] text-zinc-600 dark:text-zinc-300 uppercase">
+              <span className="inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 font-mono text-[11px] text-zinc-600 dark:text-zinc-300 ">
                 <span className="w-3.5 h-3.5 rounded-full border border-black/10" style={{ backgroundColor: accent }} aria-hidden="true" />
                 {accent}
               </span>
@@ -385,7 +393,7 @@ export const SettingsView = () => {
             />
             <p id="asaas-wallet-hint" className="text-xs text-zinc-500 dark:text-zinc-400">
               {isSuperAdmin
-                ? 'Identificador da carteira (walletId) da conta Asaas no CNPJ da mecânica. Nas cobranças, a parte da oficina cai direto nela.'
+                ? 'Identificador da carteira (walletId) da conta Asaas no CNPJ da mecânica. Nas cobranças, a parte da Base cai direto nela.'
                 : 'Por segurança, só a administração da Munago altera a carteira. Para trocar, fale com o suporte.'}
             </p>
           </div>

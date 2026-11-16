@@ -1,20 +1,19 @@
 import { Router, type RequestHandler } from 'express';
 import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { notifications, type Permissions } from '../db/schema';
-import { effectivePermissions, requirePermission, unitScope, ws, type AuthUser } from '../auth/middleware';
+import { effectivePermissions, requirePermission, ws, type AuthUser } from '../auth/middleware';
 import { asyncHandler } from '../middleware/errorHandler';
 import type { ApiDeps } from './deps';
 
-/** Avisos que a pessoa enxerga: os gerais (estoque baixo) se cuida de estoque/OS; os dirigidos, se é do setor e da unidade. */
+/** Avisos que a pessoa enxerga na Base: os gerais (estoque baixo) se cuida de estoque/OS; os dirigidos, se é do setor. */
 function visibleTo(u: AuthUser, workspaceId: string) {
   const p = effectivePermissions(u);
   const mine = (Object.keys(p) as (keyof Permissions)[]).filter(k => p[k]);
-  const scope = unitScope(u);
   return and(
     eq(notifications.workspaceId, workspaceId),
     or(
       p.canManageInventory || p.canManageOS ? isNull(notifications.target) : undefined,
-      mine.length ? and(inArray(notifications.target, mine), scope ? or(isNull(notifications.unitId), eq(notifications.unitId, scope)) : undefined) : undefined,
+      mine.length ? inArray(notifications.target, mine) : undefined,
     ),
   );
 }

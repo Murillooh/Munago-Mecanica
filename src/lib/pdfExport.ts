@@ -87,8 +87,14 @@ const drawHeader = (doc: jsPDF, store: StoreInfo, title: string, filterLabel?: s
   setText(doc, 15, 'bold', C.text);
   doc.text(fit(doc, name, half), M, 12);
   setText(doc, 7.5, 'normal', C.muted);
-  const contact = [store.address?.replace(/\s+/g, ' '), store.contactPhone, store.contactEmail].filter(Boolean).join('   ·   ');
-  if (contact) doc.text(fit(doc, contact, half), M, 17.5);
+  const address = store.address?.replace(/\s+/g, ' ');
+  const reach = [store.contactPhone, store.contactEmail].filter(Boolean).join('   ·   ');
+  const contact = [address, reach].filter(Boolean).join('   ·   ');
+  if (doc.getTextWidth(contact) <= half) doc.text(contact, M, 17.5);
+  else {
+    if (address) doc.text(fit(doc, address, half), M, 17.5);
+    if (reach) doc.text(fit(doc, reach, half), M, address ? 21.5 : 17.5);
+  }
 
   // Direita: qual documento é, quando saiu e o filtro usado
   setText(doc, 11, 'bold', C.text);
@@ -739,7 +745,7 @@ export interface ExportDiagnosticPdfOptions {
 
 export const exportDiagnosticToPDF = ({ store, text, products = [] }: ExportDiagnosticPdfOptions) => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const title = 'Diagnóstico Operacional & Riscos de Ruptura';
+  const title = 'Diagnóstico de estoque';
   const W = pageW(doc) - 2 * M;
   const bottom = pageH(doc) - 16;
   const LH = 4.6; // altura da linha do corpo
@@ -793,7 +799,9 @@ export const exportDiagnosticToPDF = ({ store, text, products = [] }: ExportDiag
         x = M + 8;
       }
       setText(doc, 10.5, 'bold', C.text);
-      doc.text(fit(doc, t.toUpperCase(), M + W - x), x, y);
+      // IA costuma mandar o título todo em maiúsculas: vira frase normal
+      const label = t === t.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t;
+      doc.text(fit(doc, label, M + W - x), x, y);
       doc.setDrawColor(...C.border);
       doc.setLineWidth(0.3);
       doc.line(M, y + 2.5, M + W, y + 2.5);
@@ -843,6 +851,36 @@ export const exportDiagnosticToPDF = ({ store, text, products = [] }: ExportDiag
       }
       y += 1.5;
     }
+  }
+
+  // Lista de compras com os números reais (a IA cita poucos itens e em texto corrido)
+  const buy = products.filter(p => (p.quantity || 0) <= (p.minQuantity || 0))
+    .map(p => ({ p, qty: Math.max(0, (p.minQuantity || 0) - (p.quantity || 0)) }))
+    .sort((a, b) => Number((b.p.quantity || 0) <= 0) - Number((a.p.quantity || 0) <= 0) || b.qty * (b.p.price || 0) - a.qty * (a.p.price || 0));
+  if (buy.length) {
+    y = sectionTitle(doc, store, title, y + 4, 'Lista de compras', `${num(buy.length)} ${buy.length === 1 ? 'item' : 'itens'} no mínimo ou abaixo · quantidade para voltar ao estoque mínimo`);
+    const total = buy.reduce((s, b) => s + b.qty * (b.p.price || 0), 0);
+    table(doc, {
+      ...tableBase(doc, store, title),
+      startY: y,
+      head: [['Código', 'Peça', 'Estoque', 'Mín.', 'Comprar', 'Unitário', 'Custo', 'Fornecedor']],
+      body: buy.map(({ p, qty }) => [p.sku || '-', p.name || 'Sem nome', num(p.quantity), num(p.minQuantity), qty ? num(qty) : '-', brl(p.price || 0), qty ? brl(qty * (p.price || 0)) : '-', p.supplier || '-']),
+      foot: [[{ content: 'Total para repor', colSpan: 6 }, { content: brl(total), styles: { halign: 'right' } }, '']],
+      columnStyles: {
+        0: { cellWidth: 22, textColor: C.muted },
+        1: { cellWidth: 'auto', fontStyle: 'bold', overflow: 'linebreak' },
+        2: { cellWidth: 14, halign: 'right' },
+        3: { cellWidth: 11, halign: 'right', textColor: C.muted },
+        4: { cellWidth: 15, halign: 'right', fontStyle: 'bold' },
+        5: { cellWidth: 22, halign: 'right' },
+        6: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
+        7: { cellWidth: 30, textColor: C.muted },
+      },
+      didParseCell: data => {
+        if (data.section === 'body' && data.column.index === 2 && data.cell.raw === '0') { data.cell.styles.textColor = C.red; data.cell.styles.fontStyle = 'bold'; }
+      },
+    });
+    y = lastY(doc) + 4;
   }
 
   const note = 'Análise gerada por IA a partir dos dados do estoque. Confira antes de tomar decisões de compra.';

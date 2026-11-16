@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Camera, Check, ChevronLeft, ChevronRight, Expand, FileText, Loader2, Mail, MessageCircle, Minus, Package, Paperclip, Play, Plus, Send, ShieldCheck, Square, Wrench, X, XCircle } from 'lucide-react';
+import type { Product } from '../../context/AppContext';
+import { ArrowLeft, KeyRound, Camera, Check, ChevronLeft, ChevronRight, Expand, FileText, Loader2, Mail, MessageCircle, Minus, Package, Paperclip, Play, Plus, Search, Send, ShieldCheck, Square, Wrench, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApp } from '../../context/AppContext';
 import { apiPost } from '../../lib/api';
@@ -7,7 +8,8 @@ import { compressImage } from '../../lib/compressImage';
 import { MAX_ESTIMATE_MINUTES, MOTO_ACTIONS, MOTO_STEPS, motoStatusLabel, motoStep, formatDuration, timeStage, type MotoAction, type MotoEvent, type MotoItem, type MotoStatus } from '../../../server/services/motoFlow';
 
 export interface MotoOS {
-  id: string; plate: string; model: string; unit: string | null; unitId: string | null; km: number; notes: string | null;
+  id: string; plate: string; model: string; km: number; notes: string | null;
+  customerName: string | null; customerPhone: string | null; franchiseName: string | null;
   status: MotoStatus; items: MotoItem[]; events: MotoEvent[];
   startedAt: string | null; finishedAt: string | null; estimatedMinutes: number | null;
   createdByName: string; createdAt: string;
@@ -23,15 +25,58 @@ export const STATUS_TONE: Record<MotoStatus, string> = {
   recebida: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
   aguardando_estoque: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
   aguardando_peca: 'bg-orange-500/15 text-orange-700 dark:text-orange-300',
-  aguardando_autorizacao: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+  aguardando_autorizacao: 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
   autorizada: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
   em_manutencao: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   finalizada: 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-300',
   recusada: 'bg-red-500/15 text-red-700 dark:text-red-300',
+  entregue: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
 };
 
 
 /** Milissegundos de manutenção, atualizando a cada segundo enquanto roda. */
+/** Escolhe a peça do estoque pesquisando por código ou nome. Sem resultado, Enter usa o texto como código. */
+function PartPicker({ code, products, onPick }: { code: string; products: Product[]; onPick: (code: string, name?: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const term = q.trim().toLowerCase();
+  const found = (term ? products.filter(p => p.sku?.toLowerCase().includes(term) || p.name.toLowerCase().includes(term)) : products)
+    .filter(p => p.sku).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).slice(0, 50);
+  const pick = (c: string, name?: string) => { onPick(c, name); setOpen(false); setQ(''); };
+  return (
+    <div className="relative" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
+      <button type="button" aria-label="Código da peça" aria-expanded={open} onClick={() => setOpen(!open)}
+        className={`${fieldClass} truncate text-left cursor-pointer ${code ? 'font-mono' : 'text-zinc-400 dark:text-zinc-600'}`}>
+        {code || 'Código'}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="flex items-center gap-2 border-b border-zinc-200 px-3 dark:border-zinc-700">
+            <Search size={14} className="shrink-0 text-zinc-400" />
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar código ou peça" aria-label="Buscar peça"
+              className="w-full bg-transparent py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+              onKeyDown={e => {
+                if (e.key === 'Escape') setOpen(false);
+                if (e.key === 'Enter') { e.preventDefault(); if (found[0]) pick(found[0].sku!, found[0].name); else if (term) pick(q.trim().toUpperCase()); }
+              }} />
+          </div>
+          <ul className="max-h-64 overflow-y-auto py-1">
+            {found.map(p => (
+              <li key={p.id}>
+                <button type="button" onClick={() => pick(p.sku!, p.name)} className="flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">
+                  <span className="shrink-0 font-mono text-xs font-semibold text-zinc-900 dark:text-zinc-100">{p.sku}</span>
+                  <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">{p.name}</span>
+                </button>
+              </li>
+            ))}
+            {!found.length && <li className="px-3 py-2 text-xs text-zinc-500">{term ? <>Nenhuma peça. Enter usa <b className="font-mono">{q.trim().toUpperCase()}</b> como código.</> : 'Estoque sem peças cadastradas.'}</li>}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function useElapsed(startedAt: string | null, finishedAt: string | null) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -81,7 +126,7 @@ const DeadlinePanel: React.FC<{ os: MotoOS }> = ({ os }) => {
           <span className="mr-1.5 text-xl align-middle">{os.finishedAt && !stage.late ? '✅' : stage.emoji}</span>
           {os.finishedAt ? (stage.late ? `Terminou ${formatDuration(over)} atrasado` : 'Terminou no prazo') : stage.label}
         </p>
-      ) : <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Manutenção em andamento</p>}
+      ) : <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Manutenção em andamento</p>}
       <p className="font-mono text-4xl font-bold tabular-nums text-zinc-900 dark:text-white">{os.finishedAt ? formatDuration(ms) : clockOf(ms)}</p>
       {stage && est && (
         <>
@@ -149,6 +194,7 @@ const EVENT_LABEL: Record<MotoEvent['type'], { title: string; who: string }> = {
   reject: { title: 'Serviço recusado', who: 'Time CS' },
   start: { title: 'Iniciou a manutenção', who: 'Mecânico' },
   finish: { title: 'Finalizou a manutenção', who: 'Mecânico' },
+  deliver: { title: 'Entregou a moto ao locatário', who: 'Front' },
 };
 const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
@@ -159,12 +205,14 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 interface Quote { prices: number[]; labor: number }
 const quoteTotal = (os: MotoOS, q: Quote) => os.items.reduce((a, it, i) => a + it.quantity * (q.prices[i] || 0), 0) + (q.labor || 0);
 
-function authRequestText(os: MotoOS, q: Quote, to?: string | null) {
+function authRequestText(os: MotoOS, q: Quote, to?: string | null, base?: string) {
   const lines = [
     `Olá${to ? `, ${to}` : ''}! Precisamos da sua autorização para a manutenção desta moto:`,
+    ...(os.franchiseName ? [`Franquia: ${os.franchiseName}`] : []),
+    ...(os.customerName ? [`Locatário: ${os.customerName}`] : []),
     '',
     `Moto: ${os.model} · placa ${os.plate}`,
-    `Km: ${os.km.toLocaleString('pt-BR')}${os.unit ? ` · Unidade: ${os.unit}` : ''}`,
+    `Km: ${os.km.toLocaleString('pt-BR')}${base ? ` · Base: ${base}` : ''}`,
     '',
     'Serviços e peças:',
     ...os.items.map((i, k) => `- ${i.quantity}x ${i.description}${i.code ? ` (${i.code})` : ''}${i.purpose ? ` (${i.purpose})` : ''}: ${brl(i.quantity * (q.prices[k] || 0))}`),
@@ -188,13 +236,14 @@ async function openProof(url: string) {
 }
 
 const EVENT_ICON: Record<MotoEvent['type'], React.ElementType> = {
-  recebida: Check, diagnose: Wrench, stock_ok: Package, stock_missing: Package, request_auth: Send, authorize: ShieldCheck, reject: XCircle, start: Play, finish: Square,
+  recebida: Check, diagnose: Wrench, stock_ok: Package, stock_missing: Package, request_auth: Send, authorize: ShieldCheck, reject: XCircle, start: Play, finish: Square, deliver: KeyRound,
 };
 
 /** OS da moto aberta na própria aba: linha do tempo em destaque, etapas, ação da vez (conforme o perfil), pedido e fotos. */
 export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged: (os: MotoOS) => void }> = ({ os, onClose, onChanged }) => {
-  const { canManageOS, canManageInventory, canApproveOS, products, units } = useApp();
-  const unit = units.find(u => u.id === os.unitId);
+  const { canManageOS, canManageInventory, canApproveOS, canCheckin, products, settings } = useApp();
+  // Franqueado da Base (Configurações)
+  const unit = { franchiseeName: settings.franchiseeName, franchiseeEmail: settings.franchiseeEmail, franchiseePhone: settings.franchiseePhone };
   const [contact, setContact] = useState({ email: '', phone: '' });
   useEffect(() => setContact({ email: unit?.franchiseeEmail ?? '', phone: unit?.franchiseePhone ?? '' }), [unit?.franchiseeEmail, unit?.franchiseePhone]);
   const [proof, setProof] = useState<{ name: string; url: string } | null>(null);
@@ -243,11 +292,10 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
     action = (
       <div className="space-y-3">
         <p className="text-sm font-semibold text-zinc-900 dark:text-white">O que precisa ser feito na moto?</p>
-        <datalist id="moto-parts">{products.map(p => <option key={p.id} value={p.sku ?? ''}>{p.name}</option>)}</datalist>
         {items.map((it, i) => (
           <div key={i} className="grid grid-cols-[5.5rem_1fr_4.5rem_auto] gap-2 sm:grid-cols-[7rem_1fr_4.5rem_1fr_auto]">
-            <input aria-label="Código" list="moto-parts" value={it.code} placeholder="Código" className={fieldClass}
-              onChange={e => { const code = e.target.value; const p = stockOf(code); setItems(items.map((x, j) => j === i ? { ...x, code, description: x.description || p?.name || '' } : x)); }} />
+            <PartPicker code={it.code} products={products}
+              onPick={(code, name) => setItems(items.map((x, j) => j === i ? { ...x, code, description: name ?? (x.description || stockOf(code)?.name || '') } : x))} />
             <input aria-label="Descrição" value={it.description} placeholder="Peça ou serviço" className={fieldClass} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} />
             <input aria-label="Quantidade" type="number" min={1} value={it.quantity} className={`${fieldClass} tabular-nums`} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, quantity: Math.max(1, Number(e.target.value) || 1) } : x))} />
             <input aria-label="Finalidade" value={it.purpose} placeholder="Finalidade (ex.: freio gasto)" className={`${fieldClass} col-span-3 sm:col-span-1`} onChange={e => setItems(items.map((x, j) => j === i ? { ...x, purpose: e.target.value } : x))} />
@@ -296,7 +344,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
     );
   } else if (os.status === 'aguardando_autorizacao' && canApproveOS) {
     const total = quoteTotal(os, quote);
-    const text = authRequestText(os, quote, unit?.franchiseeName);
+    const text = authRequestText(os, quote, unit?.franchiseeName, settings.storeName);
     const subject = `Autorização de manutenção · ${os.model} ${os.plate}`;
     const asked = os.events.filter(e => e.type === 'request_auth').length;
     const sendEmail = () => {
@@ -323,7 +371,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
         {/* 1. Pedir ao franqueado */}
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-zinc-900 dark:text-white"><span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[11px] text-white">1</span>Peça a autorização ao franqueado</p>
+            <p className="text-sm font-semibold text-zinc-900 dark:text-white"><span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-[11px] text-white">1</span>Peça a autorização ao franqueado</p>
             {asked > 0 && <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Pedido enviado {asked}×</span>}
           </div>
           <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950/40">
@@ -351,16 +399,16 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
                 </tr>
               </tbody>
               <tfoot>
-                <tr className="bg-violet-50/70 dark:bg-violet-950/20">
+                <tr className="bg-slate-50/70 dark:bg-slate-950/20">
                   <td colSpan={2} className="px-3 py-2.5 text-sm font-bold text-zinc-900 dark:text-white">Valor total da manutenção</td>
-                  <td className="px-3 py-2.5 text-right text-base font-bold tabular-nums text-violet-700 dark:text-violet-300">{brl(total)}</td>
+                  <td className="px-3 py-2.5 text-right text-base font-bold tabular-nums text-slate-700 dark:text-slate-300">{brl(total)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
           <p className="text-[11px] text-zinc-500">Preço das peças é o do cadastro do estoque e não pode ser alterado aqui.</p>
           {total <= 0 && <p className="text-[11px] text-amber-600 dark:text-amber-400">Informe os valores para enviar o pedido com o preço.</p>}
-          <p className="text-xs text-zinc-500">{unit?.franchiseeName ? <>Franqueado: <b className="text-zinc-700 dark:text-zinc-300">{unit.franchiseeName}</b>{os.unit ? ` · ${os.unit}` : ''}</> : 'Unidade sem franqueado cadastrado: preencha abaixo (ou cadastre em Equipe › Unidades).'}</p>
+          <p className="text-xs text-zinc-500">{unit?.franchiseeName ? <>Franqueado: <b className="text-zinc-700 dark:text-zinc-300">{unit.franchiseeName}</b></> : 'Base sem franqueado cadastrado: preencha abaixo (ou cadastre em Configurações).'}</p>
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="flex gap-2">
               <input type="email" aria-label="E-mail do franqueado" value={contact.email} onChange={e => setContact({ ...contact, email: e.target.value })} placeholder="email@franqueado.com" className={fieldClass} />
@@ -383,7 +431,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
 
         {/* 2. Anexar a resposta e decidir */}
         <div className="space-y-3 border-t border-blue-200/60 pt-4 dark:border-blue-900/40">
-          <p className="text-sm font-semibold text-zinc-900 dark:text-white"><span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[11px] text-white">2</span>Anexe a resposta do franqueado autorizando</p>
+          <p className="text-sm font-semibold text-zinc-900 dark:text-white"><span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-[11px] text-white">2</span>Anexe a resposta do franqueado autorizando</p>
           {proof ? (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-50/60 px-3 py-2 text-sm dark:bg-emerald-950/20">
               <FileText size={16} className="shrink-0 text-emerald-600" />
@@ -391,7 +439,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
               <button type="button" onClick={() => setProof(null)} aria-label="Remover anexo" className="rounded p-1 text-zinc-400 hover:text-red-600 cursor-pointer"><X size={14} /></button>
             </div>
           ) : (
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-500 hover:border-violet-500 hover:text-violet-600 dark:border-zinc-700 focus-within:ring-2 focus-within:ring-violet-600/40">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 px-3 py-3 text-sm font-medium text-zinc-500 hover:border-slate-500 hover:text-slate-600 dark:border-zinc-700 focus-within:ring-2 focus-within:ring-slate-600/40">
               {readingProof ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />} Anexar print ou PDF do e-mail de resposta
               <input type="file" accept="image/*,application/pdf" className="sr-only" aria-label="Anexar comprovante da autorização"
                 onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pickProof(f); }} />
@@ -402,7 +450,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
             <button type="button" disabled={busy !== null || !note.trim()} onClick={() => run('reject')} className={`${btn} border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30`}>
               {busy === 'reject' && <Loader2 size={15} className="animate-spin" />} Recusar
             </button>
-            <button type="button" disabled={busy !== null || !proof} onClick={() => run('authorize', { proof })} className={`${btn} flex-1 bg-violet-600 text-white hover:bg-violet-700`}>
+            <button type="button" disabled={busy !== null || !proof} onClick={() => run('authorize', { proof })} className={`${btn} flex-1 bg-slate-600 text-white hover:bg-slate-700`}>
               {busy === 'authorize' ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={16} />} Autorizar serviço
             </button>
           </div>
@@ -415,6 +463,16 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
       <button type="button" disabled={busy !== null} onClick={() => run('start')} className={`${btn} w-full bg-emerald-600 py-3.5 text-base text-white hover:bg-emerald-700`}>
         {busy === 'start' ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />} Iniciar manutenção{os.estimatedMinutes ? ` · prazo ${formatDuration(os.estimatedMinutes * 60_000)}` : ''}
       </button>
+    );
+  } else if (os.status === 'finalizada' && canCheckin) {
+    action = (
+      <div className="space-y-3">
+        <p className="text-sm font-semibold text-zinc-900 dark:text-white">Entregar a moto ao locatário{os.customerName ? `: ${os.customerName}` : ''}</p>
+        {noteField('Observação da entrega (opcional)')}
+        <button type="button" disabled={busy !== null} onClick={() => run('deliver')} className={`${btn} w-full bg-emerald-600 text-white hover:bg-emerald-700`}>
+          {busy === 'deliver' ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={16} />} Moto entregue
+        </button>
+      </div>
     );
   } else if (os.status === 'em_manutencao') {
     action = (
@@ -459,7 +517,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
       <button type="button" onClick={onClose} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white cursor-pointer">
         <ArrowLeft size={16} aria-hidden="true" /> Voltar para a lista
       </button>
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/90">
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/90">
         <header className="flex items-start gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -467,7 +525,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
               <span className="font-mono text-sm text-zinc-500">{os.plate}</span>
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_TONE[os.status]}`}>{motoStatusLabel(os)}</span>
             </div>
-            <p className="mt-0.5 text-xs text-zinc-500">{os.km.toLocaleString('pt-BR')} km{os.unit ? ` · ${os.unit}` : ''} · recebida por {os.createdByName} em {dateTime(os.createdAt)}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">{os.km.toLocaleString('pt-BR')} km{os.franchiseName ? ` · franquia ${os.franchiseName}` : ''}{os.customerName ? ` · locatário ${os.customerName}${os.customerPhone ? ` (${os.customerPhone})` : ''}` : ''} · recebida por {os.createdByName} em {dateTime(os.createdAt)}</p>
           </div>
           {os.startedAt && (
             <div className="shrink-0 text-right">
@@ -480,7 +538,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
         {/* Etapas */}
         <ol className="flex border-b border-zinc-200 px-5 py-3 dark:border-zinc-800" aria-label="Etapas">
           {MOTO_STEPS.map((label, i) => {
-            const done = i < stepIndex;
+            const done = i < stepIndex || os.status === 'entregue';
             const current = i === stepIndex;
             return (
               <li key={label} className="flex flex-1 items-center gap-1.5 text-[11px] font-semibold">
@@ -511,7 +569,7 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-bold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200" aria-hidden="true">{initials(ev.byName)}</span>
                       <span className="text-sm font-semibold text-zinc-900 dark:text-white">{ev.byName}</span>
-                      <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">{meta.who}</span>
+                      <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">{meta.who}</span>
                       <span className="ml-auto text-xs tabular-nums text-zinc-500">{dateTime(ev.at)}</span>
                     </div>
                     <p className="mt-1.5 text-base font-medium text-zinc-800 dark:text-zinc-100">{meta.title}</p>
@@ -531,13 +589,13 @@ export const MotoOSDetail: React.FC<{ os: MotoOS; onClose: () => void; onChanged
 
           <div className="space-y-5">
             {action && <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900/50 dark:bg-blue-950/10">{action}</section>}
-            {os.status === 'finalizada' && os.startedAt && (
+            {(os.status === 'finalizada' || os.status === 'entregue') && os.startedAt && (
               <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/40"><DeadlinePanel os={os} /></section>
             )}
 
             {os.photos?.authProof && (
-              <button type="button" onClick={() => openProof(os.photos!.authProof!.url)} className="flex w-full items-center gap-3 rounded-xl border border-violet-200 bg-violet-50/50 px-4 py-3 text-left transition-colors hover:bg-violet-50 dark:border-violet-900/50 dark:bg-violet-950/20 dark:hover:bg-violet-950/40 cursor-pointer">
-                <ShieldCheck size={18} className="shrink-0 text-violet-600" />
+              <button type="button" onClick={() => openProof(os.photos!.authProof!.url)} className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:border-slate-900/50 dark:bg-slate-950/20 dark:hover:bg-slate-950/40 cursor-pointer">
+                <ShieldCheck size={18} className="shrink-0 text-slate-600" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-zinc-900 dark:text-white">Autorização do franqueado</span>
                   <span className="block truncate text-xs text-zinc-500">{os.photos.authProof.name} · clique para abrir</span>

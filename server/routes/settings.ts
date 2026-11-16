@@ -28,6 +28,10 @@ export type SystemSettings = typeof DEFAULT_SETTINGS & {
   asaasWalletId?: string;
   /** Repasse mínimo da OS para a empresa, em % do total. Só o admin geral altera. */
   repasseMinPercent?: number;
+  /** Franqueado da Base: autoriza as manutenções (e-mail/WhatsApp). */
+  franchiseeName?: string;
+  franchiseeEmail?: string;
+  franchiseePhone?: string;
 };
 
 /** Campos que mexem no dinheiro da empresa: a própria oficina não pode alterar. */
@@ -47,6 +51,9 @@ const settingsPatch = z.object({
   monitorScrollIntervalSeconds: z.number().int().min(3).max(600),
   asaasWalletId: z.string().trim().max(100),
   repasseMinPercent: z.number().min(0).max(100),
+  franchiseeName: z.string().trim().max(100),
+  franchiseeEmail: z.union([z.literal(''), z.string().trim().toLowerCase().email('E-mail do franqueado inválido.').max(200)]),
+  franchiseePhone: z.string().trim().max(30),
 }).partial().strict();
 
 /** Configurações de uma oficina (a linha de settings usa o id da oficina). */

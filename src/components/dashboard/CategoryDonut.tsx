@@ -90,7 +90,7 @@ export const CategoryDonut: React.FC<{ products: Product[]; darkMode: boolean }>
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">Total</span>
+                <span className="text-[10px] font-semibold text-zinc-400">Total</span>
                 <span className="text-lg font-bold text-zinc-900 dark:text-white tabular-nums">{formatBRLCompact(total)}</span>
               </div>
             </div>

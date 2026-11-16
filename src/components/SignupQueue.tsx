@@ -52,7 +52,7 @@ export const SignupQueue: React.FC<{ workspaces: { id: string; name: string }[];
   const assign = async (s: Signup) => {
     const target = dest[s.id] ?? props.workspaces[0]?.id ?? NEW_WORKSPACE;
     const isNew = target === NEW_WORKSPACE;
-    const name = (newName[s.id] ?? `Oficina de ${s.name}`).trim();
+    const name = (newName[s.id] ?? `Base de ${s.name}`).trim();
     if (!target || (isNew && !name)) return toast.error('Escolha a mecânica.');
     setBusy(s.id);
     try {
@@ -124,7 +124,7 @@ export const SignupQueue: React.FC<{ workspaces: { id: string; name: string }[];
                         <label htmlFor={`name-${s.id}`} className="sr-only">Nome da nova mecânica</label>
                         <input
                           id={`name-${s.id}`}
-                          value={newName[s.id] ?? `Oficina de ${s.name}`}
+                          value={newName[s.id] ?? `Base de ${s.name}`}
                           onChange={e => setNewName(n => ({ ...n, [s.id]: e.target.value }))}
                           maxLength={100}
                           className={`${fieldCls} w-48`}

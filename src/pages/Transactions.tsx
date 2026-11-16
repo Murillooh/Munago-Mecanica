@@ -28,7 +28,7 @@ const dayLabel = (d: Date) => {
 const fmtQty = (n: number) => n.toLocaleString('pt-BR');
 
 // Células no estilo planilha: linhas de grade finas e altura baixa
-const th = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 border-b border-r last:border-r-0 border-zinc-200 dark:border-zinc-800 whitespace-nowrap';
+const th = 'px-3 py-2 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 border-b border-r last:border-r-0 border-zinc-200 dark:border-zinc-800 whitespace-nowrap';
 const td = 'px-3 py-1.5 border-b border-r last:border-r-0 border-zinc-100 dark:border-zinc-800/70';
 
 export const Transactions = () => {
@@ -171,7 +171,7 @@ export const Transactions = () => {
           selected={typeFilter === 'out'} onClick={() => setTypeFilter(typeFilter === 'out' ? 'all' : 'out')}
         />
         <HeroStat
-          icon={Scale} iconClass="bg-violet-500" label="Saldo"
+          icon={Scale} iconClass="bg-slate-500" label="Saldo"
           value={`${stats.balance >= 0 ? '+' : ''}${fmtQty(stats.balance)}`} hint={`${fmtQty(stats.total)} registros no filtro`}
         />
       </PageHero>

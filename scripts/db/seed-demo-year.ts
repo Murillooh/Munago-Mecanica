@@ -11,7 +11,7 @@ import 'dotenv/config';
 import { eq, sql } from 'drizzle-orm';
 import { createDb } from '../../server/db/client';
 import {
-  accessRequests, categories, motoCheckins, notifications, products, units, serviceOrders, services, settings, transactions, users, workspaces,
+  accessRequests, categories, motoCheckins, notifications, products, serviceOrders, services, settings, transactions, users, workspaces,
   type ServiceOrderItem, type ServiceOrderService,
 } from '../../server/db/schema';
 import { PROFILES, type Profile } from '../../server/auth/profiles';
@@ -30,7 +30,9 @@ if (!adminEmail) {
   process.exit(1);
 }
 
-const WS = 'demo-munago';
+const WS = 'demo-base-centro';
+/** Segunda Base, isolada: equipe própria e nenhum dado da primeira. */
+const WS2 = 'demo-base-caninde';
 const MIN_PERCENT = 10;
 
 // Aleatório com semente: rodar de novo gera os mesmos dados.
@@ -48,23 +50,16 @@ const NOW = new Date();
 const START = new Date(NOW); START.setHours(0, 0, 0, 0); START.setDate(START.getDate() - 365);
 
 // ---------------------------------------------------------------- equipe
-// Unidades: duas Bases que atendem motos e o CD de peças
-const UNITS = [
-  { id: 'demo-base-centro', name: 'Base Centro', kind: 'base' as const, franchiseeName: 'Ricardo Alves', franchiseeEmail: 'ricardo.franqueado@example.com', franchiseePhone: '(11) 90000-0001' },
-  { id: 'demo-base-caninde', name: 'Base Canindé', kind: 'base' as const, franchiseeName: 'Sandra Moreira', franchiseeEmail: 'sandra.franqueada@example.com', franchiseePhone: '(11) 90000-0002' },
-  { id: 'demo-cd', name: 'CD Central', kind: 'cd' as const },
-];
 // Um de cada perfil (o admin é você); Pedro ainda aguarda aprovação
-const TEAM: { id: string; email: string; name: string; profile: Profile; unitId: string | null; status: 'approved' | 'pending' }[] = [
-  { id: 'demo-admin', email: adminEmail, name: 'Murillo', profile: 'admin', unitId: null, status: 'approved' },
-  { id: 'demo-carlos', email: 'carlos.mecanico@example.com', name: 'Carlos Andrade', profile: 'mecanico', unitId: 'demo-base-centro', status: 'approved' },
-  { id: 'demo-joao', email: 'joao.freitas@example.com', name: 'João Freitas', profile: 'mecanico', unitId: 'demo-base-caninde', status: 'approved' },
-  { id: 'demo-rafa', email: 'rafaela.estoque@example.com', name: 'Rafaela Lima', profile: 'estoquista', unitId: 'demo-base-centro', status: 'approved' },
-  { id: 'demo-bia', email: 'beatriz.recepcao@example.com', name: 'Beatriz Souza', profile: 'recepcao', unitId: 'demo-base-centro', status: 'approved' },
-  { id: 'demo-larissa', email: 'larissa.cs@example.com', name: 'Larissa Prado', profile: 'cs', unitId: 'demo-base-centro', status: 'approved' },
-  { id: 'demo-marcos', email: 'marcos.cd@example.com', name: 'Marcos Teixeira', profile: 'estoque_cd', unitId: 'demo-cd', status: 'approved' },
-  { id: 'demo-paulo', email: 'paulo.gestor@example.com', name: 'Paulo Mendes', profile: 'gestor', unitId: null, status: 'approved' },
-  { id: 'demo-novo', email: 'pedro.aprendiz@example.com', name: 'Pedro Henrique', profile: 'mecanico', unitId: 'demo-base-caninde', status: 'pending' },
+const TEAM: { id: string; email: string; name: string; profile: Profile; ws: string; status: 'approved' | 'pending' }[] = [
+  { id: 'demo-admin', email: adminEmail, name: 'Murillo', profile: 'admin', ws: WS, status: 'approved' },
+  { id: 'demo-carlos', email: 'carlos.mecanico@example.com', name: 'Carlos Andrade', profile: 'mecanico', ws: WS, status: 'approved' },
+  { id: 'demo-joao', email: 'joao.freitas@example.com', name: 'João Freitas', profile: 'mecanico', ws: WS2, status: 'approved' },
+  { id: 'demo-rafa', email: 'rafaela.estoque@example.com', name: 'Rafaela Lima', profile: 'estoquista', ws: WS, status: 'approved' },
+  { id: 'demo-bia', email: 'beatriz.recepcao@example.com', name: 'Beatriz Souza', profile: 'recepcao', ws: WS, status: 'approved' },
+  { id: 'demo-larissa', email: 'larissa.cs@example.com', name: 'Larissa Prado', profile: 'cs', ws: WS, status: 'approved' },
+  { id: 'demo-paulo', email: 'paulo.gestor@example.com', name: 'Paulo Mendes', profile: 'gestor', ws: WS, status: 'approved' },
+  { id: 'demo-novo', email: 'pedro.aprendiz@example.com', name: 'Pedro Henrique', profile: 'mecanico', ws: WS2, status: 'pending' },
 ];
 const MECHANICS = TEAM.filter(u => u.profile === 'mecanico' && u.status === 'approved');
 
@@ -183,20 +178,28 @@ async function main() {
 
   // Recomeça do zero: apagar a oficina leva junto (cascade) tudo que é dela.
   await db.delete(users).where(eq(sql`lower(${users.email})`, adminEmail));
-  await db.delete(workspaces).where(eq(workspaces.id, WS));
-  await db.delete(settings).where(eq(settings.id, WS));
-  await db.insert(workspaces).values({ id: WS, name: 'Munago Mecânica', createdAt: START });
-  await db.insert(settings).values({
-    id: WS,
-    data: {
-      ...DEFAULT_SETTINGS, storeName: 'Munago Mecânica', contactPhone: '(11) 3456-7890',
-      contactEmail: 'contato@munago.example.com', address: 'Av. das Oficinas, 1200 - Vila Industrial, São Paulo/SP',
+  for (const old of [WS, WS2, 'demo-munago']) {
+    await db.delete(workspaces).where(eq(workspaces.id, old));
+    await db.delete(settings).where(eq(settings.id, old));
+  }
+  await db.insert(workspaces).values([
+    { id: WS, name: 'Base Centro', createdAt: START },
+    { id: WS2, name: 'Base Canindé', createdAt: START },
+  ]);
+  await db.insert(settings).values([
+    { id: WS, data: {
+      ...DEFAULT_SETTINGS, storeName: 'Base Centro', contactPhone: '(11) 3456-7890',
+      contactEmail: 'centro@munago.example.com', address: 'Av. das Oficinas, 1200 - Vila Industrial, São Paulo/SP',
       repasseMinPercent: MIN_PERCENT,
-    },
-  });
-  await db.insert(units).values(UNITS.map(u => ({ ...u, workspaceId: WS, createdAt: START })));
-  await db.insert(users).values(TEAM.map((u, i) => ({
-    ...u, workspaceId: WS, role: PROFILES[u.profile].role, permissions: null, createdAt: new Date(START.getTime() + i * 3 * 86_400_000),
+      franchiseeName: 'Ricardo Alves', franchiseeEmail: 'ricardo.franqueado@example.com', franchiseePhone: '(11) 90000-0001',
+    } },
+    { id: WS2, data: {
+      ...DEFAULT_SETTINGS, storeName: 'Base Canindé', repasseMinPercent: MIN_PERCENT,
+      franchiseeName: 'Sandra Moreira', franchiseeEmail: 'sandra.franqueada@example.com', franchiseePhone: '(11) 90000-0002',
+    } },
+  ]);
+  await db.insert(users).values(TEAM.map(({ ws, ...u }, i) => ({
+    ...u, workspaceId: ws, role: PROFILES[u.profile].role, permissions: null, createdAt: new Date(START.getTime() + i * 3 * 86_400_000),
   })));
 
   // Categorias e peças
@@ -361,19 +364,18 @@ async function main() {
   const motoRows: (typeof motoCheckins.$inferInsert)[] = [];
   const flow: [MotoStatus, number][] = [
     ['recebida', 25], ['recebida', 70], ['aguardando_estoque', 140], ['aguardando_peca', 300], ['aguardando_autorizacao', 200],
-    ['autorizada', 260], ['em_manutencao', 380], ['em_manutencao', 140], ['finalizada', 1500], ['finalizada', 3000], ['finalizada', 4300], ['recusada', 2000],
+    ['autorizada', 260], ['em_manutencao', 380], ['em_manutencao', 140], ['finalizada', 1500], ['finalizada', 3000], ['entregue', 4300], ['recusada', 2000],
   ];
   const MOTO_MODELS = ['Haojue DK 160', 'Haojue DK 150', 'Yamaha Factor 150', 'Avelloz', 'Shineray SHI 175', 'Shineray SHI 250'];
   flow.forEach(([status, age], i) => {
-    const unitId = i % 3 === 2 ? 'demo-base-caninde' : 'demo-base-centro';
-    const mech = unitId === 'demo-base-caninde' ? 'demo-joao' : 'demo-carlos';
+    const mech = 'demo-carlos';
     const notes = pick(['Risco no tanque lado esquerdo.', 'Retrovisor direito quebrado.', 'Cliente relata barulho na corrente.', 'Pneu traseiro careca.', null]);
     const events: MotoEvent[] = [ev('recebida', 'demo-bia', age, notes ?? undefined)];
-    const order: MotoStatus[] = ['recebida', 'aguardando_estoque', 'aguardando_autorizacao', 'autorizada', 'em_manutencao', 'finalizada'];
+    const order: MotoStatus[] = ['recebida', 'aguardando_estoque', 'aguardando_autorizacao', 'autorizada', 'em_manutencao', 'finalizada', 'entregue'];
     const reach = (st: MotoStatus) => order.indexOf(st) <= order.indexOf(status === 'aguardando_peca' ? 'aguardando_estoque' : status === 'recusada' ? 'aguardando_autorizacao' : status);
     const items = reach('aguardando_estoque') ? ITEMS.slice(0, 1 + (i % 3)) : [];
     if (reach('aguardando_estoque')) events.push(ev('diagnose', mech, age - 20));
-    if (status === 'aguardando_peca') events.push(ev('stock_missing', 'demo-rafa', age - 40, 'Kit relação em falta, pedido ao CD.'));
+    if (status === 'aguardando_peca') events.push(ev('stock_missing', 'demo-rafa', age - 40, 'Kit relação em falta, pedido ao fornecedor.'));
     if (reach('aguardando_autorizacao')) events.push(ev('stock_ok', 'demo-rafa', age - 45));
     if (status === 'aguardando_autorizacao' || status === 'recusada' || reach('autorizada')) events.push(ev('request_auth', 'demo-larissa', age - 60, 'Por WhatsApp para (11) 90000-0001'));
     if (status === 'recusada') events.push(ev('reject', 'demo-larissa', age - 90, 'Cliente não aprovou o orçamento.'));
@@ -381,15 +383,16 @@ async function main() {
     const startMin = age - 110;
     if (reach('em_manutencao')) events.push(ev('start', mech, startMin));
     const finishMin = startMin - 35 - (i * 7) % 60;
-    if (status === 'finalizada') events.push(ev('finish', mech, finishMin, 'Serviço concluído e testado.'));
+    if (reach('finalizada')) events.push(ev('finish', mech, finishMin, 'Serviço concluído e testado.'));
+    if (status === 'entregue') events.push(ev('deliver', 'demo-bia', finishMin - 40, 'Retirada pelo locatário.'));
     motoRows.push({
       id: id('moto'), workspaceId: WS, plate: plate(), model: MOTO_MODELS[i % MOTO_MODELS.length], km: int(3000, 42000),
-      unitId, unit: UNITS.find(u => u.id === unitId)!.name, photos: { ...photos, ...(reach('autorizada') ? { authProof: { name: 'autorizacao-franqueado.png', url: PX } } : {}), ...(status === 'finalizada' ? { final: [PX_DONE, PX_DONE] } : {}) }, notes, status,
+      franchiseName: pick(['Locadora Moto Rápida', 'Entregas Express', 'Rota Motos', 'Frota Já']), customerName: `${pick(FIRST)} ${pick(LAST)}`, customerPhone: `(11) 9${int(6000, 9999)}-${int(1000, 9999)}`, photos: { ...photos, ...(reach('autorizada') ? { authProof: { name: 'autorizacao-franqueado.png', url: PX } } : {}), ...(reach('finalizada') ? { final: [PX_DONE, PX_DONE] } : {}) }, notes, status,
       items: items.map(it => ({ ...it, ...(reach('aguardando_autorizacao') || status === 'aguardando_peca' ? { available: !(status === 'aguardando_peca' && it.code === 'MOT-KITREL') } : {}) })),
       events,
       estimatedMinutes: reach('aguardando_estoque') ? ({ 6: 90, 7: 90, 10: 30 } as Record<number, number>)[i] ?? [45, 60, 90][i % 3] : null, // 6: atrasada, 7: no prazo, 10: terminou atrasada
       startedAt: reach('em_manutencao') ? new Date(NOW.getTime() - startMin * 60_000) : null,
-      finishedAt: status === 'finalizada' ? new Date(NOW.getTime() - finishMin * 60_000) : null,
+      finishedAt: reach('finalizada') ? new Date(NOW.getTime() - finishMin * 60_000) : null,
       createdBy: 'demo-bia', createdByName: person('demo-bia').name, createdAt: new Date(NOW.getTime() - age * 60_000),
     });
   });
@@ -397,7 +400,7 @@ async function main() {
   // Aviso de cada OS para o setor que precisa agir agora
   await db.insert(notifications).values(motoRows.flatMap(m => {
     const n = MOTO_NOTIFY[m.status as MotoStatus];
-    return n ? [{ id: id('ntf'), workspaceId: WS, type: 'moto_os', target: n.target, unitId: m.unitId, refId: m.id, title: `${m.model} · ${m.plate}`, message: `A moto ${n.text} (${m.unit}).`, timestamp: (m.events as MotoEvent[]).at(-1) ? new Date((m.events as MotoEvent[]).at(-1)!.at) : NOW }] : [];
+    return n ? [{ id: id('ntf'), workspaceId: WS, type: 'moto_os', target: n.target, refId: m.id, title: `${m.model} · ${m.plate}`, message: `A moto ${n.text}.`, timestamp: (m.events as MotoEvent[]).at(-1) ? new Date((m.events as MotoEvent[]).at(-1)!.at) : NOW }] : [];
   }));
 
   // Pedidos de acesso (tela de cadastros)
@@ -411,7 +414,7 @@ async function main() {
   const paid = osRows.filter(o => o.status === 'paid');
   const revenue = paid.reduce((a, o) => a + (o.totalAmount ?? 0), 0);
   console.log(`Oficina demo criada em ${((Date.now() - t0) / 1000).toFixed(1)}s:`);
-  console.log(`  ${TEAM.length} pessoas na equipe, ${prodRows.length} peças, ${svcRows.length} serviços`);
+  console.log(`  2 Bases isoladas (Base Centro com todos os dados, Base Canindé vazia); ${TEAM.length} pessoas, ${prodRows.length} peças, ${svcRows.length} serviços`);
   console.log(`  ${osRows.length} OS (${paid.length} pagas, faturamento R$ ${revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`);
   console.log(`  ${motoRows.length} OS de motos em todas as etapas do fluxo`);
   console.log(`  ${txRows.length} movimentações, ${low.length} peças abaixo do mínimo, ${notifRows.length} alertas`);

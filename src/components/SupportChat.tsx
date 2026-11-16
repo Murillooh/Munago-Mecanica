@@ -313,8 +313,8 @@ export const SupportChat: React.FC = () => {
               </span>
             )}
             {/* Mini iPhone: moldura, ilha e a Ana como papel de parede */}
-            <span className="relative flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg shadow-blue-900/30 ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
-              <span className="relative flex-1 overflow-hidden rounded-[12px] bg-gradient-to-br from-blue-500 to-indigo-600">
+            <span className="relative flex h-[68px] w-11 rounded-[15px] bg-zinc-900 p-[3px] shadow-lg ring-1 ring-white/15 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
+              <span className="relative flex-1 overflow-hidden rounded-[12px] bg-blue-500">
                 <img src={ANA_IMG} alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_20%]" />
                 <span className="absolute left-1/2 top-1 h-1 w-3.5 -translate-x-1/2 rounded-full bg-black" />
                 <span className="absolute bottom-1 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-white/70" />
@@ -344,7 +344,7 @@ export const SupportChat: React.FC = () => {
           >
             {/* Tela no estilo WhatsApp com as cores do sistema: cabeçalho azul, papel de parede azulado, balões com "rabinho" */}
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#eef2fb] pb-[env(safe-area-inset-bottom)] dark:bg-[#0b1220] sm:rounded-[2.6rem] sm:pb-0">
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 pt-[env(safe-area-inset-top)] text-white sm:pt-0">
+              <div className="bg-blue-600 pt-[env(safe-area-inset-top)] text-white sm:pt-0">
                 {/* Barra de status + Dynamic Island (só na moldura; no celular real o sistema já mostra) */}
                 <div className="relative hidden h-11 items-center justify-between px-7 text-[13px] font-semibold sm:flex" aria-hidden="true">
                   <span className="tabular-nums">{clock}</span>
@@ -499,7 +499,7 @@ export const SupportChat: React.FC = () => {
                     type="submit"
                     disabled={busy || !input.trim()}
                     aria-label="Enviar"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-600/30 transition-opacity hover:brightness-110 disabled:opacity-50 cursor-pointer"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm transition-opacity hover:brightness-110 disabled:opacity-50 cursor-pointer"
                   >
                     <SendHorizontal size={19} aria-hidden="true" />
                   </button>

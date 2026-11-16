@@ -1,22 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { macZoom, macZoomProps } from '../lib/motion';
-import { 
-  X, 
-  Sparkles, 
-  Loader2, 
-  CheckCircle2, 
-  AlertTriangle, 
-  AlertCircle, 
-  Search, 
-  TrendingUp, 
-  DollarSign, 
-  Package, 
-  HelpCircle,
-  RefreshCw,
-  Send,
-  MessageSquare
-} from 'lucide-react';
+import { X, ClipboardList, Loader2, CheckCircle2, AlertTriangle, AlertCircle, Search, TrendingUp, DollarSign, Package, HelpCircle, RefreshCw, Send, MessageSquare } from 'lucide-react';
 import { Product } from '../context/AppContext';
 import { toast } from 'sonner';
 import { authFetch } from '../lib/api';
@@ -292,20 +277,20 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
         <motion.div 
           {...macZoomProps()}
           transition={macZoom}
-          className="relative w-full max-w-5xl transform overflow-hidden rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl transition-all"
+          className="relative w-full max-w-5xl transform overflow-hidden rounded-xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl transition-all"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 px-8 py-5">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 p-2.5 text-white shadow-md shadow-violet-600/10">
-                <Sparkles size={20} className="animate-pulse" />
+              <div className="rounded-xl bg-slate-600 p-2.5 text-white shadow-md">
+                <ClipboardList size={20} className="" />
               </div>
               <div>
-                <h3 className="text-base font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
-                  Gestão Inteligente AI
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                  Resumo do estoque
                 </h3>
-                <p className="text-[10px] uppercase font-black tracking-widest text-zinc-400">
-                  Relatório Analítico & Diagnóstico do Inventário
+                <p className="text-[10px] font-bold text-zinc-400">
+                  Situação das peças e o que repor
                 </p>
               </div>
             </div>
@@ -320,43 +305,43 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
 
           {/* Quick Metrics Banner */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-8 py-6 bg-zinc-50/50 dark:bg-zinc-950/20 border-b border-zinc-100 dark:border-zinc-800">
-            <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-sm flex items-center gap-3">
+            <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-150 dark:border-zinc-800 shadow-sm flex items-center gap-3">
               <div className="p-2 bg-blue-50 dark:bg-blue-900/10 rounded-xl text-blue-600">
                 <Package size={18} />
               </div>
               <div>
-                <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-405">SKUs Ativos</span>
-                <span className="text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100 tabular-nums">{totalProducts}</span>
+                <span className="block text-[10px] font-bold text-zinc-405">SKUs Ativos</span>
+                <span className="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 tabular-nums">{totalProducts}</span>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-sm flex items-center gap-3">
+            <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-150 dark:border-zinc-800 shadow-sm flex items-center gap-3">
               <div className="p-2 bg-amber-50 dark:bg-amber-900/10 rounded-xl text-amber-505 text-amber-500">
                 <AlertTriangle size={18} />
               </div>
               <div>
-                <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-405">Estoque Baixo</span>
-                <span className="text-lg font-black tracking-tight text-amber-500 tabular-nums">{lowStockProducts}</span>
+                <span className="block text-[10px] font-bold text-zinc-405">Estoque Baixo</span>
+                <span className="text-lg font-bold tracking-tight text-amber-500 tabular-nums">{lowStockProducts}</span>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-sm flex items-center gap-3">
+            <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-150 dark:border-zinc-800 shadow-sm flex items-center gap-3">
               <div className="p-2 bg-red-50 dark:bg-red-900/10 rounded-xl text-red-505 text-red-500">
                 <AlertCircle size={18} />
               </div>
               <div>
-                <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-405">Esgotados</span>
-                <span className="text-lg font-black tracking-tight text-red-500 tabular-nums">{outOfStockProducts}</span>
+                <span className="block text-[10px] font-bold text-zinc-405">Esgotados</span>
+                <span className="text-lg font-bold tracking-tight text-red-500 tabular-nums">{outOfStockProducts}</span>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-sm flex items-center gap-3">
+            <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-150 dark:border-zinc-800 shadow-sm flex items-center gap-3">
               <div className="p-2 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl text-emerald-505 text-emerald-500">
                 <DollarSign size={18} />
               </div>
               <div>
-                <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-405">Valor do Estoque</span>
-                <span className="text-md font-black tracking-tight text-emerald-500 tabular-nums">
+                <span className="block text-[10px] font-bold text-zinc-405">Valor do Estoque</span>
+                <span className="text-md font-bold tracking-tight text-emerald-500 tabular-nums">
                   R$ {totalValuation.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                 </span>
               </div>
@@ -367,19 +352,19 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
           <div className="flex border-b border-zinc-100 dark:border-zinc-800 px-8">
             <button 
               onClick={() => setActiveTab('summary')}
-              className={`py-4 px-4 font-black uppercase tracking-wider text-[10px] border-b-2 transition-all flex items-center gap-2 ${
+              className={`py-4 px-4 font-bold text-[10px] border-b-2 transition-all flex items-center gap-2 ${
                 activeTab === 'summary' 
-                  ? 'border-violet-600 text-violet-600 dark:text-violet-400' 
+                  ? 'border-slate-600 text-slate-600 dark:text-slate-400' 
                   : 'border-transparent text-zinc-400 hover:text-zinc-650'
               }`}
             >
-              <Sparkles size={14} /> Relatório Analítico
+              <ClipboardList size={14} /> Resumo
             </button>
             <button 
               onClick={() => setActiveTab('list')}
-              className={`py-4 px-4 font-black uppercase tracking-wider text-[10px] border-b-2 transition-all flex items-center gap-2 ${
+              className={`py-4 px-4 font-bold text-[10px] border-b-2 transition-all flex items-center gap-2 ${
                 activeTab === 'list' 
-                  ? 'border-violet-600 text-violet-600 dark:text-violet-400' 
+                  ? 'border-slate-600 text-slate-600 dark:text-slate-400' 
                   : 'border-transparent text-zinc-400 hover:text-zinc-650'
               }`}
             >
@@ -387,9 +372,9 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
             </button>
             <button 
               onClick={() => setActiveTab('ask')}
-              className={`py-4 px-4 font-black uppercase tracking-wider text-[10px] border-b-2 transition-all flex items-center gap-2 ${
+              className={`py-4 px-4 font-bold text-[10px] border-b-2 transition-all flex items-center gap-2 ${
                 activeTab === 'ask' 
-                  ? 'border-violet-600 text-violet-600 dark:text-violet-400' 
+                  ? 'border-slate-600 text-slate-600 dark:text-slate-400' 
                   : 'border-transparent text-zinc-400 hover:text-zinc-650'
               }`}
             >
@@ -409,13 +394,13 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                   className="space-y-4"
                 >
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
                       <TrendingUp size={14} /> Diagnóstico Geral por IA
                     </h4>
                     <button 
                       onClick={() => generateAISummary(true)}
                       disabled={isLoading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-[9px] uppercase font-black tracking-widest text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-all disabled:opacity-50 hover:bg-zinc-50 dark:hover:bg-zinc-800/55"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-[9px] font-bold text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-all disabled:opacity-50 hover:bg-zinc-50 dark:hover:bg-zinc-800/55"
                     >
                       <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
                       Atualizar Análise
@@ -424,14 +409,14 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
 
                   {isLoading ? (
                     <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                      <Loader2 size={32} className="animate-spin text-violet-605 text-violet-600" />
+                      <Loader2 size={32} className="animate-spin text-slate-605 text-slate-600" />
                       <div className="text-center">
-                        <p className="text-xs font-black uppercase tracking-widest text-zinc-500 animate-pulse">Relatório em processamento...</p>
+                        <p className="text-xs font-bold text-zinc-500 animate-pulse">Relatório em processamento...</p>
                         <p className="text-[10px] text-zinc-400 mt-1">Nossa Inteligência Artificial está diagnosticando os produtos de forma estruturada.</p>
                       </div>
                     </div>
                   ) : summary ? (
-                    <div className="prose dark:prose-invert max-w-none text-zinc-600 dark:text-zinc-300 p-6 rounded-3xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-100 dark:border-zinc-805">
+                    <div className="prose dark:prose-invert max-w-none text-zinc-600 dark:text-zinc-300 p-6 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-100 dark:border-zinc-805">
                       {renderRawMarkdown(summary)}
                     </div>
                   ) : (
@@ -456,17 +441,17 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                     <input 
                       type="text" 
                       placeholder="Filtrar status por nome ou código..." 
-                      className="w-full pl-11 pr-4 py-3 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-150 dark:border-zinc-800 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-violet-600/10 focus:border-violet-605 transition-all"
+                      className="w-full pl-11 pr-4 py-3 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-150 dark:border-zinc-800 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-slate-600/10 focus:border-slate-605 transition-all"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
 
                   {/* Products list with computed status */}
-                  <div className="overflow-x-auto border border-zinc-100 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-950/20">
+                  <div className="overflow-x-auto border border-zinc-100 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-950/20">
                     <table className="w-full min-w-[560px] text-left border-collapse">
                       <thead>
-                        <tr className="bg-zinc-50 dark:bg-zinc-900/30 text-[9px] uppercase tracking-widest font-black text-zinc-400 border-b border-zinc-100 dark:border-zinc-800">
+                        <tr className="bg-zinc-50 dark:bg-zinc-900/30 text-[9px] font-bold text-zinc-400 border-b border-zinc-100 dark:border-zinc-800">
                           <th className="py-4 px-6">Produto</th>
                           <th className="py-4 px-4">SKU / TAG</th>
                           <th className="py-4 px-4">Categoria</th>
@@ -490,13 +475,13 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                                   {p.category || 'Sem categoria'}
                                 </td>
                                 <td className="py-4 px-4 text-center tabular-nums">
-                                  <span className={p.quantity <= (p.minQuantity || 5) ? "text-red-550 font-black" : ""}>
+                                  <span className={p.quantity <= (p.minQuantity || 5) ? "text-red-550 font-bold" : ""}>
                                     {p.quantity}
                                   </span>
                                   <span className="text-zinc-400 text-[10px] ml-1 font-normal">/ {p.minQuantity}</span>
                                 </td>
                                 <td className="py-4 px-6 text-right">
-                                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 border rounded-full text-[9px] font-black uppercase tracking-wider ${status.color}`}>
+                                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 border rounded-full text-[9px] font-bold ${status.color}`}>
                                     {status.icon}
                                     {status.label}
                                   </span>
@@ -526,9 +511,9 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                   className="space-y-6"
                 >
                   <div className="flex items-center gap-2 pb-1">
-                    <MessageSquare size={16} className="text-violet-500 animate-pulse" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">
-                      Pergunte diretamente ao Assistente Inteligente
+                    <MessageSquare size={16} className="text-slate-500" />
+                    <h4 className="text-xs font-bold text-zinc-400">
+                      Pergunte sobre o estoque
                     </h4>
                   </div>
 
@@ -538,7 +523,7 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                       <input 
                         type="text" 
                         placeholder="Ex: Quais filtros de óleo estão acabando? Qual a nossa categoria mais lucrativa?" 
-                        className="w-full pl-11 pr-4 py-3.5 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-150 dark:border-zinc-800 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-violet-600/10 focus:border-violet-605 transition-all text-zinc-800 dark:text-white"
+                        className="w-full pl-11 pr-4 py-3.5 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-150 dark:border-zinc-800 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-slate-600/10 focus:border-slate-605 transition-all text-zinc-800 dark:text-white"
                         value={userQuestion}
                         onChange={(e) => setUserQuestion(e.target.value)}
                         disabled={isAsking}
@@ -547,7 +532,7 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                     <button 
                       type="submit"
                       disabled={isAsking || !userQuestion.trim()}
-                      className="inline-flex items-center gap-2 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all relative active:scale-95 disabled:opacity-50"
+                      className="inline-flex items-center gap-2 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white px-6 py-3.5 rounded-xl font-bold text-[10px] transition-all relative active:scale-95 disabled:opacity-50"
                     >
                       {isAsking ? (
                         <Loader2 className="animate-spin text-white dark:text-zinc-900" size={14} />
@@ -565,13 +550,13 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="p-6 rounded-3xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-150 dark:border-zinc-800 space-y-3"
+                        className="p-6 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-150 dark:border-zinc-800 space-y-3"
                       >
                         <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-850 pb-2.5">
-                          <div className="h-6 w-6 rounded-lg bg-violet-600 text-white flex items-center justify-center">
-                            <Sparkles size={12} className={isAsking ? "animate-spin" : ""} />
+                          <div className="h-6 w-6 rounded-lg bg-slate-600 text-white flex items-center justify-center">
+                            <ClipboardList size={12} className={isAsking ? "animate-spin" : ""} />
                           </div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-450 dark:text-zinc-400">
+                          <span className="text-[10px] font-bold text-zinc-450 dark:text-zinc-400">
                             Previsão & Retorno AI
                           </span>
                         </div>
@@ -596,7 +581,7 @@ export const InventoryAISummary: React.FC<InventoryAISummaryProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 px-8 py-5 bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] uppercase tracking-widest font-black text-zinc-400">
+          <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 px-8 py-5 bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-bold text-zinc-400">
             <span>Powered by **Gemini 3.5 Flash** Model</span>
             <span>Munago Mecânica Analytics</span>
           </div>

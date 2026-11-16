@@ -24,8 +24,6 @@ export interface Permissions {
   canCheckin: boolean;
   /** Aprova/recusa OS (CS). */
   canApproveOS: boolean;
-  /** Enxerga todas as unidades (senão, só a própria). */
-  allUnits: boolean;
 }
 
 /** Oficina (tenant). Todo dado operacional pertence a uma; usuários enxergam só a sua. */
@@ -43,7 +41,7 @@ export const UNASSIGNED_WORKSPACE = 'unassigned';
 
 const workspaceId = () => text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' });
 
-/** Unidade da oficina: Base (atende as motos) ou CD (centro de distribuição de peças). */
+/** Obsoleto: cada Base agora é um workspace isolado. Tabela mantida só porque as migrações só acrescentam. */
 export const units = pgTable('units', {
   id: text('id').primaryKey(),
   workspaceId: workspaceId(),
@@ -222,6 +220,11 @@ export const motoCheckins = pgTable('moto_checkins', {
   km: integer('km').notNull(),
   photos: jsonb('photos').$type<MotoCheckinPhotos>().notNull().default({}),
   notes: text('notes'),
+  /** Locatário: dono da moto, a quem ela é entregue no fim. */
+  customerName: text('customer_name'),
+  customerPhone: text('customer_phone'),
+  /** Franquia (locadora) dona da moto, informada pelo Front. */
+  franchiseName: text('franchise_name'),
   /** Etapa do fluxo (server/services/motoFlow.ts). */
   status: text('status').$type<MotoStatus>().notNull().default('recebida'),
   /** O que o mecânico pediu (e o estoque conferiu). */

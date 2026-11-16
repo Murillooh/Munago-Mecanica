@@ -1,8 +1,8 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { and, desc, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
-import { motoCheckins, notifications, units } from '../db/schema';
-import { effectivePermissions, requirePermission, unitScope, ws } from '../auth/middleware';
+import { motoCheckins, notifications } from '../db/schema';
+import { effectivePermissions, requirePermission, ws } from '../auth/middleware';
 import { MAX_ESTIMATE_MINUTES, MOTO_ACTIONS, MOTO_NOTIFY, type MotoAction, type MotoEvent, type MotoStatus } from '../services/motoFlow';
 import { ApiError, asyncHandler } from '../middleware/errorHandler';
 import { newId, type ApiDeps } from './deps';
@@ -13,7 +13,9 @@ const photo = z.string().max(200_000).regex(/^data:image\/(jpeg|png|webp);base64
 const checkinInput = z.object({
   plate: z.string().trim().toUpperCase().min(3).max(10),
   model: z.string().trim().min(1).max(100),
-  unitId: z.string().trim().min(1).max(100).optional(),
+  customerName: z.string().trim().min(1, 'Informe o locatário.').max(100),
+  customerPhone: z.string().trim().max(30).optional(),
+  franchiseName: z.string().trim().min(1, 'Informe a franquia.').max(100),
   km: z.number().int().nonnegative().max(2_000_000),
   notes: z.string().trim().max(2000).optional(),
   photos: z.object({
@@ -46,14 +48,14 @@ const actionInput = z.object({
   }).optional(),
 });
 
-/** Avisa o setor que precisa agir agora (só na unidade da moto). */
-async function notifyNextSector(db: ApiDeps['db'], os: { id: string; workspaceId: string; unitId: string | null; model: string; plate: string; unit: string | null }, status: MotoStatus) {
+/** Avisa o setor da Base que precisa agir agora. */
+async function notifyNextSector(db: ApiDeps['db'], os: { id: string; workspaceId: string; model: string; plate: string }, status: MotoStatus) {
   const n = MOTO_NOTIFY[status];
   if (!n) return;
   await db.insert(notifications).values({
-    id: newId(), workspaceId: os.workspaceId, type: 'moto_os', target: n.target, unitId: os.unitId, refId: os.id,
+    id: newId(), workspaceId: os.workspaceId, type: 'moto_os', target: n.target, refId: os.id,
     title: `${os.model} · ${os.plate}`,
-    message: `A moto ${n.text}${os.unit ? ` (${os.unit})` : ''}.`,
+    message: `A moto ${n.text}.`,
   });
 }
 
@@ -62,11 +64,8 @@ export function createMotoCheckinsRouter({ db, bus }: ApiDeps) {
   const r = Router();
   const { photos: _photos, ...listColumns } = getTableColumns(motoCheckins);
 
-  // Quem não enxerga todas as unidades vê só os registros da própria.
-  const visible = (req: Request) => {
-    const scope = unitScope(req.user!);
-    return and(eq(motoCheckins.workspaceId, ws(req)), scope ? eq(motoCheckins.unitId, scope) : undefined);
-  };
+  // Cada Base só enxerga as próprias motos.
+  const visible = (req: Request) => eq(motoCheckins.workspaceId, ws(req));
 
   // Lista sem as fotos (pesadas); a foto vem no GET do item.
   r.get('/moto-checkins', requirePermission(), asyncHandler(async (req, res) => {
@@ -82,18 +81,10 @@ export function createMotoCheckinsRouter({ db, bus }: ApiDeps) {
   }));
 
   r.post('/moto-checkins', requirePermission('canCheckin'), asyncHandler(async (req, res) => {
-    const { unitId: wanted, ...data } = checkinInput.parse(req.body);
-    // Preso a uma unidade: registra sempre nela. Quem vê todas escolhe (ou deixa sem).
-    const scope = unitScope(req.user!);
-    const unitId = scope ?? wanted ?? null;
-    if (scope && !req.user!.unitId) throw new ApiError(400, 'NO_UNIT', 'Seu usuário não tem unidade. Peça ao administrador.');
-    const [unit] = unitId
-      ? await db.select().from(units).where(and(eq(units.workspaceId, ws(req)), eq(units.id, unitId)))
-      : [];
-    if (unitId && !unit) throw new ApiError(400, 'INVALID_UNIT', 'Unidade não encontrada.');
+    const data = checkinInput.parse(req.body);
     const received: MotoEvent = { type: 'recebida', at: new Date().toISOString(), by: req.user!.id, byName: req.user!.name, note: data.notes };
     const [row] = await db.insert(motoCheckins).values({
-      id: newId(), workspaceId: ws(req), ...data, unitId, unit: unit?.name ?? null, createdBy: req.user!.id, createdByName: req.user!.name,
+      id: newId(), workspaceId: ws(req), ...data, createdBy: req.user!.id, createdByName: req.user!.name,
       events: [received],
     }).returning(listColumns);
     await notifyNextSector(db, row, 'recebida');

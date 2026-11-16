@@ -41,14 +41,14 @@ export const OTHER_LIGHT = '#a1a1aa';
 export const OTHER_DARK = '#52525b';
 
 // h-full + flex-1: cartões na mesma linha do grid ficam sempre com a mesma altura.
-export const cardClass = 'h-full flex-1 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors';
+export const cardClass = 'h-full flex-1 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors';
 
 // Ícones de cabeçalho no estilo iOS: degradê com brilho colorido (mesmo visual dos blocos do topo).
 export const iconBadge = {
-  blue: 'bg-gradient-to-br from-sky-400 to-blue-600 text-white border-white/30 shadow-lg shadow-blue-500/30',
-  emerald: 'bg-gradient-to-br from-emerald-400 to-teal-600 text-white border-white/30 shadow-lg shadow-emerald-500/30',
-  amber: 'bg-gradient-to-br from-amber-300 to-orange-500 text-white border-white/30 shadow-lg shadow-amber-500/30',
-  red: 'bg-gradient-to-br from-rose-400 to-pink-600 text-white border-white/30 shadow-lg shadow-rose-500/30',
-  indigo: 'bg-gradient-to-br from-indigo-400 to-blue-700 text-white border-white/30 shadow-lg shadow-indigo-500/30',
-  violet: 'bg-gradient-to-br from-fuchsia-400 to-violet-600 text-white border-white/30 shadow-lg shadow-violet-500/30',
+  blue: 'bg-sky-400 text-white border-white/30 shadow-lg',
+  emerald: 'bg-emerald-400 text-white border-white/30 shadow-lg',
+  amber: 'bg-amber-300 text-white border-white/30 shadow-lg',
+  red: 'bg-rose-400 text-white border-white/30 shadow-lg',
+  indigo: 'bg-blue-400 text-white border-white/30 shadow-lg',
+  violet: 'bg-rose-400 text-white border-white/30 shadow-lg',
 } as const;

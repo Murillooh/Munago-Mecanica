@@ -55,28 +55,28 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
     {
       label: 'Operação',
       items: [
-        ...(canCheckin || canManageOS || canApproveOS || canManageInventory || canViewReports ? [{ id: 'checkin',      label: 'OS de motos', icon: ClipboardCheck, gradient: 'from-blue-500 to-indigo-600'    }] : []),
-        ...(canViewOS           ? [{ id: 'services',     label: 'Serviços',        icon: Hammer,           gradient: 'from-green-500 to-emerald-600'  }] : []),
-        ...(canPerformTransactions ? [{ id: 'transactions', label: 'Movimentações',   icon: ArrowLeftRight,   gradient: 'from-purple-500 to-violet-600'  }] : []),
+        ...(canCheckin || canManageOS || canApproveOS || canManageInventory || canViewReports ? [{ id: 'checkin',      label: 'OS de motos', icon: ClipboardCheck, gradient: 'bg-blue-500'    }] : []),
+        ...(canViewOS           ? [{ id: 'services',     label: 'Serviços',        icon: Hammer,           gradient: 'bg-green-500'  }] : []),
+        ...(canPerformTransactions ? [{ id: 'transactions', label: 'Movimentações',   icon: ArrowLeftRight,   gradient: 'bg-slate-500'  }] : []),
       ],
     },
     {
       label: 'Gestão',
       items: [
-        { id: 'alerts',   label: 'Alertas',         icon: BellDot,        gradient: 'from-yellow-400 to-amber-500',  badge: unreadCount },
-        ...(canManageUsers   ? [{ id: 'users',    label: 'Equipe e acessos',icon: UsersRound,     gradient: 'from-teal-500 to-cyan-600'      }] : []),
-        ...(isSuperAdmin     ? [{ id: 'admin',    label: 'Painel geral',    icon: ShieldHalf,     gradient: 'from-slate-600 to-slate-700'    }] : []),
-        ...(isAdmin          ? [{ id: 'settings', label: 'Configurações',   icon: SlidersHorizontal, gradient: 'from-zinc-500 to-zinc-600'  }] : []),
+        { id: 'alerts',   label: 'Alertas',         icon: BellDot,        gradient: 'bg-yellow-400',  badge: unreadCount },
+        ...(canManageUsers   ? [{ id: 'users',    label: 'Equipe e acessos',icon: UsersRound,     gradient: 'bg-teal-500'      }] : []),
+        ...(isSuperAdmin     ? [{ id: 'admin',    label: 'Painel geral',    icon: ShieldHalf,     gradient: 'bg-slate-600'    }] : []),
+        ...(isAdmin          ? [{ id: 'settings', label: 'Configurações',   icon: SlidersHorizontal, gradient: 'bg-zinc-500'  }] : []),
       ],
     },
   ].filter(g => g.items.length > 0);
 
   const iconColors: Record<string, string> = {
-    dashboard:    'from-blue-500 to-blue-600',
-    inventory:    'from-orange-400 to-orange-500',
-    os:           'from-red-500 to-rose-600',
-    ai:           'from-pink-500 to-fuchsia-600',
-    more:         'from-zinc-400 to-zinc-500',
+    dashboard:    'bg-blue-500',
+    inventory:    'bg-orange-400',
+    os:           'bg-red-500',
+    ai:           'bg-pink-500',
+    more:         'bg-zinc-400',
   };
 
   // Iniciais do usuário para o avatar no drawer
@@ -94,51 +94,43 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
           bg-white/75 dark:bg-zinc-900/80
           backdrop-blur-2xl backdrop-saturate-[1.8]
           border border-white/60 dark:border-white/8
-          rounded-[1.75rem]
+          rounded-xl
           shadow-[0_-2px_32px_rgba(0,0,0,0.10)]
           flex items-center justify-around
           h-16 px-1
         ">
           {items.map((item) => {
             const active = activeTab === item.id && item.id !== 'more';
-            const gradient = iconColors[item.id] ?? 'from-zinc-500 to-zinc-600';
+            const gradient = iconColors[item.id] ?? 'bg-zinc-500';
             return (
               <button
                 key={item.id}
                 type="button"
                 aria-current={active ? 'page' : undefined}
                 onClick={() => item.id === 'more' ? setIsMenuOpen(true) : setActiveTab(item.id)}
-                className="relative flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-[1.5rem] transition-all duration-200 active:scale-90"
+                className="relative flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-xl transition-all duration-200 active:scale-90"
               >
                 {/* Pill de fundo no item ativo */}
                 {active && (
                   <motion.span
                     layoutId="bottomNavPill"
-                    className="absolute inset-x-1 inset-y-1.5 rounded-[1.25rem] bg-zinc-100 dark:bg-white/10"
+                    className="absolute inset-x-1 inset-y-1.5 rounded-xl bg-zinc-100 dark:bg-white/10"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                   />
                 )}
 
-                {/* Ícone iOS */}
-                <span className={`
-                  relative flex items-center justify-center
-                  w-10 h-10 rounded-[14px]
-                  bg-gradient-to-br ${gradient}
-                  transition-all duration-200
-                  ${active ? 'shadow-lg scale-110' : 'shadow-sm opacity-80'}
-                `}>
-                  <item.icon size={19} strokeWidth={2} className="text-white" aria-hidden="true" />
+                <span className="relative flex items-center justify-center w-10 h-8">
+                  <item.icon size={21} strokeWidth={2} className={active ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400'} aria-hidden="true" />
                   {/* Badge "Mais" se houver alertas */}
                   {item.id === 'more' && unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] bg-red-500 text-white text-[9px] font-black flex items-center justify-center rounded-full px-0.5 border-2 border-white dark:border-zinc-900">
+                    <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full px-0.5 border-2 border-white dark:border-zinc-900">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
                 </span>
 
                 <span className={`
-                  relative text-[9px] font-bold uppercase tracking-wider
-                  transition-colors duration-200
+                  relative text-[9px] font-bold                   transition-colors duration-200
                   ${active ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-500'}
                 `}>
                   {item.label}
@@ -180,7 +172,7 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
                     {profile?.photoURL ? (
                       <img src={profile.photoURL} alt="" className="w-9 h-9 rounded-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
-                      <span className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">{initials}</span>
+                      <span className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">{initials}</span>
                     )}
                     <div className="leading-tight">
                       <p className="text-sm font-semibold text-zinc-900 dark:text-white">{profile?.name || 'Usuário'}</p>
@@ -200,10 +192,10 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
               <div className="px-4 pt-5 space-y-5">
                 {moreGroups.map((group) => (
                   <div key={group.label}>
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 px-1 mb-2">
+                    <p className="text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 px-1 mb-2">
                       {group.label}
                     </p>
-                    <div className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800 shadow-sm">
+                    <div className="bg-white dark:bg-zinc-900 rounded-xl overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800 shadow-sm">
                       {group.items.map((item, i) => (
                         <button
                           key={item.id}
@@ -213,16 +205,15 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
                           }}
                           className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 active:bg-zinc-100 dark:active:bg-zinc-800"
                         >
-                          {/* Ícone iOS */}
-                          <span className={`flex items-center justify-center w-9 h-9 rounded-[10px] bg-gradient-to-br ${item.gradient} shadow-sm shrink-0`}>
-                            <item.icon size={17} strokeWidth={2} className="text-white" />
+                          <span className="flex items-center justify-center w-9 h-9 shrink-0">
+                            <item.icon size={19} strokeWidth={2} className="text-zinc-500 dark:text-zinc-400" />
                           </span>
 
                           <span className="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200">{item.label}</span>
 
                           {/* Badge */}
                           {'badge' in item && item.badge && item.badge > 0 && (
-                            <span className="min-w-[1.4rem] h-5 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full px-1 mr-0.5">
+                            <span className="min-w-[1.4rem] h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full px-1 mr-0.5">
                               {item.badge > 99 ? '99+' : item.badge}
                             </span>
                           )}
@@ -235,13 +226,13 @@ export const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setA
                 ))}
 
                 {/* Sair */}
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden shadow-sm">
+                <div className="bg-white dark:bg-zinc-900 rounded-xl overflow-hidden shadow-sm">
                   <button
                     onClick={() => { handleLogout(); setIsMenuOpen(false); }}
                     className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 active:bg-red-50 dark:active:bg-red-950/20"
                   >
-                    <span className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-gradient-to-br from-red-500 to-rose-600 shadow-sm shrink-0">
-                      <LogOut size={17} strokeWidth={2} className="text-white" />
+                    <span className="flex items-center justify-center w-9 h-9 shrink-0">
+                      <LogOut size={19} strokeWidth={2} className="text-red-500" />
                     </span>
                     <span className="flex-1 text-sm font-medium text-red-500">Sair da conta</span>
                   </button>

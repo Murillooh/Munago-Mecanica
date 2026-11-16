@@ -69,17 +69,6 @@ export interface UserPermissions {
   canPerformTransactions: boolean;
   canCheckin?: boolean;
   canApproveOS?: boolean;
-  allUnits?: boolean;
-}
-
-/** Unidade da oficina: Base (atende as motos) ou CD. */
-export interface Unit {
-  id: string;
-  name: string;
-  kind: 'base' | 'cd';
-  franchiseeName?: string | null;
-  franchiseeEmail?: string | null;
-  franchiseePhone?: string | null;
 }
 
 export interface UserProfile {
@@ -163,6 +152,10 @@ export interface SystemSettings {
   monitorScrollIntervalSeconds?: number;
   /** Carteira Asaas da oficina: recebe a parte dela no split das cobranças. Só o admin geral altera. */
   asaasWalletId?: string;
+  /** Franqueado da Base: autoriza as manutenções. */
+  franchiseeName?: string;
+  franchiseeEmail?: string;
+  franchiseePhone?: string;
   /** Repasse mínimo da OS para a empresa, em % do total. Só o admin geral altera. */
   repasseMinPercent?: number;
   lastFirestoreBackup?: string;
@@ -293,9 +286,6 @@ interface AppContextType {
   canCheckin: boolean;
   /** CS: aprova/recusa OS. */
   canApproveOS: boolean;
-  /** Enxerga todas as unidades (senão só a própria). */
-  allUnits: boolean;
-  units: Unit[];
   /** Abre a OS da moto de um aviso. */
   openMotoOS: (n: Notification) => void;
   /** 'NEW_PASSWORD_REQUIRED' no primeiro acesso (senha temporária do convite). */
@@ -407,7 +397,6 @@ export const AppProvider = ({ children }: { children: any }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [units, setUnits] = useState<Unit[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -582,7 +571,6 @@ export const AppProvider = ({ children }: { children: any }) => {
   // Usuário antigo (sem as chaves novas): check-list segue quem mexe em OS; vê todas as unidades.
   const canCheckin = isAdmin || (permissions.canCheckin ?? permissions.canManageOS) || false;
   const canApproveOS = isAdmin || permissions.canApproveOS || false;
-  const allUnits = isAdmin || (permissions.allUnits ?? true);
 
   // Helper for viewing: all approved users can view inventory and OS (viewers read-only, operators and admins can manage)
   const canViewInventory = true;
@@ -611,7 +599,6 @@ export const AppProvider = ({ children }: { children: any }) => {
       transactions: async () => setTransactions((await apiGet<Transaction[]>('/transactions')).map(hydrateDates)),
       categories: async () => setCategories((await apiGet<Category[]>('/categories')).map(hydrateDates)),
       services: async () => setServices(await apiGet<Service[]>('/services')),
-      units: async () => setUnits(await apiGet<Unit[]>('/units')),
       serviceOrders: async () => setServiceOrders((await apiGet<ServiceOrder[]>('/service-orders')).map(hydrateDates)),
       settings: async () => {
         const s = await apiGet<SystemSettings & { lastBackup?: string }>('/settings');
@@ -1026,8 +1013,6 @@ export const AppProvider = ({ children }: { children: any }) => {
       canViewOS,
       canCheckin,
       canApproveOS,
-      allUnits,
-      units,
       openMotoOS: (n: Notification) => openMotoOSRef.current(n),
       loginEmail,
       completeNewPassword,

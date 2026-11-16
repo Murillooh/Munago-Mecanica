@@ -3,24 +3,7 @@ import { useApp } from "../context/AppContext";
 import { PageHero, heroBtnPrimary } from './PageHero';
 import { apiDelete, apiGet, apiPost, authFetch, hydrateDates, type AppTimestamp } from "../lib/api";
 import { parseDate } from './dashboard/utils';
-import {
-  Send,
-  Loader2,
-  Sparkles,
-  Search,
-  MapPin,
-  ExternalLink,
-  History,
-  MessageSquare,
-  Trash2,
-  Plus,
-  Package,
-  Truck,
-  TrendingUp,
-  FileText,
-  Mic,
-  Square
-} from 'lucide-react';
+import { Send, Loader2, MessagesSquare, Search, MapPin, ExternalLink, History, MessageSquare, Trash2, Plus, Package, Truck, TrendingUp, FileText, Mic, Square } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Ditado por voz do navegador (Chrome, Edge, Safari). Firefox não tem: o botão some.
@@ -352,7 +335,7 @@ const AIAssistant = () => {
     <div className="w-full flex flex-col gap-4 h-[calc(100dvh-10rem-env(safe-area-inset-bottom)-env(safe-area-inset-top))] lg:h-[calc(100dvh-3rem)]">
       {/* Topo compacto (sem indicadores: a conversa precisa da altura) */}
       <PageHero
-        icon={Sparkles}
+        icon={MessagesSquare}
         title="Assistente IA"
         subtitle="Analisa seu estoque e suas OS e pesquisa preços e fornecedores na web."
         actions={<>
@@ -444,8 +427,8 @@ const AIAssistant = () => {
           <div ref={scrollRef} className="flex-1 overflow-y-auto" aria-live="polite">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center px-6 py-10 text-center">
-                <span className="p-3 rounded-2xl border bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/40">
-                  <Sparkles size={22} aria-hidden="true" />
+                <span className="p-3 rounded-xl border bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/40">
+                  <MessagesSquare size={22} aria-hidden="true" />
                 </span>
                 <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-white">
                   {firstName ? `Olá, ${firstName}. Como posso ajudar?` : 'Como posso ajudar?'}
@@ -478,7 +461,7 @@ const AIAssistant = () => {
                 {messages.map((msg, i) =>
                   msg.role === 'user' ? (
                     <div key={i} className="flex items-end justify-end gap-2">
-                      <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-sm bg-gradient-to-br from-blue-600 to-blue-700 text-white text-sm leading-relaxed whitespace-pre-wrap shadow-sm shadow-blue-600/20">
+                      <div className="max-w-[80%] px-4 py-2.5 rounded-xl rounded-br-sm bg-blue-600 text-white text-sm leading-relaxed whitespace-pre-wrap shadow-sm">
                         {msg.content}
                       </div>
                       <span className="shrink-0 w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-[10px] font-bold flex items-center justify-center" aria-hidden="true">
@@ -487,11 +470,11 @@ const AIAssistant = () => {
                     </div>
                   ) : (
                     <div key={i} className="flex items-end gap-2">
-                      <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${msg.isError ? 'bg-red-100 dark:bg-red-950/60 text-red-600' : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-600/30'}`} aria-hidden="true">
-                        <Sparkles size={13} />
+                      <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${msg.isError ? 'bg-red-100 dark:bg-red-950/60 text-red-600' : 'bg-blue-500 text-white shadow-sm'}`} aria-hidden="true">
+                        <MessagesSquare size={13} />
                       </span>
                       <div
-                        className={`max-w-[80%] min-w-0 px-4 py-3 rounded-2xl rounded-bl-sm text-sm leading-relaxed shadow-xs ${
+                        className={`max-w-[80%] min-w-0 px-4 py-3 rounded-xl rounded-bl-sm text-sm leading-relaxed shadow-xs ${
                           msg.isError
                             ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300'
                             : 'bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-200'
@@ -542,7 +525,7 @@ const AIAssistant = () => {
                   aria-label={listening ? 'Parar e enviar áudio' : 'Mandar áudio'}
                   aria-pressed={listening}
                   title={listening ? 'Parar e enviar' : 'Mandar áudio'}
-                  className={`shrink-0 p-2 rounded-lg transition-colors disabled:opacity-40 cursor-pointer ${listening ? 'bg-rose-600 text-white motion-safe:animate-pulse' : 'text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                  className={`shrink-0 p-2 rounded-lg transition-colors disabled:opacity-40 cursor-pointer ${listening ? 'bg-rose-600 text-white' : 'text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                 >
                   {listening ? <Square size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
                 </button>

@@ -92,7 +92,7 @@ export const OSCharge: React.FC<{
     <section aria-labelledby="os-charge-heading" className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50/60 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/30">
       <div className="flex flex-wrap items-center gap-2">
         <QrCode size={15} className="text-blue-600" aria-hidden="true" />
-        <h3 id="os-charge-heading" className="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Cobrança</h3>
+        <h3 id="os-charge-heading" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Cobrança</h3>
         {charge && (
           <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${PAID.has(charge.status) ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'}`}>
             {STATUS_LABEL[charge.status] ?? charge.status}

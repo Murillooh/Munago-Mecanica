@@ -2,12 +2,12 @@ import type { Permissions } from '../db/schema';
 
 /** Etapas da OS da moto, na ordem do fluxo. Compartilhado com o front. */
 export const MOTO_STATUSES = [
-  'recebida', 'aguardando_estoque', 'aguardando_peca', 'aguardando_autorizacao', 'autorizada', 'em_manutencao', 'finalizada', 'recusada',
+  'recebida', 'aguardando_estoque', 'aguardando_peca', 'aguardando_autorizacao', 'autorizada', 'em_manutencao', 'finalizada', 'entregue', 'recusada',
 ] as const;
 export type MotoStatus = (typeof MOTO_STATUSES)[number];
 
 /** Etapas como a operação enxerga: Front, Mecânico, Estoque, CS, Franqueado, Manutenção, Finalizada. */
-export const MOTO_STEPS = ['Front', 'Mecânico', 'Estoque', 'CS', 'Franqueado', 'Manutenção', 'Finalizada'] as const;
+export const MOTO_STEPS = ['Front', 'Mecânico', 'Estoque', 'CS', 'Franqueado', 'Manutenção', 'Finalizada', 'Entregue'] as const;
 
 /** Em qual das 7 etapas a OS está. "Franqueado" = CS já pediu a autorização e aguarda a resposta. */
 export function motoStep(os: { status: MotoStatus; events: { type: string }[] }): number {
@@ -17,6 +17,7 @@ export function motoStep(os: { status: MotoStatus; events: { type: string }[] })
     case 'aguardando_autorizacao': case 'recusada': return os.events.some(e => e.type === 'request_auth') ? 4 : 3;
     case 'autorizada': case 'em_manutencao': return 5;
     case 'finalizada': return 6;
+    case 'entregue': return 7;
   }
 }
 
@@ -33,7 +34,8 @@ export const MOTO_STATUS_LABEL: Record<MotoStatus, string> = {
   aguardando_autorizacao: 'Aguardando CS',
   autorizada: 'Autorizada',
   em_manutencao: 'Em manutenção',
-  finalizada: 'Finalizada',
+  finalizada: 'Pronta para entrega',
+  entregue: 'Entregue ao locatário',
   recusada: 'Recusada',
 };
 
@@ -49,7 +51,7 @@ export interface MotoItem {
 /** Prazo máximo que o mecânico pode dar a um serviço. */
 export const MAX_ESTIMATE_MINUTES = 90;
 
-export type MotoAction = 'diagnose' | 'stock_ok' | 'stock_missing' | 'request_auth' | 'authorize' | 'reject' | 'start' | 'finish';
+export type MotoAction = 'diagnose' | 'stock_ok' | 'stock_missing' | 'request_auth' | 'authorize' | 'reject' | 'start' | 'finish' | 'deliver';
 
 /** Registro da linha do tempo: tudo que aconteceu com a moto, em ordem. */
 export interface MotoEvent {
@@ -70,6 +72,7 @@ export const MOTO_ACTIONS: Record<MotoAction, { from: MotoStatus[]; to: MotoStat
   reject: { from: ['aguardando_autorizacao'], to: 'recusada', perm: 'canApproveOS', label: 'Recusar', done: 'CS recusou o serviço' },
   start: { from: ['autorizada'], to: 'em_manutencao', perm: 'canManageOS', label: 'Iniciar manutenção', done: 'Manutenção iniciada' },
   finish: { from: ['em_manutencao'], to: 'finalizada', perm: 'canManageOS', label: 'Finalizar manutenção', done: 'Manutenção finalizada' },
+  deliver: { from: ['finalizada'], to: 'entregue', perm: 'canCheckin', label: 'Entregar ao locatário', done: 'Moto entregue ao locatário' },
 };
 
 /** Quem precisa agir quando a OS chega em cada etapa (recebe o aviso) e o texto do aviso. */

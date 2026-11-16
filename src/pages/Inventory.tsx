@@ -1,45 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { macZoom, macZoomProps } from '../lib/motion';
-import { 
-  X, 
-  Search, 
-  Plus, 
-  Filter, 
-  Download, 
-  Upload, 
-  Tag, 
-  MoreVertical, 
-  Edit2, 
-  Trash2, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  AlertTriangle, 
-  AlertCircle, 
-  CheckCircle2, 
-  ChevronRight, 
-  History, 
-  Building, 
-  Sparkles, 
-  FileSpreadsheet, 
-  FileText,
-  Package,
-  Loader2,
-  LogIn,
-  LayoutGrid,
-  List,
-  Maximize2,
-  Minimize2,
-  DollarSign,
-  Boxes,
-  Barcode,
-  Layers,
-  ShieldAlert,
-  Wrench,
-  Save,
-  Image as ImageIcon,
-  Camera
-} from 'lucide-react';
+import { X, Search, Plus, Filter, Download, Upload, Tag, MoreVertical, Edit2, Trash2, ArrowUpRight, ArrowDownLeft, AlertTriangle, AlertCircle, CheckCircle2, ChevronRight, History, Building, ImagePlus, ClipboardList, FileSpreadsheet, FileText, Package, Loader2, LogIn, LayoutGrid, List, Maximize2, Minimize2, DollarSign, Boxes, Barcode, Layers, ShieldAlert, Wrench, Save, Image as ImageIcon, Camera } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { HeroStat, PageHero, heroBtn, heroBtnPrimary } from '../components/PageHero';
 import { toast } from 'sonner';
@@ -70,7 +32,7 @@ async function photoToDataUrl(file: File, maxSide = 800, maxChars = 450_000): Pr
 }
 
 /** Cor fixa por categoria (mesma categoria, mesma cor), usada só no ponto ao lado do nome. Classes por extenso para o Tailwind. */
-const CATEGORY_TONES = ['bg-sky-500', 'bg-emerald-500', 'bg-violet-500', 'bg-blue-500', 'bg-pink-500', 'bg-cyan-500', 'bg-teal-500', 'bg-indigo-500'];
+const CATEGORY_TONES = ['bg-sky-500', 'bg-emerald-500', 'bg-slate-500', 'bg-blue-500', 'bg-pink-500', 'bg-cyan-500', 'bg-teal-500', 'bg-blue-500'];
 const NO_CATEGORY_TONE = 'bg-zinc-400';
 /** Cor pela posição da categoria na lista ordenada: categorias diferentes ganham cores diferentes (até 8). */
 const categoryTone = (name: string | undefined, sortedCategories: string[]) => {
@@ -417,10 +379,10 @@ export const Inventory = () => {
             <FileSpreadsheet size={14} aria-hidden="true" /> Excel
           </button>
           <button onClick={() => setIsGoogleSheetsModalOpen(true)} className={heroBtn}>
-            <FileSpreadsheet size={14} aria-hidden="true" /> Sheets Sync
+            <FileSpreadsheet size={14} aria-hidden="true" /> Planilha Google
           </button>
           <button onClick={() => setIsAiSummaryOpen(true)} className={heroBtn}>
-            <Sparkles size={14} aria-hidden="true" /> Análise IA
+            <ClipboardList size={14} aria-hidden="true" /> Resumo do estoque
           </button>
           {canManageInventory && (
             <button onClick={() => { setSelectedProduct(null); setIsModalOpen(true); }} className={heroBtnPrimary}>
@@ -541,10 +503,10 @@ export const Inventory = () => {
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
-                  className="group flex flex-col overflow-hidden rounded-[1.25rem] bg-white shadow-sm ring-1 ring-zinc-200/70 transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-950/10 dark:bg-zinc-900 dark:ring-white/[0.06] dark:hover:shadow-black/40 dark:hover:ring-white/10"
+                  className="group flex flex-col overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-zinc-200/70 transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:shadow-lg hover: dark:bg-zinc-900 dark:ring-white/[0.06] dark:hover:shadow-black/40 dark:hover:ring-white/10"
                 >
                   {/* Foto ocupando o topo (identificação rápida no balcão); SKU e ações flutuam sobre ela */}
-                  <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-zinc-100 to-zinc-50 dark:from-zinc-800/80 dark:to-zinc-900">
+                  <div className="relative aspect-[16/11] overflow-hidden bg-zinc-100 dark:from-zinc-800/80 dark:to-zinc-900">
                     {p.imageUrl ? (
                       <img src={p.imageUrl} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" referrerPolicy="no-referrer" />
                     ) : canManageInventory ? (
@@ -611,7 +573,7 @@ export const Inventory = () => {
                     </div>
                     <div className="mt-2.5 flex h-5 items-center gap-2">
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-white/5" role="img" aria-label={`Saldo ${p.quantity} de mínimo ${minQty}`}>
-                        <div className={`h-full rounded-full ${stock === 'ok' ? 'bg-gradient-to-r from-blue-600 to-blue-400' : 'bg-gradient-to-r from-rose-600 to-rose-400'}`} style={{ width: `${coverage}%` }} />
+                        <div className={`h-full rounded-full ${stock === 'ok' ? 'bg-blue-600' : 'bg-rose-600'}`} style={{ width: `${coverage}%` }} />
                       </div>
                       {stock !== 'ok' && (
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${stock === 'out' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'}`}>
@@ -649,7 +611,7 @@ export const Inventory = () => {
         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/80 dark:border-zinc-800 overflow-x-auto shadow-xs">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold uppercase text-[10px] tracking-wider bg-zinc-50/50 dark:bg-zinc-800/40">
+              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-[10px] bg-zinc-50/50 dark:bg-zinc-800/40">
                 <th className="py-2.5 px-3">Item</th>
                 <th className="py-2.5 px-3">Código/SKU</th>
                 <th className="py-2.5 px-3">Categoria</th>
@@ -768,7 +730,7 @@ export const Inventory = () => {
             <motion.div 
               {...macZoomProps()}
               transition={macZoom}
-              className="relative bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden z-10"
+              className="relative bg-white dark:bg-zinc-900 w-full max-w-lg rounded-xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden z-10"
             >
               <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/90 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -791,7 +753,7 @@ export const Inventory = () => {
 
               <div className="p-5 sm:p-6 space-y-4 text-xs sm:text-sm">
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-zinc-50 dark:bg-zinc-800/60 p-3.5 rounded-xl border border-zinc-200/70 dark:border-zinc-700/70">
-                  Mapeamento inteligente e automático: detecta colunas de <strong>SKU</strong>, <strong>Nome/Descrição</strong>, <strong>Quantidade</strong>, <strong>Preço Unitário</strong> e <strong>Estoque Mínimo</strong>.
+                  O sistema reconhece as colunas de <strong>SKU</strong>, <strong>Nome/Descrição</strong>, <strong>Quantidade</strong>, <strong>Preço Unitário</strong> e <strong>Estoque Mínimo</strong>.
                 </p>
 
                 {isGoogleAuthenticated && (
@@ -883,7 +845,7 @@ export const Inventory = () => {
             <motion.div 
               {...macZoomProps()}
               transition={macZoom}
-              className="relative bg-white dark:bg-zinc-900 w-full max-w-2xl lg:max-w-5xl rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] z-10"
+              className="relative bg-white dark:bg-zinc-900 w-full max-w-2xl lg:max-w-5xl rounded-xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] z-10"
             >
               {/* Modal Header */}
               <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/90 flex items-center justify-between shrink-0">
@@ -920,7 +882,7 @@ export const Inventory = () => {
                 {/* Grupo 1: Identificação & Dados Básicos */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white ">
                       1. Identificação & Catálogo
                     </span>
                     <span className="text-[11px] text-zinc-400">Campos obrigatórios com *</span>
@@ -938,7 +900,7 @@ export const Inventory = () => {
                         defaultValue={selectedProduct?.sku} 
                         placeholder="Ex: PECA-001" 
                         required
-                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl font-mono text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white uppercase outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors" 
+                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl font-mono text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors" 
                       />
                     </div>
 
@@ -988,10 +950,10 @@ export const Inventory = () => {
                           type="button"
                           onClick={generateCategoryImage}
                           disabled={isGeneratingImage || !formCategory}
-                          className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-indigo-600 dark:text-indigo-400 border border-zinc-200 dark:border-zinc-700 rounded-xl transition-colors disabled:opacity-40 shrink-0"
+                          className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-blue-600 dark:text-blue-400 border border-zinc-200 dark:border-zinc-700 rounded-xl transition-colors disabled:opacity-40 shrink-0"
                           title="Gerar sugestão de imagem da categoria com IA"
                         >
-                          {isGeneratingImage ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                          {isGeneratingImage ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
                         </button>
                       </div>
                     </div>
@@ -1015,7 +977,7 @@ export const Inventory = () => {
                 {/* Grupo 2: Estoque & Parâmetros de Ruptura */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white ">
                       2. Controle de Estoque & Segurança
                     </span>
                     <span className="text-[11px] text-zinc-400">Gatilhos de aviso sonoro</span>
@@ -1101,7 +1063,7 @@ export const Inventory = () => {
                 {/* Grupo 3: Precificação & Custos */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white ">
                       3. Valores & Custos
                     </span>
                   </div>
@@ -1156,7 +1118,7 @@ export const Inventory = () => {
                 {/* Grupo 4: Imagem & Mídia */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white ">
                       4. Mídia do Produto
                     </span>
                   </div>
@@ -1216,7 +1178,7 @@ export const Inventory = () => {
                 {/* Grupo 5: Dossiê Técnico & Notas */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white tracking-wide uppercase">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white ">
                       5. Dossiê Técnico & Compatibilidade
                     </span>
                   </div>
@@ -1285,7 +1247,7 @@ export const Inventory = () => {
             <motion.div 
               {...macZoomProps()}
               transition={macZoom}
-              className="bg-white dark:bg-zinc-900 p-6 sm:p-7 rounded-2xl shadow-2xl max-w-sm w-full text-center border border-zinc-200/80 dark:border-zinc-800"
+              className="bg-white dark:bg-zinc-900 p-6 sm:p-7 rounded-xl shadow-2xl max-w-sm w-full text-center border border-zinc-200/80 dark:border-zinc-800"
             >
               <div className="w-12 h-12 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center mx-auto mb-4 border border-red-200/60 dark:border-red-900/50">
                 <Trash2 size={22} />

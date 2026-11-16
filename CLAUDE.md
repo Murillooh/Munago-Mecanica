@@ -12,7 +12,7 @@ Mapa rápido:
 |---|---|
 | Componentes/páginas React | `react-best-practices`, `react-patterns`, `react-ui-patterns`, `react-state-management`, `react-component-performance` |
 | TypeScript/tipos | `typescript-expert`, `typescript-advanced-types` |
-| Estilo/UI/UX | `tailwind-patterns`, `tailwind-design-system`, `frontend-design`, `ui-ux-pro-max`, `ui-review`, `ux-audit`, `ux-copy`, `web-design-guidelines` |
+| Estilo/UI/UX | `tailwind-patterns`, `tailwind-design-system`, `frontend-design`, `ui-ux-pro-max`, `ui-review`, `ux-audit`, `ux-copy`, `web-design-guidelines`, `unslop` (tirar cara de IA) |
 | Acessibilidade | `fixing-accessibility`, `accessibility-compliance-accessibility-audit` |
 | Animações (`motion`) | `fixing-motion-performance` |
 | Firebase/Firestore/rules | `firebase` |

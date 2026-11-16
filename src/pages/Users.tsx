@@ -14,12 +14,10 @@ import {
   SlidersHorizontal,
   Check,
   AlertTriangle,
-  Building2,
   Plus,
-  Warehouse,
   Users as UsersIcon
 } from 'lucide-react';
-import { useApp, UserProfile, type Unit } from '../context/AppContext';
+import { useApp, UserProfile } from '../context/AppContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { PROFILES, PROFILE_IDS, type Profile } from '../../server/auth/profiles';
 import { HeroStat, PageHero, heroBtnPrimary } from '../components/PageHero';
@@ -33,8 +31,8 @@ const ROLE_META: Record<Role, { label: string; short: string; description: strin
     short: 'Admin',
     description: 'Controle total: equipe, estoque, OS e configurações.',
     icon: ShieldCheck,
-    chip: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300',
-    badge: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-200/50 dark:border-indigo-900/40',
+    chip: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300',
+    badge: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/40',
   },
   editor: {
     label: 'Operador',
@@ -79,15 +77,11 @@ const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg bg-
 /** Rótulo do acesso: perfil (novo) ou cargo (usuário antigo). */
 const accessLabel = (u: UserProfile) => (u.profile && u.profile in PROFILES ? PROFILES[u.profile as Profile].label : ROLE_META[roleOf(u.role)].label);
 
-/** Perfil de acesso + unidade, usado no cadastro e na edição. O perfil já define o que a pessoa pode fazer. */
+/** Perfil de acesso na Base, usado no cadastro e na edição. O perfil já define o que a pessoa pode fazer. */
 const AccessEditor: React.FC<{
   profile: Profile;
-  unitId: string;
-  units: Unit[];
   onProfile: (p: Profile) => void;
-  onUnit: (id: string) => void;
-}> = ({ profile, unitId, units, onProfile, onUnit }) => {
-  const needsUnit = !PROFILES[profile].permissions.allUnits;
+}> = ({ profile, onProfile }) => {
   return (
     <div className="space-y-6">
       <fieldset>
@@ -120,131 +114,10 @@ const AccessEditor: React.FC<{
         </div>
       </fieldset>
 
-      <div className="space-y-1.5">
-        <label htmlFor="access-unit" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Unidade</label>
-        <select id="access-unit" value={unitId} onChange={e => onUnit(e.target.value)} className={fieldClass} required={needsUnit && units.length > 0}>
-          <option value="">{needsUnit ? 'Escolha a unidade' : 'Todas as unidades'}</option>
-          {units.map(u => <option key={u.id} value={u.id}>{u.name}{u.kind === 'cd' ? ' (CD)' : ''}</option>)}
-        </select>
-        <p className="text-[11px] text-zinc-500">
-          {needsUnit ? 'A pessoa só vê os dados desta unidade.' : 'Este perfil enxerga todas as unidades.'}
-          {units.length === 0 && ' Cadastre as unidades em "Unidades", logo abaixo da equipe.'}
-        </p>
-      </div>
     </div>
   );
 };
 
-/** Cadastro das unidades (Bases e CD). */
-/** Contato do franqueado da unidade (quem autoriza as manutenções). */
-const FranchiseeForm: React.FC<{ unit: Unit; onDone: () => void }> = ({ unit, onDone }) => {
-  const [f, setF] = useState({ franchiseeName: unit.franchiseeName ?? '', franchiseeEmail: unit.franchiseeEmail ?? '', franchiseePhone: unit.franchiseePhone ?? '' });
-  const [saving, setSaving] = useState(false);
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await apiPatch(`/units/${unit.id}`, { franchiseeName: f.franchiseeName || null, franchiseeEmail: f.franchiseeEmail || null, franchiseePhone: f.franchiseePhone || null });
-      toast.success('Franqueado salvo.');
-      onDone();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Não foi possível salvar.');
-    } finally {
-      setSaving(false);
-    }
-  };
-  return (
-    <form onSubmit={save} className="grid gap-2 px-4 pb-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
-      <input aria-label="Nome do franqueado" value={f.franchiseeName} onChange={e => setF({ ...f, franchiseeName: e.target.value })} placeholder="Nome do franqueado" maxLength={100} className={`${fieldClass} !py-2`} />
-      <input aria-label="E-mail do franqueado" type="email" value={f.franchiseeEmail} onChange={e => setF({ ...f, franchiseeEmail: e.target.value })} placeholder="email@franqueado.com" maxLength={200} className={`${fieldClass} !py-2`} />
-      <input aria-label="WhatsApp do franqueado" type="tel" value={f.franchiseePhone} onChange={e => setF({ ...f, franchiseePhone: e.target.value })} placeholder="WhatsApp (11) 98888-7777" maxLength={30} className={`${fieldClass} !py-2`} />
-      <div className="flex gap-2">
-        <button type="button" onClick={onDone} className={`${ghostBtn} !py-2`}>Cancelar</button>
-        <button type="submit" disabled={saving} className={`${primaryBtn} !py-2`}>{saving && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}Salvar</button>
-      </div>
-    </form>
-  );
-};
-
-const UnitsSection: React.FC<{ units: Unit[]; users: UserProfile[] }> = ({ units, users }) => {
-  const [editing, setEditing] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [kind, setKind] = useState<Unit['kind']>('base');
-  const [saving, setSaving] = useState(false);
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await apiPost('/units', { name, kind });
-      toast.success('Unidade cadastrada.');
-      setName('');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Não foi possível cadastrar.');
-    } finally {
-      setSaving(false);
-    }
-  };
-  const remove = async (u: Unit) => {
-    if (!window.confirm(`Excluir a unidade "${u.name}"? As pessoas dela ficam sem unidade.`)) return;
-    try { await apiDelete(`/units/${u.id}`); toast.success('Unidade excluída.'); } catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível excluir.'); }
-  };
-  return (
-    <section aria-labelledby="units-heading" className="overflow-hidden rounded-xl border border-zinc-200/70 bg-white shadow-xs dark:border-zinc-800/80 dark:bg-zinc-900/90">
-      <div className="flex items-center gap-2.5 border-b border-zinc-200 bg-zinc-50/70 px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-900">
-        <Building2 size={15} className="text-zinc-500" aria-hidden="true" />
-        <h2 id="units-heading" className="text-sm font-semibold text-zinc-900 dark:text-white">Unidades</h2>
-        <span className="text-xs text-zinc-500">Bases que atendem as motos e o CD de peças</span>
-      </div>
-      {units.length > 0 && (
-        <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
-          {units.map(u => {
-            const Icon = u.kind === 'cd' ? Warehouse : Building2;
-            const people = users.filter(x => x.unitId === u.id).length;
-            return (
-              <li key={u.id}>
-              <div className="flex items-center gap-3 px-4 py-2.5">
-                <Icon size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-zinc-900 dark:text-white">{u.name}</span>
-                  {u.kind === 'base' && (
-                    <span className="block truncate text-xs text-zinc-500">
-                      {u.franchiseeName || u.franchiseeEmail || u.franchiseePhone
-                        ? <>Franqueado: {[u.franchiseeName, u.franchiseeEmail, u.franchiseePhone].filter(Boolean).join(' · ')}</>
-                        : <span className="text-amber-600 dark:text-amber-400">Sem franqueado cadastrado (necessário para pedir autorização)</span>}
-                    </span>
-                  )}
-                </span>
-                <span className="text-[11px] font-semibold text-zinc-500">{u.kind === 'cd' ? 'CD' : 'Base'} · {people} {people === 1 ? 'pessoa' : 'pessoas'}</span>
-                {u.kind === 'base' && (
-                  <button type="button" onClick={() => setEditing(editing === u.id ? null : u.id)} className="rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30 cursor-pointer">
-                    Franqueado
-                  </button>
-                )}
-                <button type="button" onClick={() => remove(u)} aria-label={`Excluir ${u.name}`} className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 cursor-pointer">
-                  <Trash2 size={14} aria-hidden="true" />
-                </button>
-              </div>
-              {editing === u.id && <FranchiseeForm unit={u} onDone={() => setEditing(null)} />}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <form onSubmit={add} className="flex flex-wrap items-center gap-2 border-t border-zinc-100 px-4 py-3 dark:border-zinc-800/70">
-        <label htmlFor="unit-name" className="sr-only">Nome da unidade</label>
-        <input id="unit-name" required value={name} onChange={e => setName(e.target.value)} maxLength={100} placeholder="Nome da unidade (ex.: Base Centro)" className={`${fieldClass} min-w-[200px] flex-1 !py-2`} />
-        <label htmlFor="unit-kind" className="sr-only">Tipo</label>
-        <select id="unit-kind" value={kind} onChange={e => setKind(e.target.value as Unit['kind'])} className={`${fieldClass} w-auto !py-2`}>
-          <option value="base">Base</option>
-          <option value="cd">CD</option>
-        </select>
-        <button type="submit" disabled={saving} className={`${primaryBtn} !py-2`}>
-          {saving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />} Adicionar
-        </button>
-      </form>
-    </section>
-  );
-};
 
 /** Moldura de modal no mesmo padrão da ficha de OS. */
 const Dialog: React.FC<{ title: string; subtitle?: string; onClose: () => void; footer: React.ReactNode; children: React.ReactNode; labelId: string }> = ({
@@ -267,7 +140,7 @@ const Dialog: React.FC<{ title: string; subtitle?: string; onClose: () => void; 
         aria-labelledby={labelId}
         {...macZoomProps()}
         transition={macZoom}
-        className="flex max-h-[100dvh] sm:max-h-[min(820px,calc(100dvh-3rem))] w-full max-w-2xl flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl"
+        className="flex max-h-[100dvh] sm:max-h-[min(820px,calc(100dvh-3rem))] w-full max-w-2xl flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xl"
       >
         <header className="flex items-start justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
           <div>
@@ -290,12 +163,11 @@ const Dialog: React.FC<{ title: string; subtitle?: string; onClose: () => void; 
   );
 };
 
-const EMPTY_NEW_USER = { name: '', email: '', profile: 'mecanico' as Profile, unitId: '' };
+const EMPTY_NEW_USER = { name: '', email: '', profile: 'mecanico' as Profile };
 
 export const Users = () => {
   const {
     users,
-    units,
     approveUser,
     denyUser,
     deleteUser,
@@ -316,7 +188,6 @@ export const Users = () => {
 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editProfile, setEditProfile] = useState<Profile>('mecanico');
-  const [editUnit, setEditUnit] = useState('');
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
 
   const [newUser, setNewUser] = useState(EMPTY_NEW_USER);
@@ -342,7 +213,6 @@ export const Users = () => {
         email: newUser.email,
         name: newUser.name,
         profile: newUser.profile,
-        unitId: newUser.unitId || null,
       });
       toast.success('Usuário criado! O convite com a senha temporária foi enviado por e-mail.');
       setIsAddModalOpen(false);
@@ -359,14 +229,13 @@ export const Users = () => {
     // Usuário antigo (sem perfil): parte do perfil equivalente ao cargo.
     const fallback: Profile = user.role === 'admin' ? 'admin' : user.role === 'editor' ? 'mecanico' : 'gestor';
     setEditProfile(user.profile && user.profile in PROFILES ? user.profile as Profile : fallback);
-    setEditUnit(user.unitId ?? '');
   };
 
   const handleSavePermissions = async () => {
     if (!editingUser) return;
     setIsSavingPermissions(true);
     try {
-      await apiPatch(`/users/${editingUser.uid}`, { profile: editProfile, unitId: editUnit || null });
+      await apiPatch(`/users/${editingUser.uid}`, { profile: editProfile });
       toast.success('Acesso atualizado.');
       setEditingUser(null);
     } catch (err) {
@@ -386,7 +255,7 @@ export const Users = () => {
       try {
         await apiPost(`/access-requests/${request.id}/${action}`);
         await fetchAccessRequests();
-        toast.success(action === 'approve' ? `Oficina "${request.workshopName}" criada com ${request.name} como administrador.` : 'Pedido recusado.');
+        toast.success(action === 'approve' ? `Base "${request.workshopName}" criada com ${request.name} como administrador.` : 'Pedido recusado.');
       } catch (err: any) {
         toast.error(`Erro ao ${action === 'approve' ? 'aprovar' : 'recusar'}: ${err.message}`);
       }
@@ -414,7 +283,7 @@ export const Users = () => {
     })
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
 
-  const th = 'px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap';
+  const th = 'px-3 py-2 text-left text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap';
 
   return (
     <div className="w-full space-y-5 pb-24 lg:pb-6">
@@ -432,11 +301,11 @@ export const Users = () => {
       >
         <HeroStat
           icon={UsersIcon} iconClass="bg-blue-500" label="Membros"
-          value={allUsers.length} hint="com acesso a esta oficina"
+          value={allUsers.length} hint="com acesso a esta Base"
           selected={roleFilter === 'all'} onClick={() => setRoleFilter('all')}
         />
         <HeroStat
-          icon={ShieldCheck} iconClass="bg-violet-500" label="Administradores"
+          icon={ShieldCheck} iconClass="bg-slate-500" label="Administradores"
           value={allUsers.filter(u => roleOf(u.role) === 'admin').length} hint="acesso total"
           selected={roleFilter === 'admin'} onClick={() => setRoleFilter(roleFilter === 'admin' ? 'all' : 'admin')}
         />
@@ -607,7 +476,6 @@ export const Users = () => {
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${meta.chip}`}>
                       <RoleIcon size={12} aria-hidden="true" /> {accessLabel(user)}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500"><Building2 size={11} aria-hidden="true" />{units.find(x => x.id === user.unitId)?.name ?? 'Todas as unidades'}</span>
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
                       <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'approved' ? 'bg-emerald-500' : user.status === 'denied' ? 'bg-red-500' : 'bg-amber-500'}`} aria-hidden="true" />
                       {user.status === 'approved' ? 'Ativo' : user.status === 'denied' ? 'Negado' : 'Pendente'}
@@ -624,7 +492,6 @@ export const Users = () => {
                 <tr>
                   <th scope="col" className={th}>Membro</th>
                   <th scope="col" className={`${th} w-44`}>Perfil</th>
-                  <th scope="col" className={th}>Unidade</th>
                   <th scope="col" className={`${th} w-28`}>Situação</th>
                   <th scope="col" className={`${th} w-28 text-right`}><span className="sr-only">Ações</span></th>
                 </tr>
@@ -653,9 +520,6 @@ export const Users = () => {
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${meta.chip}`}>
                           <RoleIcon size={12} aria-hidden="true" /> {accessLabel(user)}
                         </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="text-zinc-600 dark:text-zinc-300">{units.find(x => x.id === user.unitId)?.name ?? <span className="text-zinc-400">Todas</span>}</span>
                       </td>
                       <td className="px-3 py-2">
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
@@ -705,7 +569,6 @@ export const Users = () => {
         )}
       </section>
 
-      {canManageUsers && <UnitsSection units={units} users={allUsers} />}
 
       {/* Editar acessos */}
       <AnimatePresence>
@@ -725,7 +588,7 @@ export const Users = () => {
               </>
             }
           >
-            <AccessEditor profile={editProfile} unitId={editUnit} units={units} onProfile={setEditProfile} onUnit={setEditUnit} />
+            <AccessEditor profile={editProfile} onProfile={setEditProfile} />
           </Dialog>
         )}
       </AnimatePresence>
@@ -778,13 +641,7 @@ export const Users = () => {
                   />
                 </div>
               </div>
-              <AccessEditor
-                profile={newUser.profile}
-                unitId={newUser.unitId}
-                units={units}
-                onProfile={p => setNewUser({ ...newUser, profile: p })}
-                onUnit={u => setNewUser({ ...newUser, unitId: u })}
-              />
+              <AccessEditor profile={newUser.profile} onProfile={p => setNewUser({ ...newUser, profile: p })} />
             </form>
           </Dialog>
         )}
@@ -803,7 +660,7 @@ export const Users = () => {
               aria-labelledby="delete-user-title"
               {...macZoomProps()}
               transition={macZoom}
-              className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6"
+              className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6"
             >
               <span className="inline-flex p-2.5 rounded-xl border bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40">
                 <AlertTriangle size={20} aria-hidden="true" />

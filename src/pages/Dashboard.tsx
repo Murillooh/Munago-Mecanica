@@ -372,7 +372,7 @@ export const Dashboard = ({
 
   const sectionHighlight = (id: string) =>
     isMonitorMode && MONITOR_SECTIONS[activeWidgetIndex]?.id === id
-      ? 'ring-2 ring-blue-500/80 dark:ring-blue-400/80 bg-blue-500/5 dark:bg-blue-500/10 shadow-lg shadow-blue-500/5'
+      ? 'ring-2 ring-blue-500/80 dark:ring-blue-400/80 bg-blue-500/5 dark:bg-blue-500/10 shadow-lg'
       : '';
 
   // Generate Executive AI Summary
@@ -465,6 +465,7 @@ export const Dashboard = ({
     <div className="w-full space-y-5">
       {/* Topo: saudação, ações e indicadores em vidro sobre o degradê azul (estilo iOS) */}
       <PageHero
+        classic
         titleAside={<>
           <Calendar size={14} aria-hidden="true" />
           <span className="first-letter:uppercase tabular-nums">
@@ -497,7 +498,7 @@ export const Dashboard = ({
           )}
         </>}
         statsId="widget-section-kpis"
-        statsClassName={`grid-cols-1 @sm:grid-cols-2 @3xl:grid-cols-4 rounded-3xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
+        statsClassName={`grid-cols-1 @sm:grid-cols-2 @3xl:grid-cols-4 rounded-xl transition-all duration-700 ${sectionHighlight('widget-section-kpis')}`}
       >
         <HeroStat
           icon={Package} iconClass="bg-blue-500" label="Valor em estoque"
@@ -544,7 +545,7 @@ export const Dashboard = ({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="sticky top-2 z-30 p-3 sm:p-4 bg-zinc-900/95 dark:bg-zinc-900/95 text-white backdrop-blur-md rounded-2xl border border-zinc-700/80 shadow-2xl space-y-3 overflow-hidden"
+            className="sticky top-2 z-30 p-3 sm:p-4 bg-zinc-900/95 dark:bg-zinc-900/95 text-white backdrop-blur-md rounded-xl border border-zinc-700/80 shadow-2xl space-y-3 overflow-hidden"
           >
             {/* Top row: Status, Current Widget & Controls */}
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -552,7 +553,7 @@ export const Dashboard = ({
               <div className="flex items-center gap-3 min-w-0 flex-wrap">
                 <div className="flex items-center gap-2 px-2.5 py-1 bg-blue-600/25 text-blue-400 border border-blue-500/40 rounded-lg text-xs font-bold">
                   <Tv size={14} className="text-blue-400" />
-                  <span className="tracking-wide uppercase text-[10px]">Painel de Parede</span>
+                  <span className="text-[10px]">Painel de Parede</span>
                 </div>
 
                 <div className="flex items-center gap-2 min-w-0">
@@ -709,7 +710,7 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div 
           id="widget-section-logistics-os"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-logistics-os')}`}
         >
           {/* BENTO 4: VISUALIZAÇÃO DE TENDÊNCIA DE ENTRADAS E SAÍDAS (RECHARTS) - col-span-12 xl:col-span-8 */}
           <div className="col-span-12 xl:col-span-8 flex flex-col">
@@ -721,7 +722,7 @@ export const Dashboard = ({
           </div>
 
           {/* BENTO 5: PÁTIO DE ORDENS DE SERVIÇO */}
-          <div className="col-span-12 xl:col-span-4 flex flex-col p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
+          <div className="col-span-12 xl:col-span-4 flex flex-col p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
@@ -781,7 +782,7 @@ export const Dashboard = ({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline gap-2">
                             <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{os.vehicleModel || os.customerName || 'Sem veículo'}</span>
-                            {os.licensePlate && <span className="shrink-0 font-mono text-[11px] uppercase text-zinc-500">{os.licensePlate}</span>}
+                            {os.licensePlate && <span className="shrink-0 font-mono text-[11px] text-zinc-500">{os.licensePlate}</span>}
                           </div>
                           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${running ? 'bg-amber-500' : 'bg-zinc-400'}`} aria-hidden="true" />
@@ -814,7 +815,7 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div
           id="widget-section-revenue"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-revenue')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-revenue')}`}
         >
           <div className="col-span-12 xl:col-span-8 flex flex-col">
             <OSRevenueChart serviceOrders={serviceOrders || []} darkMode={darkMode} onOpenOS={canManageOS ? onNewOS : undefined} />
@@ -832,10 +833,10 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div 
           id="widget-section-replenishment-cat"
-          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-replenishment-cat')}`}
+          className={`grid grid-cols-1 xl:grid-cols-12 gap-4 rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-replenishment-cat')}`}
         >
           {/* BENTO 6: CENTRAL DE REPOSIÇÃO (EXPANSIVE TABLE) - col-span-12 xl:col-span-8 */}
-          <div className="col-span-12 xl:col-span-8 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
+          <div className="col-span-12 xl:col-span-8 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-5">
                 <div>
@@ -862,7 +863,7 @@ export const Dashboard = ({
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold uppercase text-[10px] tracking-wider">
+                      <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-[10px] ">
                         <th className="py-3 px-3">Código/SKU</th>
                         <th className="py-3 px-3">Produto</th>
                         <th className="py-3 px-3">Categoria</th>
@@ -949,7 +950,7 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div
           id="widget-section-coverage"
-          className={`rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-coverage')}`}
+          className={`rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-coverage')}`}
         >
           <StockCoverage products={products || []} transactions={transactions || []} onSeeAll={onSeeAllLowStock} />
         </div>
@@ -959,10 +960,10 @@ export const Dashboard = ({
         {/* ----------------------------------------------------------------------- */}
         <div 
           id="widget-section-audit"
-          className={`col-span-12 rounded-3xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-audit')}`}
+          className={`col-span-12 rounded-xl transition-all duration-700 p-1.5 ${sectionHighlight('widget-section-audit')}`}
         >
           {/* BENTO 8: AUDITORIA OPERACIONAL RECENTE (WIDE STRIP) - col-span-12       */}
-          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
+          <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
                 <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white">
@@ -984,7 +985,7 @@ export const Dashboard = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold uppercase text-[10px] tracking-wider">
+                    <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-[10px] ">
                       <th className="py-3 px-3">Data / Hora</th>
                       <th className="py-3 px-3">Produto / Referência</th>
                       <th className="py-3 px-3">Tipo de Operação</th>
@@ -1045,11 +1046,11 @@ export const Dashboard = ({
             <motion.div
               {...macZoomProps()}
               transition={macZoom}
-              className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden"
+              className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden"
             >
               <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
                     <ClipboardList size={16} aria-hidden="true" />
                   </div>
                   <div>

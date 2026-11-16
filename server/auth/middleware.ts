@@ -25,9 +25,9 @@ declare global {
 export const WORKSPACE_HEADER = 'x-workspace-id';
 
 export const ROLE_PERMISSIONS: Record<Role, Permissions> = {
-  admin:  { canManageInventory: true,  canPerformTransactions: true,  canManageOS: true,  canViewReports: true, canManageUsers: true,  canCheckin: true,  canApproveOS: true,  allUnits: true },
-  editor: { canManageInventory: true,  canPerformTransactions: true,  canManageOS: true,  canViewReports: true, canManageUsers: false, canCheckin: true,  canApproveOS: false, allUnits: true },
-  viewer: { canManageInventory: false, canPerformTransactions: false, canManageOS: false, canViewReports: true, canManageUsers: false, canCheckin: false, canApproveOS: false, allUnits: true },
+  admin:  { canManageInventory: true,  canPerformTransactions: true,  canManageOS: true,  canViewReports: true, canManageUsers: true,  canCheckin: true,  canApproveOS: true },
+  editor: { canManageInventory: true,  canPerformTransactions: true,  canManageOS: true,  canViewReports: true, canManageUsers: false, canCheckin: true,  canApproveOS: false },
+  viewer: { canManageInventory: false, canPerformTransactions: false, canManageOS: false, canViewReports: true, canManageUsers: false, canCheckin: false, canApproveOS: false },
 };
 
 export interface TokenClaims {
@@ -147,8 +147,6 @@ export function effectivePermissions(u: Pick<AuthUser, 'role' | 'permissions' | 
   return { ...base, ...(u.permissions ?? {}) };
 }
 
-/** Unidade cujos dados o usuário enxerga; null = todas. */
-export const unitScope = (u: AuthUser): string | null => (effectivePermissions(u).allUnits ? null : u.unitId ?? '__sem_unidade__');
 
 /** Exige usuário aprovado (admin sempre passa) e, opcionalmente, uma permissão. Substitui firestore.rules. */
 export function requirePermission(perm?: keyof Permissions): RequestHandler {

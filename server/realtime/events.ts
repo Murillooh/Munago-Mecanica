@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 
 export type Resource =
   | 'products' | 'categories' | 'transactions' | 'serviceOrders'
-  | 'notifications' | 'users' | 'settings' | 'accessRequests' | 'workspaces' | 'services' | 'motoCheckins' | 'units';
+  | 'notifications' | 'users' | 'settings' | 'accessRequests' | 'workspaces' | 'services' | 'motoCheckins';
 
 /** Escopo de aviso que só o admin geral recebe (cadastros, pedidos de acesso). */
 export const ADMIN_SCOPE = '*';

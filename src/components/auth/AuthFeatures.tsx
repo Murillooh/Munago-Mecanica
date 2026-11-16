@@ -4,13 +4,13 @@ import { ShieldCheck, ChartNoAxesCombined, type LucideIcon } from 'lucide-react'
 const FEATURES: { icon: LucideIcon; title: string; detail: string; accent: string }[] = [
   {
     icon: ShieldCheck,
-    title: 'Segurança de nível empresarial',
-    detail: 'Login protegido, dados criptografados e acesso por perfil.',
+    title: 'Cada um vê o que é seu',
+    detail: 'Acesso por perfil e por unidade.',
     accent: 'from-emerald-300/40',
   },
   {
     icon: ChartNoAxesCombined,
-    title: 'Relatórios e insights em tempo real',
+    title: 'Tudo atualizado na hora',
     detail: 'Estoque, ordens de serviço e repasses atualizados na hora.',
     accent: 'from-amber-300/45',
   },
@@ -22,7 +22,7 @@ export const AuthFeatures: React.FC = () => (
     {FEATURES.map(({ icon: Icon, title, detail, accent }) => (
       <li key={title} className="flex items-start gap-4">
         <span
-          className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} to-white/5 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_8px_20px_-6px_rgba(15,23,42,0.6)] backdrop-blur-md`}
+          className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${accent} to-white/5 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_8px_20px_-6px_rgba(15,23,42,0.6)] backdrop-blur-md`}
           aria-hidden="true"
         >
           <Icon size={22} strokeWidth={2} className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]" />

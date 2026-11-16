@@ -56,7 +56,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
             <Calendar size={13} className="text-zinc-400" />
             {data?.fullDate || label}
           </span>
-          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">
             {data?.weekday}
           </span>
         </div>
@@ -173,7 +173,7 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
   }, [trendData]);
 
   return (
-    <div className="h-full flex-1 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors">
+    <div className="h-full flex-1 p-4 sm:p-5 bg-white dark:bg-zinc-900/90 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-xs flex flex-col justify-between transition-colors">
       <div className="flex flex-1 flex-col">
         {/* Header with Title, Controls & Timeframe Selector */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -268,7 +268,7 @@ export const ProductMovementTrendChart: React.FC<ProductMovementTrendChartProps>
             ['Entradas', `+${totalIn}`, 'unidades', ArrowDownLeft, 'border-zinc-200 dark:border-zinc-800', 'bg-emerald-500', 'text-emerald-600 dark:text-emerald-400'],
             ['Saídas', `-${totalOut}`, 'unidades', ArrowUpRight, 'border-zinc-200 dark:border-zinc-800', 'bg-rose-500', 'text-rose-600 dark:text-rose-400'],
             ['Saldo líquido', netBalance >= 0 ? `+${netBalance}` : `${netBalance}`, 'unidades', Scale, 'border-zinc-200 dark:border-zinc-800', 'bg-blue-500', netBalance >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'],
-            ['Média por dia', `${avgDailyVolume}`, 'un/dia', Gauge, 'border-zinc-200 dark:border-zinc-800', 'bg-zinc-500', 'text-violet-600 dark:text-violet-400'],
+            ['Média por dia', `${avgDailyVolume}`, 'un/dia', Gauge, 'border-zinc-200 dark:border-zinc-800', 'bg-zinc-500', 'text-slate-600 dark:text-slate-400'],
           ] as const).map(([label, value, unit, Icon, tile, icon, tone]) => (
             <div key={label} className={`rounded-xl border p-3 ${tile}`}>
               <div className="flex items-center gap-2">

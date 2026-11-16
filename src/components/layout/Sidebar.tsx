@@ -76,19 +76,6 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
   const openOSCount = (serviceOrders || []).filter(os => os.status === 'draft' || os.status === 'in_progress').length;
 
   // Gradientes iOS por item
-  const iconColors: Record<string, string> = {
-    dashboard:    'from-blue-500 to-blue-600',
-    inventory:    'from-orange-400 to-orange-500',
-    os:           'from-red-500 to-rose-600',
-    services:     'from-green-500 to-emerald-600',
-    transactions: 'from-purple-500 to-violet-600',
-    ai:           'from-pink-500 to-fuchsia-600',
-    alerts:       'from-yellow-400 to-amber-500',
-    users:        'from-teal-500 to-cyan-600',
-    admin:        'from-slate-600 to-slate-700',
-    settings:     'from-zinc-500 to-zinc-600',
-  };
-
   const groups: NavGroup[] = [
     {
       label: 'Operação',
@@ -141,7 +128,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       {profile?.photoURL ? (
         <img src={profile.photoURL} alt="" className={`${size} rounded-full object-cover ring-2 ring-zinc-900/10 dark:ring-white/15`} referrerPolicy="no-referrer" />
       ) : (
-        <span className={`${size} flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white ring-2 ring-zinc-900/10 dark:ring-white/15`} aria-hidden="true">{initials}</span>
+        <span className={`${size} flex items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white ring-2 ring-zinc-900/10 dark:ring-white/15`} aria-hidden="true">{initials}</span>
       )}
       <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-zinc-950" aria-label="Online" />
     </span>
@@ -161,7 +148,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
           {!isCollapsed && (
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{storeName}</p>
-              <p className="truncate text-[11px] text-zinc-500">Gestão da oficina</p>
+              <p className="truncate text-[11px] text-zinc-500">Gestão da Base</p>
             </div>
           )}
         </div>
@@ -198,13 +185,12 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
             {isCollapsed ? (
               gi > 0 && <div className="mx-2 mb-3 border-t border-zinc-200 dark:border-zinc-800" aria-hidden="true" />
             ) : (
-              <p className="mb-1 px-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{group.label}</p>
+              <p className="mb-1 px-2.5 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">{group.label}</p>
             )}
             <ul className="space-y-0.5">
               {group.items.map(item => {
                 const active = activeTab === item.id;
                 const showCount = !!item.count && item.count > 0;
-                const gradient = iconColors[item.id] ?? 'from-zinc-500 to-zinc-600';
                 return (
                   <li key={item.id} className="group/item relative">
                     <button
@@ -229,9 +215,8 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
                         />
                       )}
 
-                      {/* Ícone estilo iOS: container colorido com gradiente */}
-                      <span className={`relative shrink-0 flex items-center justify-center w-8 h-8 rounded-[10px] bg-gradient-to-br ${gradient} shadow-sm`}>
-                        <item.icon size={16} strokeWidth={2} className="text-white" aria-hidden="true" />
+                      <span className="relative shrink-0 flex items-center justify-center w-8 h-8">
+                        <item.icon size={18} strokeWidth={2} className={active ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400'} aria-hidden="true" />
                         {/* Badge de alerta no canto do ícone (modo colapsado) */}
                         {showCount && isCollapsed && item.tone === 'alert' && (
                           <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-zinc-950" aria-hidden="true" />
@@ -271,7 +256,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
       {/* Rodapé: cartão do usuário (foto, nome, e-mail, função) + sair */}
       <div className="shrink-0 p-3">
         {isCollapsed ? (
-          <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-zinc-900/5 bg-zinc-900/[0.03] p-1.5 dark:border-white/10 dark:bg-white/5">
+          <div className="flex flex-col items-center gap-1.5 rounded-xl border border-zinc-900/5 bg-zinc-900/[0.03] p-1.5 dark:border-white/10 dark:bg-white/5">
             <span title={`${profile?.name || 'Usuário'} · ${roleLabel}`}>{avatar('h-9 w-9')}</span>
             <button type="button" onClick={enterMonitor} aria-label="Modo Monitor" title="Modo Monitor: tela cheia, sem menu" className={iconButton}>
               <Maximize2 size={16} aria-hidden="true" />
@@ -281,7 +266,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
             </button>
           </div>
         ) : (
-          <div className="relative rounded-2xl border border-zinc-900/10 bg-zinc-900/[0.03] p-3 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="relative rounded-xl border border-zinc-900/10 bg-zinc-900/[0.03] p-3 dark:border-white/10 dark:bg-white/[0.04]">
             <button type="button" onClick={enterMonitor} aria-label="Modo Monitor" title="Modo Monitor: tela cheia, sem menu" className={`absolute right-2 top-2 ${iconButton}`}>
               <Maximize2 size={14} aria-hidden="true" />
             </button>
@@ -290,7 +275,7 @@ export const Sidebar = ({ activeTab, setActiveTab, setInventoryLowStockFilter, i
               <div className="min-w-0 leading-tight">
                 <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{profile?.name || 'Usuário'}</p>
                 {profile?.email && <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">{profile.email}</p>}
-                <span className="mt-1 inline-block rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+                <span className="mt-1 inline-block rounded-md bg-slate-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-500/20 dark:text-slate-300">
                   {roleLabel}
                 </span>
               </div>

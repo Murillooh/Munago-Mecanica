@@ -88,7 +88,7 @@ export const AdminPanel = () => {
     setSavingName(true);
     try {
       await apiPatch(`/admin/workspaces/${renaming.id}`, { name: renaming.name.trim() });
-      toast.success('Oficina renomeada.');
+      toast.success('Base renomeada.');
       setRenaming(null);
       await load();
     } catch (err) {
@@ -103,7 +103,7 @@ export const AdminPanel = () => {
     setDeleting(true);
     try {
       await apiDelete(`/admin/workspaces/${toDelete.id}`, { confirmName });
-      toast.success(`Oficina "${toDelete.name}" excluída.`);
+      toast.success(`Base "${toDelete.name}" excluída.`);
       // Estava dentro dela: volta para a própria oficina.
       if (toDelete.id === activeId) {
         setActiveWorkspace(null);
@@ -131,7 +131,7 @@ export const AdminPanel = () => {
       <PageHero
         icon={ShieldCheck}
         title="Painel geral"
-        subtitle="Todas as oficinas do sistema. Visível só para o administrador geral."
+        subtitle="Todas as Bases do sistema. Visível só para o administrador geral."
         actions={
           <button type="button" onClick={load} disabled={loading} className={heroBtn}>
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Atualizar
@@ -140,8 +140,8 @@ export const AdminPanel = () => {
         statsClassName="grid-cols-2 @3xl:grid-cols-4"
       >
         {data && (<>
-          <HeroStat icon={Building2} iconClass="bg-blue-500" label="Oficinas" value={data.totals.workspaces} hint="cadastradas no sistema" />
-          <HeroStat icon={Users} iconClass="bg-violet-500" label="Usuários" value={data.totals.users} hint="em todas as oficinas" />
+          <HeroStat icon={Building2} iconClass="bg-blue-500" label="Bases" value={data.totals.workspaces} hint="cadastradas no sistema" />
+          <HeroStat icon={Users} iconClass="bg-slate-500" label="Usuários" value={data.totals.users} hint="em todas as Bases" />
           <HeroStat icon={FileText} iconClass="bg-amber-500" label="Ordens de serviço" value={data.totals.serviceOrders} hint={`${data.totals.products} produtos cadastrados`} />
           <HeroStat icon={Wallet} iconClass="bg-emerald-500" label="Faturado (30 dias)" value={brl(data.totals.revenue30d)} hint={`Total: ${brl(data.totals.revenue)}`} />
         </>)}
@@ -162,15 +162,15 @@ export const AdminPanel = () => {
               type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar oficina, nome ou e-mail…"
-              aria-label="Buscar oficina"
+              placeholder="Buscar Base, nome ou e-mail…"
+              aria-label="Buscar Base"
               className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
             />
           </div>
 
           <ul className="space-y-2.5">
             {list.length === 0 && (
-              <li className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">Nenhuma oficina encontrada.</li>
+              <li className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">Nenhuma Base encontrada.</li>
             )}
             {list.map(w => {
               const isOpen = expanded === w.id;
@@ -189,7 +189,7 @@ export const AdminPanel = () => {
                             onChange={e => setRenaming({ id: w.id, name: e.target.value })}
                             onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }}
                             maxLength={100}
-                            aria-label="Novo nome da oficina"
+                            aria-label="Novo nome da Base"
                             className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-sm font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
                           />
                           <button type="submit" disabled={savingName || !renaming.name.trim()} aria-label="Salvar nome" className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-950/40 cursor-pointer">
@@ -250,7 +250,7 @@ export const AdminPanel = () => {
                           type="button"
                           onClick={() => { setToDelete(w); setConfirmName(''); }}
                           aria-label={`Excluir ${w.name}`}
-                          title="Excluir oficina"
+                          title="Excluir Base"
                           className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 cursor-pointer"
                         >
                           <Trash2 size={14} aria-hidden="true" />
@@ -279,7 +279,7 @@ export const AdminPanel = () => {
                   {isOpen && (
                     <div className="border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/50">
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">Para editar acessos, aprovar ou remover alguém, abra a equipe desta oficina.</p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">Para editar acessos, aprovar ou remover alguém, abra a equipe desta Base.</p>
                         <button
                           type="button"
                           onClick={() => manageTeam(w.id)}
@@ -317,7 +317,7 @@ export const AdminPanel = () => {
 
       {toDelete && (
         <div className="ios-fade fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-ws-title">
-          <div style={macZoomStyle()} className="ios-pop w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+          <div style={macZoomStyle()} className="ios-pop w-full max-w-md rounded-xl border border-zinc-200/80 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-950/40">
               <Trash2 size={20} aria-hidden="true" />
             </div>

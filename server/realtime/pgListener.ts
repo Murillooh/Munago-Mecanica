@@ -6,7 +6,7 @@ export const CHANGES_CHANNEL = 'mecanica_changes';
 
 const RESOURCES = new Set<Resource>([
   'products', 'categories', 'transactions', 'serviceOrders',
-  'notifications', 'users', 'settings', 'accessRequests', 'workspaces', 'services', 'motoCheckins', 'units',
+  'notifications', 'users', 'settings', 'accessRequests', 'workspaces', 'services', 'motoCheckins',
 ]);
 
 interface Log {

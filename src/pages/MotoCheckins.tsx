@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bike, Camera, Check, ChevronDown, ClipboardCheck, Gauge, ImagePlus, Loader2, Plus, Timer, Wrench, X } from 'lucide-react';
+import { Bike, Camera, Check, ChevronDown, ClipboardCheck, Gauge, ImagePlus, LayoutGrid, List, Loader2, Plus, Timer, Wrench, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApp } from '../context/AppContext';
 import { apiGet, apiPost, subscribeChanges } from '../lib/api';
@@ -60,18 +60,20 @@ const Step: React.FC<{ n: number; title: string; aside?: React.ReactNode; childr
   </fieldset>
 );
 
-const EMPTY = { plate: '', model: '', unitId: '', km: '', notes: '' };
+const EMPTY = { plate: '', model: '', franchiseName: '', customerName: '', customerPhone: '', km: '', notes: '' };
 
 /** Check-list de recebimento: registra como a moto chegou (fotos de todos os lados, km e observações). */
 export const MotoCheckins = () => {
-  const { canCheckin, allUnits, units, profile, canManageOS, canManageInventory, canApproveOS } = useApp();
-  const myUnit = units.find(u => u.id === profile?.unitId);
+  const { canCheckin, canManageOS, canManageInventory, canApproveOS } = useApp();
   const [list, setList] = useState<Checkin[] | null>(null);
   const [form, setForm] = useState<typeof EMPTY | null>(null);
   const [photos, setPhotos] = useState<Photos>({});
   const [busy, setBusy] = useState<string | null>(null); // foto sendo processada ou 'save'
   const [viewing, setViewing] = useState<Checkin | null>(null);
 
+  // Lista ou quadrados: escolha de cada usuário, lembrada neste navegador
+  const [view, setView] = useState<'list' | 'grid'>(() => { try { return localStorage.getItem('munago_moto_view') === 'grid' ? 'grid' : 'list'; } catch { return 'list'; } });
+  const changeView = (v: 'list' | 'grid') => { setView(v); try { localStorage.setItem('munago_moto_view', v); } catch { /* armazenamento indisponível */ } };
   const [filter, setFilter] = useState<'fila' | 'andamento' | 'finalizadas' | 'todas'>('fila');
 
   const load = useCallback(() => apiGet<Checkin[]>('/moto-checkins').then(setList).catch(() => setList([])), []);
@@ -105,11 +107,12 @@ export const MotoCheckins = () => {
 
   // "Minha fila": as etapas que dependem do meu perfil
   const myStatuses = useMemo(() => new Set<MotoStatus>([
+    ...(canCheckin ? ['finalizada'] as const : []),
     ...(canManageOS ? ['recebida', 'autorizada', 'em_manutencao'] as const : []),
     ...(canManageInventory ? ['aguardando_estoque', 'aguardando_peca'] as const : []),
     ...(canApproveOS ? ['aguardando_autorizacao'] as const : []),
-  ]), [canManageOS, canManageInventory, canApproveOS]);
-  const closed = (c: Checkin) => c.status === 'finalizada' || c.status === 'recusada';
+  ]), [canCheckin, canManageOS, canManageInventory, canApproveOS]);
+  const closed = (c: Checkin) => c.status === 'entregue' || c.status === 'recusada';
   const shown = (list ?? []).filter(c =>
     filter === 'fila' ? myStatuses.has(c.status) : filter === 'andamento' ? !closed(c) : filter === 'finalizadas' ? closed(c) : true);
   const counts = {
@@ -139,7 +142,7 @@ export const MotoCheckins = () => {
     setBusy('save');
     try {
       await apiPost('/moto-checkins', {
-        plate: form.plate, model: form.model, unitId: form.unitId || undefined, km: Number(form.km), notes: form.notes || undefined, photos,
+        plate: form.plate, model: form.model, franchiseName: form.franchiseName, customerName: form.customerName, customerPhone: form.customerPhone || undefined, km: Number(form.km), notes: form.notes || undefined, photos,
       });
       toast.success('Entrada da moto registrada.');
       setForm(null);
@@ -188,22 +191,57 @@ export const MotoCheckins = () => {
         <HeroStat icon={ClipboardCheck} iconClass="bg-blue-500" label="Minha fila" value={counts.fila} hint="esperando você" selected={filter === 'fila'} onClick={() => setFilter('fila')} />
         <HeroStat icon={Wrench} iconClass="bg-amber-500" label="Em andamento" value={counts.andamento} hint="ainda não finalizadas" selected={filter === 'andamento'} onClick={() => setFilter('andamento')} />
         <HeroStat icon={Timer} iconClass="bg-emerald-500" label="Em manutenção" value={working} hint="cronômetro rodando" />
-        <HeroStat icon={Bike} iconClass="bg-violet-500" label="Entradas hoje" value={today} hint={`${counts.todas} no total`} selected={filter === 'todas'} onClick={() => setFilter('todas')} />
+        <HeroStat icon={Bike} iconClass="bg-slate-500" label="Entradas hoje" value={today} hint={`${counts.todas} no total`} selected={filter === 'todas'} onClick={() => setFilter('todas')} />
       </PageHero>
 
-      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/90" aria-label="OS de motos">
+      <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/90" aria-label="OS de motos">
         <div className="flex gap-1 overflow-x-auto border-b border-zinc-200 bg-zinc-50/70 p-1.5 dark:border-zinc-800 dark:bg-zinc-900" role="group" aria-label="Filtrar">
-          {([['fila', 'Minha fila'], ['andamento', 'Em andamento'], ['finalizadas', 'Finalizadas'], ['todas', 'Todas']] as const).map(([v, label]) => (
+          {([['fila', 'Minha fila'], ['andamento', 'Em andamento'], ['finalizadas', 'Entregues e recusadas'], ['todas', 'Todas']] as const).map(([v, label]) => (
             <button key={v} type="button" aria-pressed={filter === v} onClick={() => setFilter(v)}
               className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${filter === v ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
               {label} <span className="ml-1 tabular-nums text-[10px] text-zinc-400">{counts[v]}</span>
             </button>
           ))}
+          <div className="ml-auto flex shrink-0 gap-0.5" role="group" aria-label="Modo de exibição">
+            {([['list', List, 'Lista'], ['grid', LayoutGrid, 'Quadrados']] as const).map(([v, Icon, label]) => (
+              <button key={v} type="button" aria-pressed={view === v} aria-label={label} title={label} onClick={() => changeView(v)}
+                className={`rounded-md p-1.5 transition-colors cursor-pointer ${view === v ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>
+                <Icon size={15} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
         </div>
         {list === null ? (
           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-zinc-400" aria-label="Carregando" /></div>
         ) : shown.length === 0 ? (
           <p className="py-12 text-center text-sm text-zinc-500">{filter === 'fila' ? 'Nada esperando você agora.' : list.length === 0 ? 'Nenhuma moto registrada ainda. Toque em "Registrar entrada" quando uma moto chegar.' : 'Nenhuma OS neste filtro.'}</p>
+        ) : view === 'grid' ? (
+          <ul className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {shown.map(c => (
+              <li key={c.id}>
+                <button type="button" onClick={() => open(c)} className="flex h-full w-full flex-col gap-3 rounded-xl border border-zinc-200 p-4 text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/40 cursor-pointer">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{c.model}</p>
+                      <p className="font-mono text-xs text-zinc-500">{c.plate}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_TONE[c.status]}`}>{motoStatusLabel(c)}</span>
+                  </div>
+                  <dl className="space-y-1 text-xs">
+                    {c.franchiseName && <div className="flex justify-between gap-2"><dt className="text-zinc-500">Franquia</dt><dd className="truncate font-medium text-zinc-700 dark:text-zinc-300">{c.franchiseName}</dd></div>}
+                    {c.customerName && <div className="flex justify-between gap-2"><dt className="text-zinc-500">Locatário</dt><dd className="truncate font-medium text-zinc-700 dark:text-zinc-300">{c.customerName}</dd></div>}
+                    <div className="flex justify-between gap-2"><dt className="text-zinc-500">Km</dt><dd className="tabular-nums text-zinc-700 dark:text-zinc-300">{c.km.toLocaleString('pt-BR')}</dd></div>
+                  </dl>
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-zinc-100 pt-2 text-[11px] text-zinc-500 dark:border-zinc-800">
+                    <span className="truncate">{c.createdByName}</span>
+                    {c.startedAt
+                      ? <span className="flex items-center gap-1"><Timer size={11} aria-hidden="true" /><MaintenanceTimer startedAt={c.startedAt} finishedAt={c.finishedAt} estimatedMinutes={c.estimatedMinutes} /></span>
+                      : <span className="tabular-nums">{dateTime(c.createdAt)}</span>}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
         ) : (
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {shown.map(c => (
@@ -212,10 +250,10 @@ export const MotoCheckins = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
                       <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{c.model}</span>
-                      <span className="shrink-0 font-mono text-[11px] uppercase text-zinc-500">{c.plate}</span>
+                      <span className="shrink-0 font-mono text-[11px] text-zinc-500">{c.plate}</span>
                     </div>
                     <div className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
-                      {c.km.toLocaleString('pt-BR')} km{c.unit ? ` · ${c.unit}` : ''} · {c.createdByName}
+                      {c.km.toLocaleString('pt-BR')} km{c.franchiseName ? ` · ${c.franchiseName}` : ''}{c.customerName ? ` · ${c.customerName}` : ''} · {c.createdByName}
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
@@ -234,7 +272,7 @@ export const MotoCheckins = () => {
       {/* Nova entrada: primeiro identifica a moto, depois as fotos */}
       {form && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/70 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="checkin-title">
-          <form onSubmit={save} className="flex max-h-[95dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 sm:rounded-2xl">
+          <form onSubmit={save} className="flex max-h-[95dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 sm:rounded-xl">
             <div className="flex items-center gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300"><Bike size={18} aria-hidden="true" /></span>
               <div className="min-w-0 flex-1">
@@ -250,7 +288,7 @@ export const MotoCheckins = () => {
                 <Step n={1} title="Dados da moto">
                   <div className="grid grid-cols-2 gap-3">
                     <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Placa
-                      <input required value={form.plate} onChange={e => setForm({ ...form, plate: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '') })} maxLength={10} className={`${fieldClass} mt-1 font-mono uppercase tracking-wider`} placeholder="ABC1D23" autoComplete="off" />
+                      <input required value={form.plate} onChange={e => setForm({ ...form, plate: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '') })} maxLength={10} className={`${fieldClass} mt-1 font-mono `} placeholder="ABC1D23" autoComplete="off" />
                     </label>
                     <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Modelo
                       <span className="relative mt-1 block">
@@ -268,18 +306,14 @@ export const MotoCheckins = () => {
                         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">km</span>
                       </span>
                     </label>
-                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Unidade
-                      {allUnits ? (
-                        <span className="relative mt-1 block">
-                          <select value={form.unitId} onChange={e => setForm({ ...form, unitId: e.target.value })} className={`${fieldClass} appearance-none pr-9 ${form.unitId ? '' : 'text-zinc-400 dark:text-zinc-500'}`}>
-                            <option value="">Sem unidade</option>
-                            {units.map(u => <option key={u.id} value={u.id} className="text-zinc-900 dark:text-zinc-100">{u.name}</option>)}
-                          </select>
-                          <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
-                        </span>
-                      ) : (
-                        <span className={`${fieldClass} mt-1 block cursor-default bg-zinc-50 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300`}>{myUnit?.name ?? 'Sem unidade (fale com o admin)'}</span>
-                      )}
+                    <label className="col-span-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">Franquia
+                      <input required value={form.franchiseName} onChange={e => setForm({ ...form, franchiseName: e.target.value })} maxLength={100} className={`${fieldClass} mt-1`} placeholder="Nome da franquia" />
+                    </label>
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Locatário (dono da moto)
+                      <input required value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} maxLength={100} className={`${fieldClass} mt-1`} placeholder="Nome do locatário" />
+                    </label>
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Telefone do locatário
+                      <input type="tel" value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} maxLength={30} className={`${fieldClass} mt-1`} placeholder="(11) 98888-7777" />
                     </label>
                   </div>
                 </Step>

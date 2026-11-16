@@ -28,7 +28,7 @@ describe('API v1', () => {
   describe('moto-checkins', () => {
     const img = 'data:image/jpeg;base64,/9j/AAAA';
     const checkin = (over: object = {}) => ({
-      plate: 'abc1d23', model: 'Haojue DK 160', unit: 'Base Centro', km: 15230, notes: 'Risco no tanque',
+      plate: 'abc1d23', model: 'Haojue DK 160', customerName: 'Ana Locatária', franchiseName: 'Locadora Sul', km: 15230, notes: 'Risco no tanque',
       photos: { front: img, back: img, left: img, right: img, odometer: img }, ...over,
     });
 
@@ -54,50 +54,37 @@ describe('API v1', () => {
     });
   });
 
-  describe('perfis e unidades', () => {
+  describe('perfis e bases', () => {
     const img = 'data:image/jpeg;base64,/9j/AAAA';
-    const checkin = { plate: 'XYZ9A88', model: 'Haojue DK 150', km: 900, photos: { front: img, back: img, left: img, right: img, odometer: img } };
+    const checkin = { plate: 'XYZ9A88', model: 'Haojue DK 150', km: 900, customerName: 'João Locatário', franchiseName: 'Locadora Norte', photos: { front: img, back: img, left: img, right: img, odometer: img } };
 
-    it('perfil define permissões; cada um vê só o check-list da própria unidade', async () => {
-      const base = (await h.as('admin').post('/units', { name: 'Base Centro', kind: 'base' }).expect(201)).body;
-      const outra = (await h.as('admin').post('/units', { name: 'Base Norte', kind: 'base' }).expect(201)).body;
-      await h.as('admin').post('/units', { name: 'Base Centro', kind: 'base' }).expect(409);
-      await h.as('editor').post('/units', { name: 'X', kind: 'cd' }).expect(403);
+    it('perfil define o que cada um faz; outra Base não vê as motos', async () => {
+      const front = (await h.as('admin').patch('/users/editor', { profile: 'recepcao' }).expect(200)).body;
+      expect(front).toMatchObject({ role: 'viewer', profile: 'recepcao', permissions: { canCheckin: true, canManageOS: false } });
+      await h.as('editor').post('/moto-checkins', { ...checkin, customerName: '' }).expect(400);
+      await h.as('editor').post('/moto-checkins', { ...checkin, franchiseName: '' }).expect(400);
+      const c1 = (await h.as('editor').post('/moto-checkins', checkin).expect(201)).body;
+      expect(c1).toMatchObject({ customerName: 'João Locatário', franchiseName: 'Locadora Norte', workspaceId: 'default' });
 
-      const front = (await h.as('admin').patch('/users/editor', { profile: 'recepcao', unitId: base.id }).expect(200)).body;
-      expect(front).toMatchObject({ role: 'viewer', profile: 'recepcao', permissions: { canCheckin: true, canManageOS: false, allUnits: false } });
-      await h.as('admin').patch('/users/viewer', { profile: 'recepcao', unitId: outra.id }).expect(200);
+      // Outra Base (outra oficina/workspace) não enxerga nada
+      expect((await h.as('outsider').get('/moto-checkins')).body).toHaveLength(0);
+      await h.as('outsider').get(`/moto-checkins/${c1.id}`).expect(404);
+      await h.as('outsider').post(`/moto-checkins/${c1.id}/actions`, { action: 'diagnose', items: [{ description: 'x', quantity: 1 }], estimatedMinutes: 30 }).expect(404);
 
-      // Front tenta registrar em outra unidade: vai para a dele mesmo assim
-      const c1 = (await h.as('editor').post('/moto-checkins', { ...checkin, unitId: outra.id }).expect(201)).body;
-      expect(c1).toMatchObject({ unitId: base.id, unit: 'Base Centro' });
-      await h.as('viewer').post('/moto-checkins', checkin).expect(201);
-
-      expect((await h.as('editor').get('/moto-checkins')).body).toHaveLength(1);
-      expect((await h.as('viewer').get('/moto-checkins')).body).toHaveLength(1);
-      expect((await h.as('admin').get('/moto-checkins')).body).toHaveLength(2);
-      await h.as('viewer').get(`/moto-checkins/${c1.id}`).expect(404);
-
-      // Mecânico não recebe moto (é o Front), mas vê as da unidade dele
+      // Mecânico não recebe moto (é o Front); gestor só lê
       const mec = (await h.as('admin').patch('/users/editor', { profile: 'mecanico' }).expect(200)).body;
       expect(mec).toMatchObject({ role: 'editor', permissions: { canCheckin: false, canManageOS: true, canManageInventory: false } });
       await h.as('editor').post('/moto-checkins', checkin).expect(403);
-      expect((await h.as('editor').get('/moto-checkins')).body).toHaveLength(1);
-
-      // Gestor só lê; mecânico não gerencia estoque; unidade de outra oficina é recusada
       await h.as('admin').patch('/users/viewer', { profile: 'gestor' }).expect(200);
       await h.as('viewer').post('/moto-checkins', checkin).expect(403);
-      expect((await h.as('viewer').get('/moto-checkins')).body).toHaveLength(2);
+      expect((await h.as('viewer').get('/moto-checkins')).body).toHaveLength(1);
       await h.as('editor').post('/products', { name: 'Peça', quantity: 1, minQuantity: 0 }).expect(403);
-      const alheia = (await h.as('outsider').post('/units', { name: 'Base Fora', kind: 'base' }).expect(201)).body;
-      await h.as('admin').patch('/users/editor', { unitId: alheia.id }).expect(400);
     });
 
     it('fluxo da OS da moto: front → mecânico → estoque → CS → manutenção com cronômetro', async () => {
-      const base = (await h.as('admin').post('/units', { name: 'Base A', kind: 'base' })).body;
-      await h.as('admin').patch('/users/editor', { profile: 'mecanico', unitId: base.id }).expect(200);
-      await h.as('admin').patch('/users/viewer', { profile: 'cs', unitId: base.id }).expect(200);
-      const { id } = (await h.as('admin').post('/moto-checkins', { ...checkin, unitId: base.id, notes: 'Risco no tanque' }).expect(201)).body;
+      await h.as('admin').patch('/users/editor', { profile: 'mecanico' }).expect(200);
+      await h.as('admin').patch('/users/viewer', { profile: 'cs' }).expect(200);
+      const { id } = (await h.as('admin').post('/moto-checkins', { ...checkin, notes: 'Risco no tanque' }).expect(201)).body;
       const act = (who: 'admin' | 'editor' | 'viewer', body: object) => h.as(who).post(`/moto-checkins/${id}/actions`, body);
 
       await act('viewer', { action: 'diagnose', items: [{ description: 'x', quantity: 1 }] }).expect(403);
@@ -136,6 +123,12 @@ describe('API v1', () => {
       expect(done.events.map((e: { type: string }) => e.type)).toEqual(['recebida', 'diagnose', 'stock_missing', 'stock_ok', 'request_auth', 'authorize', 'start', 'finish']);
       expect(done.events[0]).toMatchObject({ byName: 'Admin', note: 'Risco no tanque' });
       expect((await h.as('editor').get(`/moto-checkins/${id}`)).body.photos).toMatchObject({ front: img, final: [img, img], authProof: { name: 'autorizacao.pdf' } });
+      // Front entrega ao locatário
+      await act('editor', { action: 'deliver' }).expect(403);
+      await h.as('admin').patch('/users/viewer', { profile: 'recepcao' }).expect(200);
+      const delivered = (await act('viewer', { action: 'deliver', note: 'Retirada pelo locatário' }).expect(200)).body;
+      expect(delivered.status).toBe('entregue');
+      await act('viewer', { action: 'deliver' }).expect(409);
     });
 
     it('só admin dá perfil de administrador', async () => {

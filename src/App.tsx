@@ -142,7 +142,7 @@ const AppContent: React.FC<{ onPageReady: () => void }> = ({ onPageReady }) => {
           >
             <div className="flex items-center gap-2.5 bg-zinc-900/90 dark:bg-zinc-900/90 text-white backdrop-blur-md px-3.5 py-1.5 rounded-full border border-zinc-700/60 shadow-xl">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-semibold tracking-wide">Modo Monitor</span>
+              <span className="text-[11px] font-semibold ">Modo Monitor</span>
               <button
                 type="button"
                 onClick={() => {
@@ -154,7 +154,7 @@ const AppContent: React.FC<{ onPageReady: () => void }> = ({ onPageReady }) => {
               >
                 <Minimize2 size={12} />
                 <span>Restaurar Menu</span>
-                <kbd className="hidden sm:inline-block px-1 text-[9px] uppercase font-mono bg-black/40 text-zinc-300 rounded">Esc</kbd>
+                <kbd className="hidden sm:inline-block px-1 text-[9px] font-mono bg-black/40 text-zinc-300 rounded">Esc</kbd>
               </button>
             </div>
           </motion.div>
@@ -280,7 +280,7 @@ const RootScreens: React.FC<{ onPageReady: () => void }> = ({ onPageReady }) => 
     return (
       <div className="min-h-dvh bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-6">
         <ReadySignal onReady={onPageReady} />
-        <div className="max-w-md w-full bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 text-center shadow-lg">
+        <div className="max-w-md w-full bg-white dark:bg-zinc-900 p-8 rounded-xl border border-zinc-200/80 dark:border-zinc-800 text-center shadow-lg">
           <div className="w-14 h-14 bg-red-50 dark:bg-red-950/40 text-red-500 rounded-xl flex items-center justify-center mx-auto mb-5 border border-red-200/60 dark:border-red-800/50">
             <LogIn size={26} />
           </div>

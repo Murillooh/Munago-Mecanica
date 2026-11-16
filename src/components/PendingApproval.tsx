@@ -9,7 +9,7 @@ const POLL_MS = 15_000;
 
 const STEPS = [
   { label: 'Conta criada', detail: 'Seu acesso já está cadastrado.', state: 'done' },
-  { label: 'Aguardando entrar numa mecânica', detail: 'Um administrador vai vincular você a uma oficina.', state: 'current' },
+  { label: 'Aguardando entrar numa mecânica', detail: 'Um administrador vai vincular você a uma Base.', state: 'current' },
   { label: 'Acesso liberado', detail: 'Você entra direto no sistema, sem recarregar.', state: 'todo' },
 ] as const;
 
@@ -84,7 +84,7 @@ export const PendingApproval: React.FC<{
       >
         {/* Painel azul com a mesma divisa diagonal brilhante do login */}
         <div
-          className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 to-indigo-700 p-16 flex-col justify-between relative overflow-hidden"
+          className="hidden lg:flex flex-1 bg-blue-600 p-16 flex-col justify-between relative overflow-hidden"
           style={{ clipPath: `polygon(0 0, calc(100% - ${SLANT}px) 0, 100% 100%, 0 100%)` }}
         >
           <div aria-hidden="true" className="absolute inset-0" style={AUTH_PANEL_GRID} />
@@ -99,9 +99,9 @@ export const PendingApproval: React.FC<{
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-12">
               <img src="/brand/munago-mecanica-icon.svg" alt="" width={48} height={48} className="h-12 w-12 rounded-xl shadow-xl ring-1 ring-white/20" />
-              <span className="font-black text-3xl tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">Munago <span className="text-amber-300">Mecânica</span></span>
+              <span className="font-bold text-3xl tracking-tighter text-white">Munago <span className="text-amber-300">Mecânica</span></span>
             </div>
-            <h2 className="text-5xl font-black text-white leading-[1.1] mb-6 drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+            <h2 className="text-5xl font-bold text-white leading-[1.1] mb-6">
               Quase lá! <br />
               <span className="text-blue-200">Falta só liberar.</span>
             </h2>
@@ -125,12 +125,12 @@ export const PendingApproval: React.FC<{
         <div className="w-full lg:w-[460px] flex flex-col justify-center p-6 sm:p-12 lg:p-14">
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <img src="/brand/munago-mecanica-icon.svg" alt="" width={36} height={36} className="h-9 w-9 rounded-lg" />
-            <span className="font-black text-xl tracking-tight text-white">Munago <span className="text-amber-300">Mecânica</span></span>
+            <span className="font-bold text-xl tracking-tight text-white">Munago <span className="text-amber-300">Mecânica</span></span>
           </div>
 
           <motion.div {...rise(0)}><WaitingEmblem /></motion.div>
 
-          <motion.h1 {...rise(1)} className="text-3xl sm:text-4xl font-black tracking-tight text-white">Acesso em análise</motion.h1>
+          <motion.h1 {...rise(1)} className="text-3xl sm:text-4xl font-bold tracking-tight text-white">Acesso em análise</motion.h1>
           <motion.p {...rise(2)} className="mt-3 text-sm text-zinc-400 leading-relaxed max-w-md">
             Um administrador da <span className="font-semibold text-white">{storeName}</span> vai colocar você na sua mecânica e liberar o acesso em breve.
           </motion.p>
@@ -145,11 +145,6 @@ export const PendingApproval: React.FC<{
           <motion.ol {...rise(4)} className="relative mt-8 space-y-5" aria-label="Andamento da aprovação">
             <span aria-hidden="true" className="absolute left-[13px] top-7 h-[calc(50%-1.75rem)] w-0.5 rounded-full bg-emerald-500/70" />
             <span aria-hidden="true" className="absolute left-[13px] top-1/2 bottom-7 w-0.5 overflow-hidden rounded-full bg-zinc-800">
-              <motion.span
-                className="absolute inset-x-0 h-8 bg-gradient-to-b from-transparent via-blue-300 to-transparent"
-                animate={{ top: ['-2rem', '100%'] }}
-                transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-              />
             </span>
             {STEPS.map((s) => (
               <li key={s.label} className="relative flex items-start gap-4" aria-current={s.state === 'current' ? 'step' : undefined}>
@@ -193,7 +188,7 @@ export const PendingApproval: React.FC<{
               ) : (
                 <motion.div
                   key={nextAt}
-                  className="h-full origin-left rounded-full bg-gradient-to-r from-blue-600 to-blue-400"
+                  className="h-full origin-left rounded-full bg-blue-600"
                   initial={{ scaleX: 1 }}
                   animate={{ scaleX: 0 }}
                   transition={{ duration: Math.max(0, nextAt - Date.now()) / 1000, ease: 'linear' }}
@@ -207,7 +202,7 @@ export const PendingApproval: React.FC<{
               type="button"
               onClick={check}
               disabled={checking}
-              className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-blue-600/30 transition-[background-color,transform] hover:bg-blue-700 active:scale-[0.98] disabled:opacity-70 cursor-pointer"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-lg transition-[background-color,transform] hover:bg-blue-700 active:scale-[0.98] disabled:opacity-70 cursor-pointer"
             >
               <RefreshCw size={16} className={checking ? 'animate-spin' : ''} aria-hidden="true" />
               {checking ? 'Verificando…' : 'Verificar agora'}
@@ -215,7 +210,7 @@ export const PendingApproval: React.FC<{
             <button
               type="button"
               onClick={onLogout}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-800/60 px-5 py-3.5 text-sm font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 cursor-pointer"
+              className="flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/60 px-5 py-3.5 text-sm font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 cursor-pointer"
             >
               <LogOut size={16} aria-hidden="true" /> Sair
             </button>
@@ -224,7 +219,7 @@ export const PendingApproval: React.FC<{
       </motion.div>
 
       <div className="relative z-10 flex w-full justify-center">
-        <div className="flex flex-col items-center w-full max-w-3xl gap-1.5 px-4 sm:px-6 py-3 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-center text-white/70 text-[10px] sm:text-[11px] font-semibold tracking-[0.15em] sm:tracking-[0.3em] uppercase">
+        <div className="flex flex-col items-center w-full max-w-3xl gap-1.5 px-4 sm:px-6 py-3 rounded-xl bg-black/50 backdrop-blur-md border border-white/10 text-center text-white/70 text-[10px] sm:text-[11px] font-semibold tracking-[0.15em] sm:tracking-[0.3em] ">
           <span className="text-white">Munago Desenvolvedora de Software</span>
           <span>&copy; 2026 • Gestão Operacional • Versão 1.0.1</span>
         </div>

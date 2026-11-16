@@ -13,14 +13,14 @@
     <meta name="apple-mobile-web-app-title" content="Munago" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>Munago Mecânica - Gestão de Oficina</title>
+    <title>Munago Mecânica</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="120x120" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="description" content="Sistema profissional de gestão de estoque e almoxarifado com atualizações em tempo real e controle de ordens de serviço." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       (function() {
         try {
@@ -50,8 +50,7 @@
     </script>
     <!-- Preload: estilos no head porque o React reaproveita a mesma marcação (components/Preloader.tsx). -->
     <style>
-      .mp-root{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#09090b;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#f4f4f5}
-      .mp-root::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 48%,rgba(37,99,235,.24),transparent 72%),radial-gradient(ellipse 90% 85% at 50% 50%,transparent 60%,rgba(0,0,0,.5) 100%)}
+      .mp-root{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#09090b;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#f4f4f5}
       .mp-stage{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:18px;animation:mpIn .5s cubic-bezier(.22,1,.36,1) both}
       .mp-scene{perspective:720px;width:150px;height:118px;display:flex;align-items:center;justify-content:center}
       .mp-logo{position:relative;width:132px;height:104px;transform-style:preserve-3d;animation:mpSpin 5.5s ease-in-out infinite}
@@ -69,9 +68,9 @@
       .mp-floor{position:relative;width:120px;height:14px;margin-top:-6px;border-radius:50%;background:radial-gradient(closest-side,rgba(37,99,235,.45),transparent);filter:blur(4px);animation:mpFloor 5.5s ease-in-out infinite}
       .mp-word{font-size:22px;font-weight:800;letter-spacing:-.04em;color:#fff;line-height:1}
       .mp-word span{color:#fcd34d}
-      .mp-mark{width:64px;height:64px;border-radius:18px;box-shadow:0 12px 32px rgba(37,99,235,.35),0 0 0 1px rgba(255,255,255,.12);animation:mpPulse 2s ease-in-out infinite}
+      .mp-mark{width:64px;height:64px;border-radius:18px;box-shadow:0 0 0 1px rgba(255,255,255,.12);animation:mpPulse 2s ease-in-out infinite}
       .mp-track{position:relative;width:140px;height:3px;border-radius:999px;background:#27272a;overflow:hidden}
-      .mp-track span{position:absolute;top:0;bottom:0;width:40%;left:-40%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#93c5fd);box-shadow:0 0 12px rgba(96,165,250,.9);animation:mpSweep 1.3s cubic-bezier(.65,0,.35,1) infinite}
+      .mp-track span{position:absolute;top:0;bottom:0;width:40%;left:-40%;border-radius:999px;background:#2563eb;animation:mpSweep 1.3s cubic-bezier(.65,0,.35,1) infinite}
       .mp-caption{font-size:10px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:#71717a}
       @keyframes mpIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
       @keyframes mpSpin{0%,100%{transform:rotateX(14deg) rotateY(-32deg) translateY(0)}50%{transform:rotateX(8deg) rotateY(32deg) translateY(-8px)}}

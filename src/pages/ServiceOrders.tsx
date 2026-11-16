@@ -96,7 +96,7 @@ const whatsappLink = (phone?: string) => {
 const PlateBadge: React.FC<{ plate?: string }> = ({ plate }) => (
   <span className="inline-flex flex-col overflow-hidden rounded-[4px] border border-zinc-900 dark:border-zinc-300 bg-white leading-none shrink-0">
     <span className="h-[3px] bg-[#003399]" aria-hidden="true" />
-    <span className="px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wider text-zinc-900">
+    <span className="px-1.5 py-0.5 font-mono text-[11px] font-bold text-zinc-900">
       {plate || 'S/ PLACA'}
     </span>
   </span>
@@ -138,7 +138,7 @@ const PlateInput: React.FC<{ id: string; value: string; onChange: (v: string) =>
       autoComplete="off"
       spellCheck={false}
       disabled={disabled}
-      className="w-full bg-white py-1.5 text-center font-mono text-[1.6rem] font-bold uppercase tracking-[0.12em] text-zinc-900 outline-none placeholder:text-zinc-300 disabled:opacity-60"
+      className="w-full bg-white py-1.5 text-center font-mono text-[1.6rem] font-bold tracking-[0.12em] text-zinc-900 outline-none placeholder:text-zinc-300 disabled:opacity-60"
     />
   </div>
 );
@@ -521,7 +521,7 @@ export const ServiceOrders = () => {
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center text-center py-16 px-6 bg-white dark:bg-zinc-900/90 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
+        <div className="flex flex-col items-center text-center py-16 px-6 bg-white dark:bg-zinc-900/90 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800">
           <span className="p-3 rounded-xl border bg-zinc-50 dark:bg-zinc-800 border-zinc-200/70 dark:border-zinc-700 text-zinc-400">
             <FileText size={22} aria-hidden="true" />
           </span>
@@ -560,7 +560,7 @@ export const ServiceOrders = () => {
               aria-labelledby="os-dialog-title"
               {...macZoomProps()}
               transition={macZoom}
-              className="flex h-[100dvh] sm:h-auto sm:max-h-[min(860px,calc(100dvh-3rem))] w-full max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl"
+              className="flex h-[100dvh] sm:h-auto sm:max-h-[min(860px,calc(100dvh-3rem))] w-full max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xl"
             >
               {/* Cabeçalho: número da OS + etapa */}
               <header className="border-b border-zinc-200 dark:border-zinc-800 px-6 pt-5 pb-4 sm:px-8">
@@ -652,7 +652,7 @@ export const ServiceOrders = () => {
                   <div className="space-y-8">
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-0">
                       <section aria-labelledby="os-client-heading" className="space-y-4 md:pr-8">
-                        <h4 id="os-client-heading" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        <h4 id="os-client-heading" className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                           <User size={14} aria-hidden="true" /> Cliente
                         </h4>
                         <Field id="os-customer-name" label="Nome">
@@ -683,7 +683,7 @@ export const ServiceOrders = () => {
                       </section>
 
                       <section aria-labelledby="os-vehicle-heading" className="space-y-4 md:border-l md:border-zinc-200 md:pl-8 dark:md:border-zinc-800">
-                        <h4 id="os-vehicle-heading" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        <h4 id="os-vehicle-heading" className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                           <Car size={14} aria-hidden="true" /> Veículo
                         </h4>
                         <Field id="os-vehicle-plate" label="Placa">
@@ -975,7 +975,7 @@ export const ServiceOrders = () => {
               aria-describedby="os-delete-desc"
               {...macZoomProps()}
               transition={macZoom}
-              className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6"
+              className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6"
             >
               <span className="inline-flex p-2.5 rounded-xl border bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200/50 dark:border-red-900/40">
                 <AlertTriangle size={20} aria-hidden="true" />

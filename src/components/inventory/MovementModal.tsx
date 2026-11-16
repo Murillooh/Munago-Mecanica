@@ -100,7 +100,7 @@ export const MovementModal: React.FC<Props> = ({ open, type, product, allowNegat
             aria-labelledby={`${uid}-title`}
             {...macZoomProps()}
             transition={macZoom}
-            className="w-full max-w-md overflow-hidden border border-zinc-200 bg-white shadow-2xl sm:rounded-2xl dark:border-zinc-800 dark:bg-zinc-900"
+            className="w-full max-w-md overflow-hidden border border-zinc-200 bg-white shadow-2xl sm:rounded-xl dark:border-zinc-800 dark:bg-zinc-900"
           >
             <header className="flex items-start justify-between gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
               <div className="flex min-w-0 items-start gap-3">

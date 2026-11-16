@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { 
   Lock, 
   Mail, 
-  Sparkles, 
+  
   Palette, 
   X, 
   User,
@@ -35,7 +35,7 @@ type AuthStep = 'login' | 'newPassword' | 'resetCode';
 // Cadastro (tela "Criar Conta"): form = dados + senha | code = código enviado ao e-mail
 type SignupStep = 'form' | 'code';
 
-const inputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 pl-12 pr-5 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all text-sm font-medium";
+const inputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-4 pl-12 pr-5 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all text-sm font-medium";
 const passwordInputClass = inputClass.replace('pr-5', 'pr-12');
 
 const PasswordToggle: React.FC<{ visible: boolean; onToggle: () => void }> = ({ visible, onToggle }) => (
@@ -50,9 +50,9 @@ const PasswordToggle: React.FC<{ visible: boolean; onToggle: () => void }> = ({ 
   </button>
 );
 
-const regInputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 dark:text-white font-medium transition-all";
+const regInputClass = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 dark:text-white font-medium transition-all";
 const regPasswordInputClass = regInputClass.replace('pr-4', 'pr-12');
-const regLabelClass = "text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1";
+const regLabelClass = "text-[10px] font-bold text-zinc-400 ml-1";
 const regIconClass = "absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600";
 
 const SocialDivider: React.FC<{ label: string }> = ({ label }) => (
@@ -60,7 +60,7 @@ const SocialDivider: React.FC<{ label: string }> = ({ label }) => (
     <div className="absolute inset-0 flex items-center" aria-hidden="true">
       <div className="w-full border-t border-zinc-100 dark:border-zinc-800"></div>
     </div>
-    <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em]">
+    <div className="relative flex justify-center text-[10px] tracking-[0.2em]">
       <span className="bg-white dark:bg-zinc-900 px-4 text-zinc-400 font-bold">{label}</span>
     </div>
   </div>
@@ -72,7 +72,7 @@ const GoogleButton: React.FC<{ id: string; label: string; onClick: () => void; d
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className="w-full flex items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-8 py-3.5 rounded-2xl font-bold transition-all border border-zinc-200 dark:border-zinc-700 shadow-sm disabled:opacity-50 cursor-pointer active:scale-95"
+    className="w-full flex items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-8 py-3.5 rounded-xl font-bold transition-all border border-zinc-200 dark:border-zinc-700 shadow-sm disabled:opacity-50 cursor-pointer active:scale-95"
   >
     <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -353,7 +353,7 @@ const Login: React.FC = () => {
           animate={{ x: brandX }}
           transition={sideSwapTransition}
           style={{ clipPath: brandClip }}
-          className="hidden lg:flex flex-1 lg:-ml-16 lg:-mr-32 bg-gradient-to-br from-blue-600 to-indigo-700 p-16 lg:pl-32 flex-col justify-between relative overflow-hidden z-10"
+          className="hidden lg:flex flex-1 lg:-ml-16 lg:-mr-32 bg-blue-600 p-16 lg:pl-32 flex-col justify-between relative overflow-hidden z-10"
         >
           <div aria-hidden="true" className="absolute inset-0" style={PANEL_GRID} />
           {panelWidths.brand > 0 && (
@@ -372,7 +372,7 @@ const Login: React.FC = () => {
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-12">
               <img src="/brand/munago-mecanica-icon.svg" alt="" width={48} height={48} className="h-12 w-12 rounded-xl shadow-xl ring-1 ring-white/20" />
-              <span className="font-black text-3xl tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">Munago <span className="text-amber-300">Mecânica</span></span>
+              <span className="font-bold text-3xl tracking-tighter text-white">Munago <span className="text-amber-300">Mecânica</span></span>
             </div>
             
             <AnimatePresence mode="wait" initial={false}>
@@ -385,19 +385,19 @@ const Login: React.FC = () => {
               >
                 {view === 'login' ? (
                   <>
-                    <h2 className="text-5xl font-black text-white leading-[1.1] mb-6 drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]">
-                      Gestão Inteligente <br />
-                      <span className="text-blue-200">Para sua Oficina.</span>
+                    <h2 className="text-5xl font-bold text-white leading-[1.1] mb-6">
+                      Estoque e OS <br />
+                      <span className="text-blue-200">da sua oficina.</span>
                     </h2>
                     <p className="text-blue-50 text-lg font-medium max-w-md leading-relaxed opacity-80">
-                      Controle de estoque, ordens de serviço e inteligência artificial em uma única plataforma robusta e intuitiva.
+                      Peças, ordens de serviço e equipe num lugar só.
                     </p>
                   </>
                 ) : (
                   <>
-                    <h2 className="text-5xl font-black text-white leading-[1.1] mb-6 drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]">
-                      Faça parte <br />
-                      <span className="text-blue-200">da plataforma.</span>
+                    <h2 className="text-5xl font-bold text-white leading-[1.1] mb-6">
+                      Cadastre <br />
+                      <span className="text-blue-200">sua oficina.</span>
                     </h2>
                     <p className="text-blue-50 text-lg font-medium max-w-md leading-relaxed opacity-80">
                       Crie sua conta em poucos passos. Assim que um administrador liberar, você já entra no sistema.
@@ -431,7 +431,7 @@ const Login: React.FC = () => {
           {/* Celular/tablet: o painel azul some, então a marca vem para o topo do formulário. */}
           <div className="lg:hidden mb-8 flex items-center gap-2.5">
             <img src="/brand/munago-mecanica-icon.svg" alt="" width={36} height={36} className="h-9 w-9 rounded-lg" />
-            <span className="font-black text-xl tracking-tight text-zinc-900 dark:text-white">Munago <span className="text-amber-500 dark:text-amber-300">Mecânica</span></span>
+            <span className="font-bold text-xl tracking-tight text-zinc-900 dark:text-white">Munago <span className="text-amber-500 dark:text-amber-300">Mecânica</span></span>
           </div>
           <AnimatePresence mode="wait" initial={false} custom={direction} onExitComplete={focusCurrentView}>
             {view === 'login' ? (
@@ -445,7 +445,7 @@ const Login: React.FC = () => {
                 transition={screenTransition}
               >
                 <div className="mb-10">
-                  <h1 className="text-3xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">
+                  <h1 className="text-3xl font-bold text-zinc-900 dark:text-white mb-2 tracking-tight">
                     {titles[authStep][0]}
                   </h1>
                   <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
@@ -457,7 +457,7 @@ const Login: React.FC = () => {
                   {showsCredentials && (
                     <>
                       <div className="space-y-1.5">
-                        <label htmlFor="login-email-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">E-mail</label>
+                        <label htmlFor="login-email-input" className="text-[10px] font-bold text-zinc-400 ml-1">E-mail</label>
                         <div className="relative group">
                           <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
                           <input
@@ -476,7 +476,7 @@ const Login: React.FC = () => {
                       </div>
 
                       <div className="space-y-1.5 font-sans">
-                        <label htmlFor="login-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Senha</label>
+                        <label htmlFor="login-password-input" className="text-[10px] font-bold text-zinc-400 ml-1">Senha</label>
                         <div className="relative group">
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
                           <input
@@ -498,7 +498,7 @@ const Login: React.FC = () => {
                             id="btn-forgot-password"
                             type="button"
                             onClick={handleForgotPassword}
-                            className="text-[10px] font-bold text-zinc-400 hover:text-blue-600 transition-colors uppercase tracking-widest cursor-pointer"
+                            className="text-[10px] font-bold text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
                           >
                             Esqueceu a senha?
                           </button>
@@ -509,7 +509,7 @@ const Login: React.FC = () => {
 
                   {showsCode && (
                     <div className="space-y-1.5">
-                      <label htmlFor="reset-code-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Código de verificação</label>
+                      <label htmlFor="reset-code-input" className="text-[10px] font-bold text-zinc-400 ml-1">Código de verificação</label>
                       <div className="relative group">
                         <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
                         <input
@@ -529,7 +529,7 @@ const Login: React.FC = () => {
                   {showsNewPassword && (
                     <>
                       <div className="space-y-1.5">
-                        <label htmlFor="new-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Nova senha</label>
+                        <label htmlFor="new-password-input" className="text-[10px] font-bold text-zinc-400 ml-1">Nova senha</label>
                         <div className="relative group">
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
                           <input
@@ -551,7 +551,7 @@ const Login: React.FC = () => {
                         </p>
                       </div>
                       <div className="space-y-1.5">
-                        <label htmlFor="confirm-password-input" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">Confirmar nova senha</label>
+                        <label htmlFor="confirm-password-input" className="text-[10px] font-bold text-zinc-400 ml-1">Confirmar nova senha</label>
                         <div className="relative group">
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-600 transition-colors" size={18} aria-hidden="true" />
                           <input
@@ -577,7 +577,7 @@ const Login: React.FC = () => {
                       role="alert"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs font-bold"
+                      className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs font-bold"
                     >
                       <AlertCircle size={16} aria-hidden="true" />
                       <p>{loginError}</p>
@@ -588,7 +588,7 @@ const Login: React.FC = () => {
                     id="btn-login-submit"
                     type="submit"
                     disabled={isLoggingIn}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black transition-all transform active:scale-95 shadow-xl shadow-blue-600/20 dark:shadow-blue-500/40 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-widest mt-6 cursor-pointer"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold transition-all transform active:scale-95 shadow-xl dark: flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed text-sm mt-6 cursor-pointer"
                   >
                     {isLoggingIn ? (
                       <>
@@ -648,7 +648,7 @@ const Login: React.FC = () => {
                     <ArrowLeft size={20} aria-hidden="true" />
                   </button>
                   <div>
-                    <h1 className="text-3xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">
+                    <h1 className="text-3xl font-bold text-zinc-900 dark:text-white mb-2 tracking-tight">
                       {signupStep === 'code' ? 'Confirme seu e-mail' : 'Criar Conta'}
                     </h1>
                     <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
@@ -753,7 +753,7 @@ const Login: React.FC = () => {
                     <div
                       id="signup-error"
                       role="alert"
-                      className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs font-bold"
+                      className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 text-xs font-bold"
                     >
                       <AlertCircle size={16} aria-hidden="true" />
                       <p>{signupError}</p>
@@ -764,7 +764,7 @@ const Login: React.FC = () => {
                     id="btn-reg-submit"
                     type="submit"
                     disabled={registrationLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:opacity-50 mt-2 cursor-pointer active:scale-95"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 mt-2 cursor-pointer active:scale-95"
                   >
                     {registrationLoading ? (
                       <>
@@ -818,7 +818,7 @@ const Login: React.FC = () => {
       {/* Footer info */}
       {/* No fluxo (abaixo do card): em celular ou tela baixa não sobrepõe o formulário. */}
       <div className="relative z-10 flex w-full justify-center">
-        <div className="flex flex-col items-center w-full max-w-3xl gap-1.5 px-4 sm:px-6 py-3 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 shadow-xl shadow-black/60 transition-[border-color,box-shadow,background-color] duration-300 ease-out motion-reduce:transition-none hover:bg-black/60 hover:border-blue-400/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.45)] text-center text-white/70 text-[10px] sm:text-[11px] font-semibold tracking-[0.15em] sm:tracking-[0.3em] uppercase">
+        <div className="flex flex-col items-center w-full max-w-3xl gap-1.5 px-4 sm:px-6 py-3 rounded-xl bg-black/50 backdrop-blur-md border border-white/10 shadow-xl shadow-black/60 transition-[border-color,box-shadow,background-color] duration-300 ease-out motion-reduce:transition-none hover:bg-black/60 hover:border-blue-400/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.45)] text-center text-white/70 text-[10px] sm:text-[11px] font-semibold tracking-[0.15em] sm:tracking-[0.3em] ">
           <span className="text-white">Munago Desenvolvedora de Software</span>
           <span>&copy; 2026 • Gestão Operacional • Versão 1.0.1</span>
         </div>
