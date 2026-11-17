@@ -9,7 +9,7 @@ const POLL_MS = 15_000;
 
 const STEPS = [
   { label: 'Conta criada', detail: 'Seu acesso já está cadastrado.', state: 'done' },
-  { label: 'Aguardando entrar numa mecânica', detail: 'Um administrador vai vincular você a uma Base.', state: 'current' },
+  { label: 'Aguardando a Base', detail: 'Um administrador vai escolher a sua Base.', state: 'current' },
   { label: 'Acesso liberado', detail: 'Você entra direto no sistema, sem recarregar.', state: 'todo' },
 ] as const;
 
@@ -132,7 +132,7 @@ export const PendingApproval: React.FC<{
 
           <motion.h1 {...rise(1)} className="text-3xl sm:text-4xl font-bold tracking-tight text-white">Acesso em análise</motion.h1>
           <motion.p {...rise(2)} className="mt-3 text-sm text-zinc-400 leading-relaxed max-w-md">
-            Um administrador da <span className="font-semibold text-white">{storeName}</span> vai colocar você na sua mecânica e liberar o acesso em breve.
+            Um administrador vai escolher a Base em que você vai trabalhar e liberar o acesso em breve.
           </motion.p>
           {email && (
             <motion.p {...rise(3)} className="mt-4 inline-flex w-fit items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-1.5 font-mono text-xs text-zinc-300">

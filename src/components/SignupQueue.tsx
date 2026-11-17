@@ -24,8 +24,8 @@ function since(iso: string) {
 const fieldCls = 'rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs font-medium text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white';
 
 /**
- * Fila (só do admin geral) de quem criou conta e ainda não está em nenhuma mecânica:
- * escolhe qualquer mecânica (ou cria uma nova) e pode recusar. Some quando não há ninguém esperando.
+ * Fila (só do admin geral) de quem criou conta e ainda não está em nenhuma Base:
+ * escolhe qualquer Base (ou cria uma nova) e pode recusar. Some quando não há ninguém esperando.
  */
 export const SignupQueue: React.FC<{ workspaces: { id: string; name: string }[]; onDone?: () => void }> = (props) => {
   const [items, setItems] = useState<Signup[]>([]);
@@ -53,7 +53,7 @@ export const SignupQueue: React.FC<{ workspaces: { id: string; name: string }[];
     const target = dest[s.id] ?? props.workspaces[0]?.id ?? NEW_WORKSPACE;
     const isNew = target === NEW_WORKSPACE;
     const name = (newName[s.id] ?? `Base de ${s.name}`).trim();
-    if (!target || (isNew && !name)) return toast.error('Escolha a mecânica.');
+    if (!target || (isNew && !name)) return toast.error('Escolha a Base.');
     setBusy(s.id);
     try {
       await apiPost(`/signups/${s.id}/assign`, isNew
@@ -88,10 +88,10 @@ export const SignupQueue: React.FC<{ workspaces: { id: string; name: string }[];
     <section aria-labelledby="signup-queue-title" className="overflow-hidden rounded-xl border border-amber-300/60 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/10">
       <div className="flex items-center gap-2 border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/40">
         <UserPlus size={16} className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
-        <h2 id="signup-queue-title" className="text-sm font-semibold text-zinc-900 dark:text-white">Cadastros novos aguardando mecânica</h2>
+        <h2 id="signup-queue-title" className="text-sm font-semibold text-zinc-900 dark:text-white">Cadastros novos aguardando Base</h2>
         <span className="rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">{items.length}</span>
         <p className="ml-auto hidden text-xs text-zinc-500 sm:block dark:text-zinc-400">
-          Escolha a mecânica de cada pessoa e aprove.
+          Escolha a Base de cada pessoa e aprove.
         </p>
       </div>
 
@@ -109,7 +109,7 @@ export const SignupQueue: React.FC<{ workspaces: { id: string; name: string }[];
 
               <div className="flex flex-wrap items-center gap-2">
                 <>
-                    <label htmlFor={`dest-${s.id}`} className="sr-only">Mecânica de {s.name}</label>
+                    <label htmlFor={`dest-${s.id}`} className="sr-only">Base de {s.name}</label>
                     <select
                       id={`dest-${s.id}`}
                       value={target}
@@ -117,11 +117,11 @@ export const SignupQueue: React.FC<{ workspaces: { id: string; name: string }[];
                       className={`${fieldCls} max-w-[14rem] cursor-pointer`}
                     >
                       {props.workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                      <option value={NEW_WORKSPACE}>+ Nova mecânica</option>
+                      <option value={NEW_WORKSPACE}>+ Nova Base</option>
                     </select>
                     {isNew && (
                       <>
-                        <label htmlFor={`name-${s.id}`} className="sr-only">Nome da nova mecânica</label>
+                        <label htmlFor={`name-${s.id}`} className="sr-only">Nome da nova Base</label>
                         <input
                           id={`name-${s.id}`}
                           value={newName[s.id] ?? `Base de ${s.name}`}

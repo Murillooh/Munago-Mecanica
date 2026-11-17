@@ -91,7 +91,7 @@ export function authMiddleware(opts: { db: DB; verifier: TokenVerifier; bootstra
         // Admin geral (instalação nova): ganha a própria oficina e é admin dela.
         if (emailVerified && admins.has(email)) {
           const workspaceId = crypto.randomUUID();
-          await tx.insert(workspaces).values({ id: workspaceId, name: `Oficina de ${name}` });
+          await tx.insert(workspaces).values({ id: workspaceId, name: `Base de ${name}` });
           const [created] = await tx.insert(users).values({
             id: claims.sub, workspaceId, email, name,
             role: 'admin', status: 'approved', permissions: ROLE_PERMISSIONS.admin,

@@ -56,7 +56,7 @@ describe('authMiddleware', () => {
     expect(res.body).toMatchObject({ role: 'admin', status: 'approved', isSuperAdmin: true });
     expect(res.body.workspaceId).not.toBe(UNASSIGNED_WORKSPACE);
     const [w] = await db.select().from(workspaces).where(eq(workspaces.id, res.body.workspaceId));
-    expect(w.name).toBe('Oficina de Fulano');
+    expect(w.name).toBe('Base de Fulano');
   });
 
   it('admin geral não "entra" na área de cadastros sem oficina', async () => {
