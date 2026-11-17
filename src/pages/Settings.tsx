@@ -532,7 +532,7 @@ export const SettingsView = () => {
                 </button>
               </>
             ) : drive?.configured ? (
-              <button type="button" onClick={() => openGoogleAuth('drive')} disabled={isConnectingDrive} className={secondaryBtn}>
+              <button type="button" onClick={() => openGoogleAuth()} disabled={isConnectingDrive} className={secondaryBtn}>
                 {isConnectingDrive ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Link2 size={14} className="text-blue-600" aria-hidden="true" />}
                 Conectar Google Drive
               </button>

@@ -5,15 +5,12 @@ import { googleConnections } from '../db/schema';
 import type { DB } from '../db/client';
 import { ApiError } from '../middleware/errorHandler';
 
-export type GooglePurpose = 'drive' | 'sheets';
-
 const BASE_SCOPES = [
   // Backup/restauração no Google Drive (só arquivos criados pelo app)
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://www.googleapis.com/auth/userinfo.email',
 ];
-const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 const STATE_TTL_MS = 10 * 60 * 1000;
 // Renova um pouco antes de expirar para o navegador não receber token prestes a vencer.
 const REFRESH_MARGIN_MS = 2 * 60 * 1000;
@@ -144,11 +141,11 @@ export function createGoogleOAuth(cfg: GoogleOAuthConfig) {
   return {
     configured,
 
-    authUrl(userId: string, purpose: GooglePurpose) {
+    authUrl(userId: string) {
       assertConfigured();
       return makeClient().generateAuthUrl({
         access_type: 'offline',
-        scope: purpose === 'sheets' ? [...BASE_SCOPES, SHEETS_SCOPE] : BASE_SCOPES,
+        scope: BASE_SCOPES,
         // Mantém o que o usuário já autorizou (ex.: Drive) ao pedir planilhas depois.
         include_granted_scopes: true,
         prompt: 'consent',
@@ -172,7 +169,7 @@ export function createGoogleOAuth(cfg: GoogleOAuthConfig) {
         .where(eq(googleConnections.userId, userId));
       // E-mail da conta Google conectada, para a tela mostrar qual conta está ligada.
       const email = row ? emailFromIdToken((await load(userId))?.id_token) : null;
-      return { connected: Boolean(row), sheets: Boolean(row?.scope?.includes(SHEETS_SCOPE)), email };
+      return { connected: Boolean(row), email };
     },
 
     async accessToken(userId: string) {

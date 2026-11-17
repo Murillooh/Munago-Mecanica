@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { MovementModal } from '../components/inventory/MovementModal';
 import CategoryManager from '../components/CategoryManager';
 
-import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { InventoryAISummary } from '../components/InventoryAISummary';
 import { apiGet } from '../lib/api';
 
@@ -60,19 +59,10 @@ export const Inventory = () => {
     toggleMonitorMode
   } = useApp();
 
-  const { openGoogleAuth, isLoading: isAuthenticatingGoogle } = useGoogleAuth();
-
   const generateImage = async (category: string) => {
     toast.error('Gerar imagens requer chave de API Gemini no backend.');
     return '';
   };
-  // Tokens do Google ficam no servidor (por usuário); a planilha é lida por lá.
-  const fetchGoogleSheetsData = async (spreadsheetId: string, range: string) => {
-    const q = new URLSearchParams({ spreadsheetId, range });
-    const data = await apiGet<{ values: any[][] }>(`/google/sheets?${q}`);
-    return data.values || [];
-  };
-  const [googleConfig, setGoogleConfig] = useState({ hasClientId: true, hasClientSecret: true });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -85,12 +75,7 @@ export const Inventory = () => {
   const [formImageUrl, setFormImageUrl] = useState('');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [deleteProductConfirm, setDeleteProductConfirm] = useState<string | null>(null);
-  const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState(false);
   const [isAiSummaryOpen, setIsAiSummaryOpen] = useState(false);
-  const [isFetchingSheets, setIsFetchingSheets] = useState(false);
-  const [isGoogleAuthenticated, setIsGoogleAuthenticated] = useState(false);
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState('');
-  const [sheetRange, setSheetRange] = useState('Página1!A1:Z100');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
   useEffect(() => {
@@ -102,15 +87,6 @@ export const Inventory = () => {
       setFormImageUrl('');
     }
   }, [selectedProduct, isModalOpen]);
-
-  useEffect(() => {
-    apiGet<{ configured: boolean; sheets: boolean }>('/google/status')
-      .then(({ configured, sheets }) => {
-        setGoogleConfig({ hasClientId: configured, hasClientSecret: configured });
-        setIsGoogleAuthenticated(sheets);
-      })
-      .catch(() => {});
-  }, []);
 
   // Ordem fixa das categorias existentes: define a cor de cada uma nos cartões.
   const categoryOrder = useMemo(
@@ -247,118 +223,6 @@ export const Inventory = () => {
     }
   };
 
-  const handleGoogleAuth = () => {
-    openGoogleAuth('sheets');
-  };
-
-  const extractSpreadsheetId = (urlOrId: string): string => {
-    const match = urlOrId.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    return match ? match[1] : urlOrId.trim();
-  };
-
-  const handleFetchGoogleSheetsData = async () => {
-    if (!spreadsheetUrl.trim()) {
-      toast.error('Por favor, informe a URL ou o ID de sua planilha Google.');
-      return;
-    }
-
-    const spreadsheetId = extractSpreadsheetId(spreadsheetUrl);
-    setIsFetchingSheets(true);
-    const toastId = toast.loading('Sincronizando planilha com o banco de dados...');
-    
-    try {
-      const values = await fetchGoogleSheetsData(spreadsheetId, sheetRange);
-      if (!values || values.length < 2) {
-        toast.error('Planilha vazia ou com dados insuficientes (é necessário ao menos cabeçalho e uma linha de dados).', { id: toastId });
-        setIsFetchingSheets(false);
-        return;
-      }
-
-      // Parse headers from the first row
-      const headers = values[0].map((h: any) => (h || '').toString().toLowerCase().trim());
-      
-      // Auto-detect columns indices
-      let skuIdx = headers.findIndex((h: string) => h.includes('sku') || h.includes('código') || h.includes('codigo') || h.includes('tag') || h.includes('id'));
-      let nameIdx = headers.findIndex((h: string) => h.includes('nome') || h.includes('produto') || h.includes('item') || h.includes('descri') || h.includes('titulo'));
-      let qtyIdx = headers.findIndex((h: string) => h.includes('quant') || h.includes('qtd') || h.includes('quantidade') || h.includes('estoque') || h.includes('saldo'));
-      let priceIdx = headers.findIndex((h: string) => h.includes('preç') || h.includes('preco') || h.includes('preço') || h.includes('valor') || h.includes('custo') || h.includes('venda'));
-      let categoryIdx = headers.findIndex((h: string) => h.includes('cat') || h.includes('categoria'));
-      let minQtyIdx = headers.findIndex((h: string) => h.includes('min') || h.includes('mín') || h.includes('alerta') || h.includes('mínimo'));
-
-      // Fallbacks if name is not auto-detected
-      if (nameIdx === -1) {
-        skuIdx = skuIdx !== -1 ? skuIdx : 0;
-        nameIdx = nameIdx !== -1 ? nameIdx : 1;
-        qtyIdx = qtyIdx !== -1 ? qtyIdx : 2;
-        priceIdx = priceIdx !== -1 ? priceIdx : 3;
-      }
-
-      let addedCount = 0;
-      let updatedCount = 0;
-
-      // Iterate through rows (skipping headers)
-      for (let i = 1; i < values.length; i++) {
-        const row = values[i];
-        if (!row || row.length === 0) continue;
-
-        const name = row[nameIdx] ? row[nameIdx].toString().trim() : '';
-        if (!name) continue;
-
-        const sku = skuIdx !== -1 && row[skuIdx] ? row[skuIdx].toString().trim() : '';
-        
-        // Parse numeric values safely
-        const rawQty = qtyIdx !== -1 && row[qtyIdx] ? row[qtyIdx].toString().replace(/[^\d.-]/g, '') : '0';
-        const quantity = Math.max(0, parseInt(rawQty, 10) || 0);
-
-        const rawPrice = priceIdx !== -1 && row[priceIdx] ? row[priceIdx].toString().replace(/[^\d.,-]/g, '').replace(',', '.') : '0';
-        const price = Math.max(0, parseFloat(rawPrice) || 0);
-
-        const category = categoryIdx !== -1 && row[categoryIdx] ? row[categoryIdx].toString().trim() : 'Geral';
-        
-        const rawMinQty = minQtyIdx !== -1 && row[minQtyIdx] ? row[minQtyIdx].toString().replace(/[^\d.-]/g, '') : '5';
-        const minQuantity = Math.max(1, parseInt(rawMinQty, 10) || 5);
-
-        // Find existing product by SKU or exact Name matches
-        const existingProduct = products.find(p => (sku && p.sku === sku) || (p.name.toLowerCase() === name.toLowerCase()));
-
-        if (existingProduct) {
-          // Update existing keys
-          await updateProduct(existingProduct.id, {
-            sku: sku || existingProduct.sku || '',
-            name: name,
-            quantity: quantity,
-            price: price,
-            category: category,
-            minQuantity: minQuantity,
-            lastUpdated: new Date()
-          });
-          updatedCount++;
-        } else {
-          // Add brand new product
-          await addProduct({
-            sku: sku,
-            name: name,
-            quantity: quantity,
-            price: price,
-            category: category,
-            minQuantity: minQuantity,
-            createdAt: new Date(),
-            lastUpdated: new Date()
-          });
-          addedCount++;
-        }
-      }
-
-      toast.success(`Sincronização concluída! Adicionados: ${addedCount}, Atualizados: ${updatedCount}`, { id: toastId, duration: 5000 });
-      setIsGoogleSheetsModalOpen(false);
-    } catch (e: any) {
-      console.error('Error synchronizing sheet:', e);
-      toast.error(`Falha ao sincronizar: ${e.message || 'Erro desconhecido'}`, { id: toastId });
-    } finally {
-      setIsFetchingSheets(false);
-    }
-  };
-
   return (
     // Sem animação própria: a troca de aba (App) já anima a entrada da tela.
     <motion.div
@@ -377,9 +241,6 @@ export const Inventory = () => {
           </button>
           <button onClick={() => handleExportData('xlsx')} className={heroBtn}>
             <FileSpreadsheet size={14} aria-hidden="true" /> Excel
-          </button>
-          <button onClick={() => setIsGoogleSheetsModalOpen(true)} className={heroBtn}>
-            <FileSpreadsheet size={14} aria-hidden="true" /> Planilha Google
           </button>
           <button onClick={() => setIsAiSummaryOpen(true)} className={heroBtn}>
             <ClipboardList size={14} aria-hidden="true" /> Resumo do estoque
@@ -715,116 +576,6 @@ export const Inventory = () => {
           </table>
         </div>
       )}
-
-       {/* Google Sheets Sync Modal */}
-       <AnimatePresence>
-        {isGoogleSheetsModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsGoogleSheetsModalOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              {...macZoomProps()}
-              transition={macZoom}
-              className="relative bg-white dark:bg-zinc-900 w-full max-w-lg rounded-xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl overflow-hidden z-10"
-            >
-              <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/90 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/50 dark:border-emerald-900/50 shadow-xs">
-                    <FileSpreadsheet size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">Sincronização Google Sheets</h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Sincronize SKUs, saldos e custos em tempo real.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGoogleSheetsModalOpen(false)}
-                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="p-5 sm:p-6 space-y-4 text-xs sm:text-sm">
-                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-zinc-50 dark:bg-zinc-800/60 p-3.5 rounded-xl border border-zinc-200/70 dark:border-zinc-700/70">
-                  O sistema reconhece as colunas de <strong>SKU</strong>, <strong>Nome/Descrição</strong>, <strong>Quantidade</strong>, <strong>Preço Unitário</strong> e <strong>Estoque Mínimo</strong>.
-                </p>
-
-                {isGoogleAuthenticated && (
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                        Link ou ID da Planilha Google *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="https://docs.google.com/spreadsheets/d/.../edit"
-                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-xs sm:text-sm font-medium text-zinc-900 dark:text-white outline-none focus:border-emerald-600 transition-colors"
-                        value={spreadsheetUrl}
-                        onChange={(e) => setSpreadsheetUrl(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                        Intervalo (Range / Página)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Folha1!A1:Z100 ou A1:Z100"
-                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-xs sm:text-sm font-medium text-zinc-900 dark:text-white outline-none focus:border-emerald-600 transition-colors"
-                        value={sheetRange}
-                        onChange={(e) => setSheetRange(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {googleConfig && (!googleConfig.hasClientId || !googleConfig.hasClientSecret) && (
-                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 p-3 rounded-xl text-amber-700 dark:text-amber-400 text-xs flex items-center gap-2">
-                    <AlertTriangle size={15} /> Credenciais OAuth do Google pendentes no ambiente.
-                  </div>
-                )}
-
-                <div className="flex gap-2.5 pt-2">
-                  <button 
-                    type="button"
-                    onClick={() => setIsGoogleSheetsModalOpen(false)}
-                    className="flex-1 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/70 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-zinc-200/80 dark:border-zinc-700"
-                  >
-                    Cancelar
-                  </button>
-                  {!isGoogleAuthenticated ? (
-                    <button 
-                      type="button"
-                      onClick={handleGoogleAuth}
-                      disabled={!googleConfig?.hasClientId}
-                      className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition-all shadow-xs active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      <LogIn size={15} /> Conectar Google
-                    </button>
-                  ) : (
-                    <button 
-                      type="button"
-                      onClick={handleFetchGoogleSheetsData}
-                      disabled={isFetchingSheets}
-                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition-all shadow-xs active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isFetchingSheets ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-                      {isFetchingSheets ? 'Puxando Dados...' : 'Sincronizar Agora'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <CategoryManager 
         isOpen={isCategoryManagerOpen} 

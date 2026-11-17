@@ -26,12 +26,12 @@ export function useGoogleAuth() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  /** 'drive': só backup (escopos não sensíveis, sem aviso do Google). 'sheets': acrescenta leitura de planilhas. */
-  const openGoogleAuth = async (purpose: 'drive' | 'sheets' = 'drive') => {
+  /** Conecta a conta Google para o backup no Drive (escopos não sensíveis). */
+  const openGoogleAuth = async () => {
     setIsLoading(true);
     try {
       // Sem isso, um erro do servidor (ex.: OAuth do Google não configurado) abria um popup about:blank.
-      const { url } = await apiGet<{ url: string }>(`/google/auth-url?purpose=${purpose}`);
+      const { url } = await apiGet<{ url: string }>('/google/auth-url');
       window.open(url, 'google-auth-popup', 'width=500,height=600');
     } catch (err) {
       console.error('Error opening auth:', err);

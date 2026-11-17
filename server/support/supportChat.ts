@@ -78,7 +78,7 @@ Sistema web de gestão para oficinas de motos: almoxarifado (estoque de peças),
 - "Novo Produto" cadastra a peça: nome, SKU, categoria, preço, mão de obra, quantidade, estoque mínimo, fornecedor, lote, validade, foto e observação. Lápis edita, lixeira exclui.
 - Entrada e saída: botões "Entrar" e "Sair" no cartão da peça. Informe a quantidade (há atalhos 1, 5, 10) e o motivo (ex.: "Compra", "Uso em ordem de serviço"). O sistema mostra o saldo antes e depois. Saída maior que o saldo é bloqueada.
 - Busca por SKU, nome ou código; filtro por categoria; visualização em grade ou lista.
-- Exportar: "Relatório PDF", "CSV" e "Excel". "Sheets Sync" importa peças de uma planilha do Google (precisa conectar a conta Google). "Análise IA" gera um resumo inteligente do estoque.
+- Exportar: "Relatório PDF", "CSV" e "Excel". "Análise IA" gera um resumo inteligente do estoque.
 - Quando uma peça chega ao estoque mínimo, o sistema cria um alerta automaticamente.
 
 ## Ordens de serviço (OS)

@@ -64,8 +64,9 @@ describe('Google OAuth', () => {
   });
 
   it('callback guarda tokens cifrados para o usuário do state; navegador só recebe o access_token', async () => {
-    const { url } = (await h.as('editor').get('/google/auth-url?purpose=sheets').expect(200)).body;
-    expect(url).toContain('spreadsheets.readonly');
+    const { url } = (await h.as('editor').get('/google/auth-url').expect(200)).body;
+    expect(url).toContain('drive.file');
+    expect(url).not.toContain('spreadsheets');
 
     await g.handleCallback('abc', stateFrom(url));
     const [row] = await h.db.select().from(googleConnections);
@@ -98,7 +99,7 @@ describe('Google OAuth', () => {
 
   it('renova o access_token vencido mantendo o refresh_token', async () => {
     client.getToken.mockResolvedValueOnce({ tokens: { access_token: 'velho', refresh_token: 'rt', expiry_date: Date.now() - 1000, scope: 'x' } });
-    await g.handleCallback('c', stateFrom(g.authUrl('editor', 'drive')));
+    await g.handleCallback('c', stateFrom(g.authUrl('editor')));
 
     expect(await g.accessToken('editor')).toMatchObject({ accessToken: 'at-refreshed' });
     expect(client.refreshAccessToken).toHaveBeenCalledOnce();
@@ -109,7 +110,7 @@ describe('Google OAuth', () => {
 
   it('acesso revogado no Google: remove a conexão', async () => {
     client.getToken.mockResolvedValueOnce({ tokens: { access_token: 'velho', refresh_token: 'rt', expiry_date: 0, scope: 'x' } });
-    await g.handleCallback('c', stateFrom(g.authUrl('editor', 'drive')));
+    await g.handleCallback('c', stateFrom(g.authUrl('editor')));
     client.refreshAccessToken.mockRejectedValueOnce(new Error('invalid_grant'));
 
     expect(await g.accessToken('editor')).toBeNull();
@@ -117,15 +118,10 @@ describe('Google OAuth', () => {
   });
 
   it('desconectar apaga e revoga', async () => {
-    await g.handleCallback('abc', stateFrom(g.authUrl('editor', 'drive')));
+    await g.handleCallback('abc', stateFrom(g.authUrl('editor')));
     await h.as('editor').del('/google/connection').expect(204);
     expect(client.revokeToken).toHaveBeenCalledWith('rt-abc');
     expect((await h.as('editor').get('/google/status').expect(200)).body).toMatchObject({ connected: false });
   });
 
-  it('planilhas: valida o ID e exige canManageInventory', async () => {
-    await h.as('viewer').get('/google/sheets?spreadsheetId=abcdefghijk').expect(403);
-    await h.as('editor').get('/google/sheets?spreadsheetId=../../x').expect(400);
-    await h.as('editor').get('/google/sheets?spreadsheetId=abcdefghijk').expect(404);
-  });
 });
