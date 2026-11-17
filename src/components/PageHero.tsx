@@ -27,12 +27,12 @@ export const PageHero: React.FC<{
   statsClassName?: string;
   /** id do grid de indicadores (o Modo Monitor rola até ele). */
   statsId?: string;
-  /** Visual antigo (gradiente índigo): só no topo do painel inicial. */
+  /** Visual índigo (padrão em todas as páginas); false = topo azul-escuro sóbrio. */
   classic?: boolean;
-}> = ({ icon: Icon, title, subtitle, eyebrow, titleAside, actions, children, statsClassName, statsId, classic }) => {
+}> = ({ icon: Icon, title, subtitle, eyebrow, titleAside, actions, children, statsClassName, statsId, classic = true }) => {
   const titleId = React.useId();
   return (
-    <ClassicHero.Provider value={!!classic}>
+    <ClassicHero.Provider value={classic}>
     <section aria-labelledby={titleId} className={`@container relative shrink-0 overflow-hidden p-4 sm:p-5 text-white ${classic
       ? 'rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-[#4d4ca6] via-[#3b3995] to-[#2c2878] shadow-xl shadow-black/40'
       : 'rounded-xl border border-slate-700/60 bg-[#16233a] shadow-sm'}`}>
