@@ -648,10 +648,15 @@ describe('API v1', () => {
       await h.as('admin').del('/users/admin').expect(400);
     });
 
-    it('excluir remove do banco e do Cognito', async () => {
+    it('excluir tira da oficina e do Cognito, e a pessoa não volta para a fila', async () => {
       await h.as('admin').del('/users/viewer').expect(204);
       expect(h.cognito.deleteUser).toHaveBeenCalledWith('viewer@x.com');
-      expect(await h.db.select().from(users).where(eq(users.id, 'viewer'))).toHaveLength(0);
+      expect((await h.as('admin').get('/users').expect(200)).body.map((u: { id: string }) => u.id)).not.toContain('viewer');
+      // Entrar de novo (ex.: Google) não recria como pendente: fica barrado e fora da fila de aprovação.
+      await h.as('viewer').get('/products').expect(403);
+      expect((await h.as('boss').get('/signups').expect(200)).body).toHaveLength(0);
+      // O admin pode convidar de novo: o bloqueio sai.
+      await h.as('admin').post('/users', { email: 'viewer@x.com', name: 'Viewer', role: 'viewer' }).expect(201);
     });
   });
 

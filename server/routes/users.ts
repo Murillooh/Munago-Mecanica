@@ -69,9 +69,15 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
     if (role === 'admin' && !isAdmin(actor)) {
       throw new ApiError(403, 'ADMIN_ONLY', 'Apenas administradores podem criar outros administradores.');
     }
-    const [existing] = await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = ${input.email}`);
-    // Um e-mail pertence a uma oficina só; a mensagem não revela qual.
-    if (existing) throw new ApiError(409, 'USER_EXISTS', 'Este e-mail já tem cadastro no sistema.');
+    const [existing] = await db.select({ id: users.id, status: users.status, workspaceId: users.workspaceId })
+      .from(users).where(sql`lower(${users.email}) = ${input.email}`);
+    // Removido ou recusado antes: o admin está trazendo a pessoa de volta, então o bloqueio sai.
+    if (existing && existing.status === 'denied' && existing.workspaceId === UNASSIGNED_WORKSPACE) {
+      await db.delete(users).where(eq(users.id, existing.id));
+    } else if (existing) {
+      // Um e-mail pertence a uma oficina só; a mensagem não revela qual.
+      throw new ApiError(409, 'USER_EXISTS', 'Este e-mail já tem cadastro no sistema.');
+    }
 
 
     const sub = await cognito.createUser(input.email, input.name);
@@ -156,8 +162,13 @@ export function createUsersRouter({ db, bus, cognito }: ApiDeps) {
       // Usuário migrado que nunca entrou pode não existir no Cognito.
       if ((e as { name?: string })?.name !== 'UserNotFoundException') throw e;
     }
-    await db.delete(users).where(eq(users.id, target.id));
+    // Sai da oficina e fica como "removido" fora de qualquer lista. Sem esse registro, o próximo
+    // login (ex.: Google) recriava a pessoa como pendente e ela voltava para a fila de aprovação.
+    await db.update(users).set({
+      workspaceId: UNASSIGNED_WORKSPACE, status: 'denied', role: 'viewer', profile: null, permissions: ROLE_PERMISSIONS.viewer,
+    }).where(eq(users.id, target.id));
     bus.emitChange(ws(req), 'users');
+    bus.emitChange(ADMIN_SCOPE, 'users');
     res.status(204).end();
   }));
 

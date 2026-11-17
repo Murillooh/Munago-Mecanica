@@ -4,6 +4,8 @@ import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
   AdminDisableUserCommand,
+  ListUsersCommand,
+  UserNotFoundException,
   UsernameExistsException,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { ApiError } from '../middleware/errorHandler';
@@ -29,6 +31,7 @@ export interface CognitoAdmin {
   /** Cria o usuário; o Cognito envia e-mail com senha temporária. Retorna o sub. */
   createUser(email: string, name: string): Promise<string>;
   disableUser(email: string): Promise<void>;
+  /** Apaga todas as contas de login com este e-mail (senha e Google). */
   deleteUser(email: string): Promise<void>;
 }
 
@@ -65,7 +68,24 @@ export function createCognitoAdmin(cfg: CognitoConfig): CognitoAdmin {
     },
 
     async deleteUser(email) {
-      await idp.send(new AdminDeleteUserCommand({ UserPoolId: cfg.userPoolId, Username: email }));
+      // Quem entra com Google vira "Google_<id>" no Cognito: apagar pelo e-mail não achava essa conta.
+      const safe = email.replace(/["\\]/g, '');
+      let usernames: string[];
+      try {
+        const out = await idp.send(new ListUsersCommand({ UserPoolId: cfg.userPoolId, Filter: `email = "${safe}"` }));
+        usernames = (out.Users ?? []).map((u) => u.Username).filter((n): n is string => !!n);
+      } catch (e) {
+        // Sem cognito-idp:ListUsers na role: apaga ao menos a conta de senha (o bloqueio no banco segura o resto).
+        if ((e as { name?: string })?.name !== 'AccessDeniedException') throw e;
+        usernames = [email];
+      }
+      for (const username of usernames) {
+        try {
+          await idp.send(new AdminDeleteUserCommand({ UserPoolId: cfg.userPoolId, Username: username }));
+        } catch (e) {
+          if (!(e instanceof UserNotFoundException)) throw e;
+        }
+      }
     },
   };
 }
