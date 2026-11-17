@@ -30,6 +30,13 @@ const C = {
   amber: [217, 119, 6] as RGB,
   redBg: [254, 242, 242] as RGB,
   redBorder: [254, 202, 202] as RGB,
+  navy: [11, 31, 58] as RGB,
+  navySoft: [22, 46, 80] as RGB,
+  navyLine: [44, 70, 108] as RGB,
+  navyMuted: [148, 163, 184] as RGB,
+  brand: [16, 163, 110] as RGB,
+  zebra: [246, 248, 251] as RGB,
+  cardBg: [248, 250, 252] as RGB,
 };
 
 const M = 12; // margem lateral
@@ -73,53 +80,74 @@ const newDoc = () => new jsPDF({ orientation: 'landscape', unit: 'mm', format: '
 const pageW = (doc: jsPDF) => doc.internal.pageSize.getWidth();
 const pageH = (doc: jsPDF) => doc.internal.pageSize.getHeight();
 
-/** Cabeçalho da primeira página, estilo papel timbrado. Devolve o Y onde o conteúdo começa. */
+/** Logo em texto (caixa branca), igual em todos os relatórios. */
+const drawLogo = (doc: jsPDF, x: number, y: number, w: number, h: number) => {
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  setText(doc, 13, 'bold', C.navy);
+  doc.text('Munago', x + w / 2, y + h / 2 + 0.6, { align: 'center' });
+  setText(doc, 5.5, 'bold', C.brand);
+  doc.text('M E C Â N I C A', x + w / 2, y + h / 2 + 5, { align: 'center' });
+};
+
+/** Cabeçalho da primeira página: faixa azul-marinho com logo, título e caixa de emissão. Devolve o Y do conteúdo. */
 const drawHeader = (doc: jsPDF, store: StoreInfo, title: string, filterLabel?: string) => {
   const W = pageW(doc);
   const name = store.storeName || 'Munago Mecânica';
-  const half = (W - 2 * M) / 2 - 6;
+  const bandH = 30;
 
-  // Filete azul no topo da folha
-  doc.setFillColor(...C.blue);
-  doc.rect(0, 0, W, 1.6, 'F');
+  doc.setFillColor(...C.navy);
+  doc.rect(0, 0, W, bandH, 'F');
+  doc.setFillColor(...C.brand);
+  doc.rect(0, bandH, W, 1.4, 'F');
 
-  // Esquerda: oficina e contatos
-  setText(doc, 15, 'bold', C.text);
-  doc.text(fit(doc, name, half), M, 12);
-  setText(doc, 7.5, 'normal', C.muted);
-  const address = store.address?.replace(/\s+/g, ' ');
-  const reach = [store.contactPhone, store.contactEmail].filter(Boolean).join('   ·   ');
-  const contact = [address, reach].filter(Boolean).join('   ·   ');
-  if (doc.getTextWidth(contact) <= half) doc.text(contact, M, 17.5);
-  else {
-    if (address) doc.text(fit(doc, address, half), M, 17.5);
-    if (reach) doc.text(fit(doc, reach, half), M, address ? 21.5 : 17.5);
-  }
+  drawLogo(doc, M, 6, 38, 18);
 
-  // Direita: qual documento é, quando saiu e o filtro usado
-  setText(doc, 11, 'bold', C.text);
-  doc.text(fit(doc, title, half), W - M, 12, { align: 'right' });
+  // Caixa da direita: emissão e filtro/base
+  const boxW = 64;
+  const boxX = W - M - boxW;
+  doc.setFillColor(...C.navySoft);
+  doc.setDrawColor(...C.navyLine);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(boxX, 7, boxW, 16, 2, 2, 'FD');
   const now = new Date();
-  setText(doc, 7.5, 'normal', C.muted);
-  doc.text(`Emitido em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`, W - M, 17.5, { align: 'right' });
-  if (filterLabel) doc.text(fit(doc, `Filtro: ${filterLabel}`, half), W - M, 21.5, { align: 'right' });
+  const rows: [string, string][] = [
+    [filterLabel ? 'FILTRO' : 'BASE', filterLabel || name],
+    ['EMISSÃO', `${now.toLocaleDateString('pt-BR')}, ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`],
+  ];
+  rows.forEach(([k, v], i) => {
+    setText(doc, 6.3, 'bold', C.navyMuted);
+    doc.text(k, boxX + 4, 13 + i * 6);
+    setText(doc, 7.8, 'bold', [255, 255, 255]);
+    doc.text(fit(doc, v, boxW - 26), boxX + 22, 13 + i * 6);
+  });
 
-  doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.3);
-  doc.line(M, 24.5, W - M, 24.5);
-  return 30;
+  // Centro: sobretítulo verde, título branco e contatos
+  const tx = M + 44;
+  const tw = boxX - 6 - tx;
+  setText(doc, 7, 'bold', C.brand);
+  doc.text(fit(doc, `${name.toUpperCase()}  |  RELATÓRIO`, tw), tx, 11);
+  setText(doc, 14, 'bold', [255, 255, 255]);
+  doc.text(fit(doc, title, tw), tx, 18);
+  const contact = [store.address?.replace(/\s+/g, ' '), store.contactPhone, store.contactEmail].filter(Boolean).join('   |   ');
+  if (contact) {
+    setText(doc, 7.2, 'normal', [203, 213, 225]);
+    doc.text(fit(doc, contact, tw), tx, 23.5);
+  }
+  return bandH + 9;
 };
 
-/** Cabeçalho reduzido das páginas seguintes. */
+/** Cabeçalho reduzido das páginas seguintes: faixa fina azul-marinho. */
 const drawCompactHeader = (doc: jsPDF, store: StoreInfo, title: string) => {
   const W = pageW(doc);
-  setText(doc, 8.5, 'bold', C.text);
-  doc.text(store.storeName || 'Munago Mecânica', M, 10);
-  setText(doc, 8, 'normal', C.muted);
-  doc.text(title, W - M, 10, { align: 'right' });
-  doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.3);
-  doc.line(M, 13, W - M, 13);
+  doc.setFillColor(...C.navy);
+  doc.rect(0, 0, W, 11, 'F');
+  doc.setFillColor(...C.brand);
+  doc.rect(0, 11, W, 0.9, 'F');
+  setText(doc, 8.5, 'bold', [255, 255, 255]);
+  doc.text(store.storeName || 'Munago Mecânica', M, 7.2);
+  setText(doc, 8, 'normal', C.navyMuted);
+  doc.text(title, W - M, 7.2, { align: 'right' });
 };
 
 /** Rodapé com "Página X de Y" em todas as páginas e salva o arquivo. */
@@ -130,10 +158,11 @@ const finalize = (doc: jsPDF, store: StoreInfo, label: string, filePrefix: strin
   for (let i = 1; i <= total; i++) {
     doc.setPage(i);
     doc.setDrawColor(...C.border);
-    doc.setLineWidth(0.2);
+    doc.setLineWidth(0.25);
     doc.line(M, H - 10, W - M, H - 10);
-    setText(doc, 7, 'normal', C.faint);
-    doc.text(`${store.storeName || 'Munago Mecânica'} · ${label}`, M, H - 6);
+    setText(doc, 7, 'normal', C.muted);
+    doc.text(`${store.storeName || 'Munago Mecânica'}   |   ${label}   |   Documento gerado pelo sistema`, M, H - 6);
+    setText(doc, 7, 'bold', C.text);
     doc.text(`Página ${i} de ${total}`, W - M, H - 6, { align: 'right' });
   }
   const slug = (store.storeName || 'munago').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_');
@@ -148,20 +177,21 @@ const tableBase = (doc: jsPDF, store: StoreInfo, title: string): Partial<UserOpt
     fontSize: 7.5,
     cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 },
     textColor: C.text,
-    lineColor: C.border,
-    lineWidth: { bottom: 0.1 },
+    lineColor: [226, 232, 240],
+    lineWidth: 0.15,
     overflow: 'ellipsize',
   },
   headStyles: {
-    fillColor: C.track,
-    textColor: C.muted,
+    fillColor: C.navy,
+    textColor: [255, 255, 255],
     fontStyle: 'bold',
-    fontSize: 7,
-    lineColor: [212, 212, 216],
-    lineWidth: { bottom: 0.3 },
+    fontSize: 7.2,
+    lineColor: C.navy,
+    lineWidth: 0.15,
+    cellPadding: { top: 2.4, bottom: 2.4, left: 2, right: 2 },
   },
-  footStyles: { fillColor: C.track, textColor: C.text, fontStyle: 'bold', lineWidth: { top: 0.3 }, lineColor: [212, 212, 216] },
-  alternateRowStyles: { fillColor: C.bg },
+  footStyles: { fillColor: [226, 232, 240], textColor: C.navy, fontStyle: 'bold', lineWidth: 0.15, lineColor: [203, 213, 225] },
+  alternateRowStyles: { fillColor: C.zebra },
   margin: { left: M, right: M, top: TOP_CONT, bottom: 16 },
   showHead: 'everyPage',
   showFoot: 'lastPage',
@@ -194,35 +224,38 @@ const sectionTitle = (doc: jsPDF, store: StoreInfo, reportTitle: string, y: numb
     drawCompactHeader(doc, store, reportTitle);
     y = TOP_CONT;
   }
-  setText(doc, 10.5, 'bold', C.text);
-  doc.text(title, M, y + 4);
+  doc.setFillColor(...C.brand);
+  doc.roundedRect(M, y, 1.4, 6, 0.6, 0.6, 'F');
+  setText(doc, 11, 'bold', C.navy);
+  doc.text(title, M + 4, y + 4.6);
   if (subtitle) {
+    const tw = doc.getTextWidth(title);
     setText(doc, 7.5, 'normal', C.muted);
-    doc.text(subtitle, M, y + 8.5);
+    doc.text(fit(doc, subtitle, pageW(doc) - 2 * M - tw - 12), pageW(doc) - M, y + 4.6, { align: 'right' });
   }
-  return y + (subtitle ? 11 : 7);
+  return y + 9;
 };
 
 const card = (
   doc: jsPDF, x: number, y: number, w: number, h: number,
-  label: string, value: string, sub?: string, tone: 'default' | 'alert' = 'default', accent: RGB = C.blue,
+  label: string, value: string, sub?: string, tone: 'default' | 'alert' = 'default', accent: RGB = C.brand,
 ) => {
   const alert = tone === 'alert';
-  doc.setFillColor(...(alert ? C.redBg : ([255, 255, 255] as RGB)));
-  doc.setDrawColor(...(alert ? C.redBorder : C.border));
+  doc.setFillColor(...C.cardBg);
+  doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.25);
-  doc.roundedRect(x, y, w, h, 2, 2, 'FD');
+  doc.roundedRect(x, y, w, h, 1.8, 1.8, 'FD');
   doc.setFillColor(...(alert ? C.red : accent));
-  doc.rect(x, y + 3, 0.9, h - 6, 'F');
+  doc.roundedRect(x, y, w, 1.6, 0.8, 0.8, 'F');
 
-  setText(doc, 6.8, 'bold', alert ? C.red : C.muted);
-  doc.text(label.toUpperCase(), x + 4, y + 5.5);
+  setText(doc, 6.6, 'bold', alert ? C.red : [71, 85, 105]);
+  doc.text(fit(doc, label.toUpperCase(), w - 8), x + 4, y + 6.4);
   const big = h >= 18;
-  setText(doc, big ? 14 : 10.5, 'bold', alert ? C.red : C.text);
-  doc.text(fit(doc, value, w - 8), x + 4, y + (big ? 12.5 : 10.5));
+  setText(doc, big ? 14 : 10.5, 'bold', alert ? C.red : C.navy);
+  doc.text(fit(doc, value, w - 8), x + 4, y + (big ? 13.2 : 11));
   if (sub && big) {
-    setText(doc, 6.8, 'normal', C.muted);
-    doc.text(fit(doc, sub, w - 8), x + 4, y + 17.5);
+    setText(doc, 6.6, 'normal', C.muted);
+    doc.text(fit(doc, sub, w - 8), x + 4, y + 18);
   }
 };
 
@@ -294,8 +327,8 @@ const inventoryTable = (doc: jsPDF, store: StoreInfo, title: string, products: P
     .forEach(([cat, items]) => {
       const catValue = items.reduce((a, p) => a + (p.price || 0) * (p.quantity || 0), 0);
       body.push([
-        { content: `${cat}  ·  ${items.length} ${items.length === 1 ? 'item' : 'itens'}`, colSpan: 6, styles: { fontStyle: 'bold', fillColor: [239, 246, 255], textColor: C.blue } },
-        { content: brl(catValue), colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [239, 246, 255], textColor: C.blue } },
+        { content: `${cat}  ·  ${items.length} ${items.length === 1 ? 'item' : 'itens'}`, colSpan: 6, styles: { fontStyle: 'bold', fillColor: [236, 241, 247], textColor: C.navy } },
+        { content: brl(catValue), colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [236, 241, 247], textColor: C.navy } },
       ]);
       items.forEach(p => {
         const value = (p.price || 0) * (p.quantity || 0);
@@ -792,13 +825,13 @@ export const exportDiagnosticToPDF = ({ store, text, products = [] }: ExportDiag
       ensure(22);
       let x = M;
       if (n) {
-        doc.setFillColor(...C.blue);
+        doc.setFillColor(...C.navy);
         doc.circle(M + 2.8, y - 1.3, 2.8, 'F');
         setText(doc, 8, 'bold', [255, 255, 255]);
         doc.text(n, M + 2.8, y - 0.2, { align: 'center' });
         x = M + 8;
       }
-      setText(doc, 10.5, 'bold', C.text);
+      setText(doc, 10.5, 'bold', C.navy);
       // IA costuma mandar o título todo em maiúsculas: vira frase normal
       const label = t === t.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t;
       doc.text(fit(doc, label, M + W - x), x, y);
